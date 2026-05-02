@@ -8,7 +8,14 @@
             <li class="nav-link">
                 <p ><span>About Us</span></p>
             </li>
-            <li class="nav-link">
+            <li
+                class="nav-link"
+                tabindex="0"
+                (click)="onProgramsClick()"
+                (keydown)="onProgramsKeydown($event)"
+                role="button"
+                aria-label="Programs — scroll to What We Offer"
+            >
                 <p><span>Programs</span></p>
             </li>
             <li class="nav-link">

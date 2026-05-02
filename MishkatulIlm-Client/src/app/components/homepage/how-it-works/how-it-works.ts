@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { GetStartedBtn } from '../../get-started-btn/get-started-btn';
 
 export type StepAccent = 'green' | 'gold';
 
@@ -11,7 +12,7 @@ export interface HowItWorksStep {
 
 @Component({
   selector: 'app-how-it-works',
-  imports: [],
+  imports: [GetStartedBtn],
   templateUrl: './how-it-works.html',
   styleUrl: './how-it-works.scss',
 })

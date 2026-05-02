@@ -12,7 +12,7 @@ $text-body: #3d4540;
     position: relative;
     overflow: hidden;
     background: $cream-how;
-    padding-top: clamp(0.5rem, 1.5vw, 1rem);
+    padding-top: clamp(0.35rem, 1vw, 0.65rem);
     padding-bottom: clamp(2.5rem, 5vw, 3.5rem);
    
 
@@ -164,6 +164,12 @@ $text-body: #3d4540;
     border-left: 8px solid $gold-line;
     flex-shrink: 0;
     margin-left: -1px;
+}
+
+.how-it-works-cta {
+    display: flex;
+    justify-content: center;
+    margin-top: clamp(1.75rem, 4vw, 2.75rem);
 }
 
 @media (max-width: 767px) {

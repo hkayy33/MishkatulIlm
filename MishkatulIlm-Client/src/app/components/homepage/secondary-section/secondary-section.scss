@@ -1,0 +1,81 @@
+$cream-top: #fcfbf7;
+$green: #1e4638;
+$gold: #c4a35a;
+
+:host {
+    display: block;
+}
+
+.container {
+    position: relative;
+    box-sizing: border-box;
+    overflow: hidden;
+    background: $cream-top;
+    min-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(2.25rem, 5vw, 3.5rem) clamp(1rem, 4vw, 2rem)
+        clamp(1.65rem, 4vw, 2.75rem);
+
+    &::before,
+    &::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: min(22vw, 200px);
+        pointer-events: none;
+        opacity: 0.11;
+        background:
+            radial-gradient(circle at 25% 35%, rgba($gold, 0.45) 0%, transparent 45%),
+            radial-gradient(circle at 75% 65%, rgba($green, 0.12) 0%, transparent 48%),
+            repeating-linear-gradient(
+                118deg,
+                transparent,
+                transparent 14px,
+                rgba($gold, 0.2) 14px,
+                rgba($gold, 0.2) 15px
+            );
+    }
+
+    &::before {
+        left: 0;
+        mask-image: linear-gradient(90deg, black 0%, transparent 100%);
+    }
+
+    &::after {
+        right: 0;
+        mask-image: linear-gradient(270deg, black 0%, transparent 100%);
+    }
+
+    .top-section {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        box-sizing: border-box;
+        gap: clamp(1.6rem, 3.6vw, 2.5rem);
+        width: 100%;
+
+        h2 {
+            margin: 0;
+            font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+            font-size: clamp(1.35rem, 3.2vw, 1.85rem);
+            font-weight: 700;
+            color: $green;
+            text-align: center;
+            letter-spacing: 0.02em;
+        }
+
+        .topic-cards {
+            display: flex;
+            flex-wrap: wrap;
+            gap: clamp(1.35rem, 2.75vw, 1.85rem) clamp(1.5rem, 3.2vw, 2.5rem);
+            justify-content: center;
+            width: 100%;
+            max-width: 76rem;
+        }
+    }
+}

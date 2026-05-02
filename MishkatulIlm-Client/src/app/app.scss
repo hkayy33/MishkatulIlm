@@ -1,0 +1,17 @@
+.app-shell {
+    position: relative;
+    min-height: 100vh;
+}
+
+.app-shell app-nav-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+}
+
+.app-shell app-homepage {
+    display: block;
+    width: 100%;
+}

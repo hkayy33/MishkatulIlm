@@ -1,0 +1,188 @@
+$green: #1e4638;
+$gold: #c4a35a;
+$gold-line: #d4bc7a;
+$cream-how: #f7f3ea;
+$text-body: #3d4540;
+
+:host {
+    display: block;
+}
+
+.how-it-works {
+    position: relative;
+    overflow: hidden;
+    background: $cream-how;
+    padding-top: clamp(0.35rem, 1vw, 0.65rem);
+    padding-bottom: clamp(2.5rem, 5vw, 3.5rem);
+   
+
+    // Soft side ornaments (subtle tan wash, arabesque-adjacent feel without heavy assets)
+    &::before,
+    &::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: min(22vw, 200px);
+        pointer-events: none;
+        opacity: 0.14;
+        background: radial-gradient(
+                circle at 30% 40%,
+                rgba($gold, 0.55) 0%,
+                transparent 55%
+            ),
+            radial-gradient(circle at 70% 60%, rgba($green, 0.2) 0%, transparent 50%),
+            repeating-linear-gradient(
+                125deg,
+                transparent,
+                transparent 12px,
+                rgba($gold, 0.25) 12px,
+                rgba($gold, 0.25) 13px
+            );
+    }
+
+    &::before {
+        left: 0;
+        mask-image: linear-gradient(90deg, black 0%, transparent 100%);
+    }
+
+    &::after {
+        right: 0;
+        mask-image: linear-gradient(270deg, black 0%, transparent 100%);
+    }
+}
+
+.how-it-works-inner {
+    position: relative;
+    z-index: 1;
+    box-sizing: border-box;
+    max-width: 76rem;
+    margin: 0 auto;
+    padding-left: clamp(1rem, 4vw, 2rem);
+    padding-right: clamp(1rem, 4vw, 2rem);
+}
+
+.section-title {
+    margin: 0 0 clamp(1rem, 2.2vw, 1.35rem);
+    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    font-size: clamp(1.3rem, 3.1vw, 1.72rem);
+    font-weight: 700;
+    color: $green;
+    text-align: center;
+    letter-spacing: 0.02em;
+}
+
+.steps-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    flex: 0 0 auto;
+    width: min(100%, 200px);
+    max-width: 220px;
+}
+
+.step-badge {
+    width: clamp(48px, 6.5vw, 52px);
+    height: clamp(48px, 6.5vw, 52px);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: clamp(0.5rem, 1.2vw, 0.65rem);
+    flex-shrink: 0;
+}
+
+.step-badge--green {
+    background: $green;
+}
+
+.step-badge--gold {
+    background: $gold;
+}
+
+.step-num {
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: clamp(1.02rem, 1.6vw, 1.12rem);
+    font-weight: 600;
+    color: #fff;
+    line-height: 1;
+}
+
+.step-title {
+    margin: 0 0 clamp(0.3rem, 0.8vw, 0.4rem);
+    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    font-size: clamp(1rem, 1.85vw, 1.12rem);
+    font-weight: 600;
+    color: $green;
+    letter-spacing: 0.01em;
+    line-height: 1.25;
+}
+
+.step-desc {
+    margin: 0;
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: clamp(0.84rem, 1.35vw, 0.94rem);
+    line-height: 1.48;
+    color: $text-body;
+    max-width: 17rem;
+}
+
+.connector {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex: 1 1 auto;
+    min-width: 1rem;
+    max-width: clamp(3.25rem, 8vw, 4.25rem);
+    align-self: flex-start;
+    margin-top: clamp(24px, 3.2vw, 28px);
+    padding: 0 0.2rem;
+}
+
+.connector-line {
+    flex: 1;
+    height: 0;
+    border-top: 2px dotted $gold-line;
+    min-width: 0.5rem;
+}
+
+.connector-arrow {
+    width: 0;
+    height: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 8px solid $gold-line;
+    flex-shrink: 0;
+    margin-left: -1px;
+}
+
+.how-it-works-cta {
+    display: flex;
+    justify-content: center;
+    margin-top: clamp(1.75rem, 4vw, 2.75rem);
+}
+
+@media (max-width: 767px) {
+    .steps-row {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .step {
+        max-width: 22rem;
+    }
+
+    .connector {
+        display: none;
+    }
+}

@@ -1,0 +1,31 @@
+<section class="how-it-works" aria-labelledby="how-it-works-title">
+  <div class="how-it-works-inner">
+    <h2 id="how-it-works-title" class="section-title">How It Works</h2>
+
+    <div class="steps-row" role="list">
+      @for (step of steps; track step.n; let i = $index) {
+        <div class="step" role="listitem">
+          <div
+            class="step-badge"
+            [class.step-badge--green]="step.accent === 'green'"
+            [class.step-badge--gold]="step.accent === 'gold'"
+          >
+            <span class="step-num">{{ step.n }}</span>
+          </div>
+          <h3 class="step-title">{{ step.title }}</h3>
+          <p class="step-desc">{{ step.description }}</p>
+        </div>
+        @if (i < steps.length - 1) {
+          <div class="connector" aria-hidden="true">
+            <span class="connector-line"></span>
+            <span class="connector-arrow"></span>
+          </div>
+        }
+      }
+    </div>
+
+    <div class="how-it-works-cta">
+      <app-get-started-btn></app-get-started-btn>
+    </div>
+  </div>
+</section>

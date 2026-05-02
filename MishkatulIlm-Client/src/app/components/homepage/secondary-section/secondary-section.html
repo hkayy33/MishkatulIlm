@@ -1,0 +1,46 @@
+<div class="container" id="what-we-offer">
+    <div class="top-section">
+        <h2>What We Offer</h2>
+        <div class="topic-cards">
+            <app-topic-card *ngFor="let card of topicsPrimary" [card]="card"></app-topic-card>
+            <div
+                class="topic-cards-extra"
+                [class.topic-cards-extra--open]="showAllTopics()"
+                [attr.inert]="showAllTopics() ? null : ''"
+                [attr.aria-hidden]="showAllTopics() ? null : 'true'"
+            >
+                <div class="topic-cards-extra-inner">
+                    <app-topic-card *ngFor="let card of topicsExtra" [card]="card"></app-topic-card>
+                </div>
+            </div>
+        </div>
+        <div class="topic-expand" *ngIf="topicsExtra.length">
+            <button
+                type="button"
+                class="topic-expand-btn"
+                (click)="toggleTopics()"
+                [attr.aria-expanded]="showAllTopics()"
+            >
+                <span class="topic-expand-text">{{
+                    showAllTopics() ? 'Show less' : 'Show more'
+                }}</span>
+                <svg
+                    class="topic-expand-arrow"
+                    [class.topic-expand-arrow--open]="showAllTopics()"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                >
+                    <path
+                        d="M6 9l6 6 6-6"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    />
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>

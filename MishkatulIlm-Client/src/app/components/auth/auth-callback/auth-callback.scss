@@ -1,0 +1,16 @@
+@use '../auth-page.shared';
+
+.auth-card--compact {
+  max-width: 22rem;
+  text-align: center;
+}
+
+.auth-callback__status {
+  margin: 0;
+  font-family:
+    'Source Sans 3',
+    system-ui,
+    sans-serif;
+  font-size: 0.95rem;
+  color: #5c574f;
+}

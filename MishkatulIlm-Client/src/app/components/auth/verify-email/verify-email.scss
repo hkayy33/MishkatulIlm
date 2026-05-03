@@ -1,0 +1,29 @@
+@use '../auth-page.shared';
+
+.verify-email__addr {
+  font-weight: 600;
+  color: #2d2a26;
+  word-break: break-all;
+}
+
+.verify-email__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.verify-email__hint {
+  margin: 0;
+  font-family:
+    'Source Sans 3',
+    system-ui,
+    sans-serif;
+  font-size: 0.9rem;
+  color: #5c574f;
+  text-align: center;
+}
+
+.verify-email__hint a {
+  color: #6b5a45;
+  font-weight: 600;
+}

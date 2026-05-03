@@ -1,0 +1,43 @@
+<div class="auth-page">
+  <div class="auth-card">
+    <header class="auth-card__header">
+      <h2>Confirm your email</h2>
+      <p class="auth-card__lede">
+        We sent a confirmation link to <span class="verify-email__addr">{{ email }}</span>. Open it to verify your
+        account, then you can sign in and continue to onboarding.
+      </p>
+    </header>
+
+    @if (submitError) {
+      <p class="auth-form__error" role="alert">{{ submitError }}</p>
+    }
+    @if (submitInfo) {
+      <p class="auth-form__info" role="status">{{ submitInfo }}</p>
+    }
+
+    <div class="verify-email__actions">
+      <button
+        type="button"
+        class="auth-form__submit"
+        [disabled]="resendBusy || cooldownSec() > 0"
+        (click)="resend()"
+      >
+        @if (resendBusy) {
+          Sending…
+        } @else if (cooldownSec() > 0) {
+          Resend in {{ cooldownSec() }}s
+        } @else {
+          Resend confirmation email
+        }
+      </button>
+      <p class="verify-email__hint">
+        After you verify, <a routerLink="/login">go to log in</a>.
+      </p>
+    </div>
+
+    <p class="auth-card__switch">
+      Wrong address?
+      <a routerLink="/register">Back to register</a>
+    </p>
+  </div>
+</div>

@@ -40,6 +40,20 @@
   letter-spacing: -0.02em;
 }
 
+.onboarding-form__error {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.75rem;
+  font-family:
+    "Source Sans 3",
+    system-ui,
+    sans-serif;
+  font-size: 0.875rem;
+  color: #8b2c2c;
+  background: rgba(139, 44, 44, 0.08);
+  border: 1px solid rgba(139, 44, 44, 0.2);
+  border-radius: 8px;
+}
+
 .onboarding-form__lede {
   margin: 0;
   font-family:

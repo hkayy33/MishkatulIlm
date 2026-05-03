@@ -1,5 +1,5 @@
 <div class="container">
-  @if (!userLoggedIn) {
+  @if (!auth.isAuthenticated()) {
     <app-auth></app-auth>
   } @else {
     <form class="onboarding-form" novalidate (submit)="onSubmit($event)">
@@ -9,6 +9,10 @@
           Tell us a bit about yourself and the subjects you are interested in.
         </p>
       </header>
+
+      @if (submitError) {
+        <p class="onboarding-form__error" role="alert">{{ submitError }}</p>
+      }
 
       <section class="onboarding-section" aria-labelledby="student-info-heading">
         <h3 id="student-info-heading" class="onboarding-section__title">Your details</h3>

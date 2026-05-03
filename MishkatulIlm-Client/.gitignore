@@ -28,6 +28,10 @@ yarn-error.log
 !.vscode/extensions.json
 .history/*
 
+# Local secrets (created by npm postinstall if missing)
+/src/environments/environment.development.local.ts
+/src/environments/environment.prod.local.ts
+
 # Miscellaneous
 /.angular/cache
 .sass-cache/

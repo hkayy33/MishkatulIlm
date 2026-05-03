@@ -1,5 +1,9 @@
-import { Component, OnInit } from '@angular/core';
-import { ONBOARDING_ACCESS_SESSION_KEY } from '../../auth/onboarding-access-session';
+import { Component, inject } from '@angular/core';
+import { Router } from '@angular/router';
+import { switchMap } from 'rxjs';
+import { AuthService } from '../../core/services/auth.service';
+import type { SaveOnboardingRequest } from '../../core/models/onboarding.models';
+import { OnboardingApiService } from '../../core/services/onboarding-api.service';
 import { Auth } from '../auth/auth';
 
 interface SelectOption {
@@ -19,18 +23,12 @@ interface SubjectOption {
   templateUrl: './onboarding.html',
   styleUrl: './onboarding.scss',
 })
-export class Onboarding implements OnInit {
-  /** True after registration (session) or when a real auth layer sets access. */
-  userLoggedIn = false;
+export class Onboarding {
+  protected readonly auth = inject(AuthService);
+  private readonly onboardingApi = inject(OnboardingApiService);
+  private readonly router = inject(Router);
 
-  ngOnInit(): void {
-    if (
-      typeof sessionStorage !== 'undefined' &&
-      sessionStorage.getItem(ONBOARDING_ACCESS_SESSION_KEY) === '1'
-    ) {
-      this.userLoggedIn = true;
-    }
-  }
+  submitError: string | null = null;
 
   readonly maxSubjects = 4;
 
@@ -98,5 +96,53 @@ export class Onboarding implements OnInit {
 
   onSubmit(event: Event): void {
     event.preventDefault();
+    const form = event.target as HTMLFormElement;
+
+    const firstName = (form.elements.namedItem('fname') as HTMLInputElement)?.value?.trim() ?? '';
+    const lastName = (form.elements.namedItem('lname') as HTMLInputElement)?.value?.trim() ?? '';
+    const ageRange = (form.elements.namedItem('age') as HTMLSelectElement)?.value ?? '';
+    const gender = (form.elements.namedItem('gender') as HTMLSelectElement)?.value ?? '';
+    const currentLevel =
+      (form.elements.namedItem('current-level') as HTMLSelectElement)?.value ?? '';
+    const lessonFrequency =
+      (form.elements.namedItem('lesson-frequency') as HTMLSelectElement)?.value ?? '';
+
+    const subjectCodes = this.subjectOptions.filter((o) => o.selected).map((o) => o.value);
+
+    if (!firstName || !lastName) {
+      this.submitError = 'Please enter your first and last name.';
+      return;
+    }
+    if (!ageRange || !gender || !currentLevel || !lessonFrequency) {
+      this.submitError = 'Please complete all dropdown fields.';
+      return;
+    }
+    if (subjectCodes.length === 0) {
+      this.submitError = 'Select at least one subject.';
+      return;
+    }
+
+    const body: SaveOnboardingRequest = {
+      firstName,
+      lastName,
+      ageRange,
+      gender,
+      currentLevel,
+      lessonFrequency,
+      subjectCodes,
+    };
+
+    this.submitError = null;
+    this.onboardingApi
+      .save(body)
+      .pipe(switchMap(() => this.auth.markOnboardingCompleted()))
+      .subscribe({
+        next: () => void this.router.navigate(['/']),
+        error: (err: { error?: { message?: string }; message?: string }) => {
+          const msg = err?.error?.message ?? err?.message;
+          this.submitError =
+            typeof msg === 'string' ? msg : 'Could not submit your application. Try again.';
+        },
+      });
   }
 }

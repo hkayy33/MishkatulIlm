@@ -3,8 +3,9 @@
     width: 100%;
 }
 
-// Match nav-bar inner .container height so copy clears the overlay nav
+// Nav sits above the hero in the DOM but overlaps visually (pull hero up); padding keeps copy clear.
 $nav-height: 12vh;
+$nav-margin: 5px;
 $hero-green: #002b1b;
 $accent-gold: #c59d5f;
 
@@ -13,7 +14,8 @@ $accent-gold: #c59d5f;
     width: 100%;
     min-height: 100vh;
     box-sizing: border-box;
-    padding-top: $nav-height;
+    margin-top: calc(-1 * (#{$nav-height} + #{$nav-margin}));
+    padding-top: calc(#{$nav-height} + #{$nav-margin});
     overflow: hidden;
     background: $hero-green;
     display: flex;
@@ -25,7 +27,7 @@ $accent-gold: #c59d5f;
     flex: 1;
     width: 100%;
     align-items: stretch;
-    min-height: calc(100vh - #{$nav-height});
+    min-height: calc(100vh - #{$nav-height} - #{$nav-margin});
 }
 
 .info-section {

@@ -1,2 +1,38 @@
-<footer>
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a routerLink="/" class="footer-logo-link">Mishkatul Ilm</a>
+      <p class="footer-tagline">Questions about programs or this site? Email us anytime.</p>
+    </div>
+
+    <nav class="footer-columns" aria-label="Footer">
+      <div class="footer-col">
+        <h2 class="footer-heading">Contact</h2>
+        <ul class="footer-list">
+          <li>
+            <a class="footer-link" href="mailto:mishkatulilm0@gmail.com">mishkatulilm0@gmail.com</a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h2 class="footer-heading">Legal</h2>
+        <ul class="footer-list">
+          <li><a class="footer-link" routerLink="/privacy">Privacy Policy</a></li>
+          <li><a class="footer-link" routerLink="/terms">Terms of Use</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h2 class="footer-heading">Explore</h2>
+        <ul class="footer-list">
+          <li><a class="footer-link" routerLink="/">Home</a></li>
+        </ul>
+      </div>
+    </nav>
+  </div>
+
+  <div class="footer-bottom">
+    <p class="copyright">© {{ currentYear }} Mishkatul Ilm. All rights reserved.</p>
+  </div>
 </footer>

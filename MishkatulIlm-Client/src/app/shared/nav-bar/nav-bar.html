@@ -1,30 +1,35 @@
-<div class="container">
+<div class="container" [class.container--home]="isHomeRoute()">
     <img src="/logo.png" alt="Mishkatul Ilm logo">
 
-    <div class="nav-links">
-            <li class="nav-link">
-                <p><span>Home</span></p>
-            </li>
-            <li class="nav-link">
-                <p ><span>About Us</span></p>
-            </li>
-            <li
-                class="nav-link"
-                tabindex="0"
-                (click)="onProgramsClick()"
-                (keydown)="onProgramsKeydown($event)"
-                role="button"
-                aria-label="Programs — scroll to What We Offer"
+    <ul class="nav-links">
+        <li class="nav-link">
+            <a
+                routerLink="/"
+                class="nav-route-link"
+                [attr.aria-current]="isHomeRoute() ? 'page' : null"
             >
-                <p><span>Programs</span></p>
-            </li>
-            <li class="nav-link">
-                <p><span>How It Works</span></p>
-            </li>
-            <div>
-                <app-get-started-btn></app-get-started-btn>
-            </div>
-
-    </div>
+                <span>Home</span>
+            </a>
+        </li>
+        <li class="nav-link">
+            <p><span>About Us</span></p>
+        </li>
+        <li
+            class="nav-link"
+            tabindex="0"
+            (click)="onProgramsClick()"
+            (keydown)="onProgramsKeydown($event)"
+            role="button"
+            aria-label="Programs — scroll to What We Offer"
+        >
+            <p><span>Programs</span></p>
+        </li>
+        <li class="nav-link">
+            <p><span>How It Works</span></p>
+        </li>
+        <li class="nav-link nav-link--cta">
+            <app-get-started-btn></app-get-started-btn>
+        </li>
+    </ul>
 
 </div>

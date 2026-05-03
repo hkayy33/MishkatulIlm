@@ -1,0 +1,93 @@
+<div class="auth-page">
+  <div class="auth-card">
+    <header class="auth-card__header">
+      <h2>Create an account</h2>
+      <p class="auth-card__lede">Register to access programs and student onboarding.</p>
+    </header>
+
+    <form class="auth-form" novalidate (submit)="onSubmit($event)" autocomplete="on">
+      @if (submitError) {
+        <p class="auth-form__error" role="alert">{{ submitError }}</p>
+      }
+
+      <div class="form-field">
+        <label for="register-fname">First name</label>
+        <input
+          id="register-fname"
+          name="firstName"
+          type="text"
+          autocomplete="given-name"
+          required
+          placeholder="First name"
+        />
+      </div>
+
+      <div class="form-field">
+        <label for="register-lname">Last name</label>
+        <input
+          id="register-lname"
+          name="lastName"
+          type="text"
+          autocomplete="family-name"
+          required
+          placeholder="Last name"
+        />
+      </div>
+
+      <div class="form-field">
+        <label for="register-email">Email</label>
+        <input
+          id="register-email"
+          name="email"
+          type="email"
+          autocomplete="email"
+          required
+          placeholder="you@example.com"
+        />
+      </div>
+
+      <div class="form-field">
+        <label for="register-password">Password</label>
+        <input
+          id="register-password"
+          name="password"
+          type="password"
+          autocomplete="new-password"
+          required
+          minlength="8"
+          placeholder="At least 8 characters"
+        />
+      </div>
+
+      <div class="form-field">
+        <label for="register-confirm">Confirm password</label>
+        <input
+          id="register-confirm"
+          name="confirmPassword"
+          type="password"
+          autocomplete="new-password"
+          required
+          minlength="8"
+          placeholder="Repeat password"
+        />
+      </div>
+
+      <div class="form-field form-field--checkbox">
+        <input id="register-terms" name="terms" type="checkbox" required />
+        <label for="register-terms">
+          I agree to the
+          <a routerLink="/terms">Terms of Use</a>
+          and
+          <a routerLink="/privacy">Privacy Policy</a>.
+        </label>
+      </div>
+
+      <button type="submit" class="auth-form__submit">Register</button>
+    </form>
+
+    <p class="auth-card__switch">
+      Already have an account?
+      <a routerLink="/login">Log in</a>
+    </p>
+  </div>
+</div>

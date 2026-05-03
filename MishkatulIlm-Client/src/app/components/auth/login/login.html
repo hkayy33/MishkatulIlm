@@ -1,0 +1,47 @@
+<div class="auth-page">
+  <div class="auth-card">
+    <header class="auth-card__header">
+      <h2>Log in</h2>
+      <p class="auth-card__lede">Welcome back. Sign in to continue your learning journey.</p>
+    </header>
+
+    <form class="auth-form" novalidate (submit)="onSubmit($event)" autocomplete="on">
+      <div class="form-field">
+        <label for="login-email">Email</label>
+        <input
+          id="login-email"
+          name="email"
+          type="email"
+          autocomplete="email"
+          required
+          placeholder="you@example.com"
+        />
+      </div>
+
+      <div class="form-field">
+        <label for="login-password">Password</label>
+        <input
+          id="login-password"
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          required
+          minlength="8"
+          placeholder="••••••••"
+        />
+      </div>
+
+      <div class="form-field form-field--checkbox">
+        <input id="login-remember" name="remember" type="checkbox" />
+        <label for="login-remember">Keep me signed in on this device</label>
+      </div>
+
+      <button type="submit" class="auth-form__submit">Log in</button>
+    </form>
+
+    <p class="auth-card__switch">
+      New here?
+      <a routerLink="/register">Create an account</a>
+    </p>
+  </div>
+</div>

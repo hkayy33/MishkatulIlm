@@ -1,8 +1,9 @@
 import { Component, Input } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-get-started-btn',
-  imports: [],
+  imports: [RouterLink],
   templateUrl: './get-started-btn.html',
   styleUrl: './get-started-btn.scss',
   host: {

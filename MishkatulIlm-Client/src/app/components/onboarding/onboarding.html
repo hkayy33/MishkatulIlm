@@ -1,0 +1,102 @@
+<div class="container">
+  @if (!userLoggedIn) {
+    <app-auth></app-auth>
+  } @else {
+    <form class="onboarding-form" novalidate (submit)="onSubmit($event)">
+      <header class="onboarding-form__header">
+        <h2>Student onboarding</h2>
+        <p class="onboarding-form__lede">
+          Tell us a bit about yourself and the subjects you are interested in.
+        </p>
+      </header>
+
+      <section class="onboarding-section" aria-labelledby="student-info-heading">
+        <h3 id="student-info-heading" class="onboarding-section__title">Your details</h3>
+        <div class="student-info">
+          <div class="student-info__column">
+            <div class="form-field">
+              <label for="fname">First name</label>
+              <input type="text" id="fname" name="fname" autocomplete="given-name" />
+            </div>
+            <div class="form-field">
+              <label for="lname">Last name</label>
+              <input type="text" id="lname" name="lname" autocomplete="family-name" />
+            </div>
+          </div>
+          <div class="student-info__column">
+            <div class="form-field">
+              <label for="age">Age</label>
+              <select id="age" name="age">
+                @for (opt of ageRanges; track opt.value + opt.label) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="gender">Gender</label>
+              <select id="gender" name="gender" autocomplete="sex">
+                @for (opt of genders; track opt.value + opt.label) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
+                }
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="onboarding-section" aria-labelledby="subjects-heading">
+        <h3 id="subjects-heading" class="onboarding-section__title">Select your desired subjects</h3>
+        <p class="onboarding-section__hint">
+          You may select up to {{ maxSubjects }} subjects ({{ selectedSubjectCount }} selected).
+        </p>
+        <fieldset class="subject-fieldset">
+          <legend class="visually-hidden">Subjects</legend>
+          <div class="subjects">
+            @for (opt of subjectOptions; track opt.value) {
+              <label
+                class="subject-option"
+                [class.subject-option--max]="isSubjectCheckboxDisabled(opt)"
+              >
+                <input
+                  type="checkbox"
+                  name="subject"
+                  [value]="opt.value"
+                  [checked]="opt.selected"
+                  [disabled]="isSubjectCheckboxDisabled(opt)"
+                  (change)="onSubjectChange(opt, $event)"
+                />
+                <span class="subject-option__label">{{ opt.label }}</span>
+              </label>
+            }
+          </div>
+        </fieldset>
+      </section>
+
+      <section class="onboarding-section" aria-labelledby="lesson-heading">
+        <h3 id="lesson-heading" class="onboarding-section__title">Level and schedule</h3>
+        <div class="lesson-freq">
+          <div class="form-field">
+            <label for="current-level">Current level</label>
+            <select id="current-level" name="current-level">
+              @for (opt of currentLevels; track opt.value + opt.label) {
+                <option [value]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="lesson-frequency">Desired lesson frequency</label>
+            <select id="lesson-frequency" name="lesson-frequency">
+              @for (opt of lessonFrequencies; track opt.value + opt.label) {
+                <option [value]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <div class="onboarding-form__actions">
+        <button type="submit" class="onboarding-form__submit">Submit application</button>
+      </div>
+    </form>
+  }
+</div>

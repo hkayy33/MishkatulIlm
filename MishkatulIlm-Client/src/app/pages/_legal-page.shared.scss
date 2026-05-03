@@ -1,0 +1,57 @@
+$accent-gold: #c59d5f;
+$text: #1a1a1a;
+$muted: #4a4a4a;
+
+.legal-page {
+    background: #fcfbf7;
+    color: $text;
+    min-height: 50vh;
+    padding-top: 2.5rem;
+    padding-bottom: 4rem;
+    box-sizing: border-box;
+}
+
+.legal-inner {
+    max-width: 42rem;
+    margin: 0 auto;
+    padding: 0 clamp(1.25rem, 4vw, 2rem);
+    font-family:
+        'Source Sans 3',
+        system-ui,
+        sans-serif;
+    line-height: 1.6;
+}
+
+.legal-page h1 {
+    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    font-size: clamp(1.75rem, 4vw, 2.25rem);
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+}
+
+.legal-updated {
+    color: $muted;
+    font-size: 0.9rem;
+    margin: 0 0 1.5rem;
+}
+
+.legal-page h2 {
+    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 2rem 0 0.5rem;
+}
+
+.legal-page p {
+    margin: 0 0 1rem;
+}
+
+.legal-page a {
+    color: #1e4638;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+
+    &:hover {
+        color: $accent-gold;
+    }
+}

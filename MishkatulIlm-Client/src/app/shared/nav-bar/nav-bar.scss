@@ -1,17 +1,32 @@
+$accent-gold: #c59d5f;
+$nav-text-dark: #1a1a1a;
+$nav-font:
+    'Source Sans 3',
+    system-ui,
+    sans-serif;
+
+// In normal document flow so the bar scrolls away with the page (not viewport-fixed).
 :host {
     display: block;
     width: 100%;
 }
 
 .container {
+    position: relative;
+    z-index: 10;
     height: 12vh;
     box-sizing: border-box;
     margin-top: 5px;
-    // background: rgba(248, 243, 237, 0.88);
-    // box-shadow: 0 1px 0 rgba(42, 34, 24, 0.08);
     display: flex;
     flex-direction: row;
     align-items: center;
+    background: rgba(252, 251, 247, 0.94);
+    box-shadow: 0 1px 0 rgba(42, 34, 24, 0.08);
+
+    &.container--home {
+        background: transparent;
+        box-shadow: none;
+    }
 
     img{
         width: 250px;
@@ -22,22 +37,64 @@
     .nav-links{
         display: flex;
         flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
         gap: 50px;
-        margin-left: auto;
-        padding-right: 40px;
-        color: white;
-        cursor: pointer;
-        
+        margin: 0 0 0 auto;
+        padding: 0 40px 0 0;
+        list-style: none;
+        color: $nav-text-dark;
+        font-family: $nav-font;
+        font-size: 1rem;
+        font-weight: 400;
+        line-height: 1.25;
 
         .nav-link {
-            display: inline-block;
-            list-style: none;
-            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin: 0;
+            padding: 0;
+            line-height: inherit;
+            cursor: pointer;
 
             &:focus-visible {
-                outline: 2px solid gold;
+                outline: 2px solid $accent-gold;
                 outline-offset: 4px;
                 border-radius: 4px;
+            }
+
+            & > p {
+                margin: 0;
+                padding: 0;
+                font-family: inherit;
+                font-size: inherit;
+                font-weight: inherit;
+                line-height: inherit;
+            }
+
+            .nav-route-link {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0;
+                padding: 0;
+                border: none;
+                color: inherit;
+                font-family: inherit;
+                font-size: inherit;
+                font-weight: inherit;
+                line-height: inherit;
+                text-decoration: none;
+                vertical-align: baseline;
+                cursor: pointer;
+
+                &:focus-visible {
+                    outline: 2px solid $accent-gold;
+                    outline-offset: 4px;
+                    border-radius: 4px;
+                }
             }
 
             & span {
@@ -51,7 +108,7 @@
                     bottom: 0;
                     width: 100%;
                     height: 2px;
-                    background-color: gold;
+                    background-color: $accent-gold;
                     transform: scaleX(0);
                     transform-origin: left center;
                     transition: transform 0.25s ease;
@@ -63,5 +120,28 @@
             }
         }
 
+        .nav-link--cta {
+            cursor: default;
+
+            &:focus-visible {
+                outline: none;
+            }
+        }
+    }
+
+    &.container--home .nav-links {
+        color: #fff;
+
+        .nav-link:focus-visible {
+            outline-color: gold;
+        }
+
+        .nav-route-link:focus-visible {
+            outline-color: gold;
+        }
+
+        .nav-link span::after {
+            background-color: gold;
+        }
     }
 }

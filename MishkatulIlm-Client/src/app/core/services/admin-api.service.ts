@@ -22,6 +22,7 @@ export interface AdminStudentRow {
   currentLevel: string;
   lessonFrequency: string;
   subjectCodes: string[];
+  preferredAvailability: string[];
 }
 
 export interface AdminCreateUserBody {

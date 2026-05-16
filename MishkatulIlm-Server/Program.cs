@@ -5,6 +5,7 @@ using MishkatulIlm_Server.Authentication;
 using MishkatulIlm_Server.Data;
 using MishkatulIlm_Server.Options;
 using MishkatulIlm_Server.Services;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,7 +17,11 @@ builder.Services.AddOpenApi();
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (!string.IsNullOrWhiteSpace(connectionString))
 {
-    builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
+    var npgsqlBuilder = new NpgsqlDataSourceBuilder(connectionString);
+    npgsqlBuilder.EnableDynamicJson();
+    var npgsqlDataSource = npgsqlBuilder.Build();
+
+    builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(npgsqlDataSource));
 }
 
 builder.Services.Configure<SupabaseAuthOptions>(builder.Configuration.GetSection(SupabaseAuthOptions.SectionName));
@@ -35,21 +40,13 @@ builder.Services.AddHttpClient(nameof(SupabaseJwtKeyProvider), client =>
 });
 builder.Services.AddSingleton<SupabaseJwtKeyProvider>();
 builder.Services.AddHostedService<SupabaseJwksRefreshWorker>();
-builder.Services.AddSingleton<IConfigureNamedOptions<JwtBearerOptions>, ConfigureSupabaseJwtBearerOptions>();
+builder.Services.AddSingleton<IPostConfigureOptions<JwtBearerOptions>, ConfigureSupabaseJwtBearerOptions>();
 
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<SupabaseAdminAuthClient>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer();
-
-// Other components can set ValidIssuer/ValidIssuers on JwtBearerOptions after our Supabase config.
-// That bypasses IssuerValidator and rejects tokens whose iss does not match byte-for-byte.
-builder.Services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
-{
-    options.TokenValidationParameters.ValidIssuer = null;
-    options.TokenValidationParameters.ValidIssuers = null;
-});
 
 builder.Services.AddAuthorization();
 

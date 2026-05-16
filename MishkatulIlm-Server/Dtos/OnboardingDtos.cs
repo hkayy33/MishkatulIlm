@@ -24,4 +24,7 @@ public sealed class SaveOnboardingRequest
 
     [Required]
     public List<string> SubjectCodes { get; set; } = new();
+
+    [Required]
+    public List<string> PreferredAvailability { get; set; } = new();
 }

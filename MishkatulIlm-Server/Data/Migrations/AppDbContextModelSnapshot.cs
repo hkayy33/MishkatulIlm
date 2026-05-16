@@ -86,6 +86,10 @@ namespace MishkatulIlm_Server.Data.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.PrimitiveCollection<List<string>>("PreferredAvailability")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
                     b.PrimitiveCollection<List<string>>("SubjectCodes")
                         .IsRequired()
                         .HasColumnType("jsonb");

@@ -32,6 +32,11 @@ export function createAuthServiceStub(): AuthService {
     markOnboardingCompleted: () => of(void 0),
     resendSignupConfirmation: () => of(void 0),
     handleAuthRedirectResult: () => Promise.resolve(),
+    initSession: () => Promise.resolve(),
+    getBearerToken$: () => of(token()),
+    refreshSessionBeforeApi: () => of(void 0),
+    whenSessionReady$: () => of(!!token()),
+    isApiRequest: (url: string) => url.includes('/api/'),
     syncServerProfile: () => of(void 0),
     refreshServerProfile: () => of(void 0),
     clearSession: () => {

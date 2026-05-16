@@ -1,0 +1,17 @@
+<section class="dashboard">
+  <h1>My dashboard</h1>
+  @if (auth.user(); as u) {
+    <p class="dashboard__welcome">
+      Welcome back, {{ u.firstName || 'student' }}.
+    </p>
+    @if (!u.onboardingCompleted) {
+      <p class="dashboard__hint">
+        Complete your
+        <a routerLink="/onboarding">student onboarding</a>
+        so we can match you with the right programs.
+      </p>
+    } @else {
+      <p class="dashboard__hint">Your application is on file. We will be in touch about next steps.</p>
+    }
+  }
+</section>

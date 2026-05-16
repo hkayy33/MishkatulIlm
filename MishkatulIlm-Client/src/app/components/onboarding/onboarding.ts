@@ -1,8 +1,17 @@
-import { afterNextRender, Component, inject } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { afterNextRender, Component, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { catchError, firstValueFrom, of, switchMap } from 'rxjs';
+import { catchError, finalize, firstValueFrom, of, switchMap, throwError } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
-import type { SaveOnboardingRequest } from '../../core/models/onboarding.models';
+import {
+  availabilitySlotKey,
+  LESSON_TIME_SLOTS,
+  type LessonTimeSlotCode,
+  type SaveOnboardingRequest,
+  type WeekdayCode,
+  WEEKDAYS,
+} from '../../core/models/onboarding.models';
 import { OnboardingApiService } from '../../core/services/onboarding-api.service';
 import { Auth } from '../auth/auth';
 
@@ -19,7 +28,7 @@ interface SubjectOption {
 
 @Component({
   selector: 'app-onboarding',
-  imports: [Auth],
+  imports: [Auth, FormsModule],
   templateUrl: './onboarding.html',
   styleUrl: './onboarding.scss',
 })
@@ -29,21 +38,32 @@ export class Onboarding {
   private readonly router = inject(Router);
 
   submitError: string | null = null;
+  submitting = signal(false);
+
+  firstName = '';
+  lastName = '';
 
   constructor() {
     // Login only reads `isAdmin` from the API. If /me failed earlier or the row was fixed in the DB
     // after sign-in, refresh here so admins are not stuck on onboarding.
     afterNextRender(() => {
-      if (!this.auth.isAuthenticated()) return;
       void firstValueFrom(
-        this.auth.syncServerProfile().pipe(
-          switchMap(() => this.auth.refreshServerProfile()),
+        this.auth.whenSessionReady$().pipe(
+          switchMap((ready) => {
+            if (!ready) return of(void 0);
+            return this.auth.syncServerProfile().pipe(
+              switchMap(() => this.auth.refreshServerProfile()),
+            );
+          }),
           catchError(() => of(void 0)),
         ),
       ).then(() => {
+        if (!this.auth.isAuthenticated()) return;
         const u = this.auth.user();
+        if (u?.firstName) this.firstName = u.firstName;
+        if (u?.lastName) this.lastName = u.lastName;
         if (u?.isAdmin) void this.router.navigateByUrl('/admin', { replaceUrl: true });
-        else if (u?.onboardingCompleted) void this.router.navigateByUrl('/', { replaceUrl: true });
+        else if (u?.onboardingCompleted) void this.router.navigateByUrl('/dashboard', { replaceUrl: true });
       });
     });
   }
@@ -86,6 +106,12 @@ export class Onboarding {
     { value: 'FLEXIBLE', label: 'Flexible (to be agreed)' },
   ];
 
+  readonly weekDays = WEEKDAYS;
+  readonly timeSlots = LESSON_TIME_SLOTS;
+
+  /** Selected DAY-SLOT codes, e.g. MON-MORNING */
+  private readonly availabilitySelected = new Set<string>();
+
   subjectOptions: SubjectOption[] = [
     { value: 'QURAN-MEMORISATION', label: 'Quran memorisation', selected: false },
     { value: 'TAJWEED', label: 'Tajweed', selected: false },
@@ -103,6 +129,25 @@ export class Onboarding {
     return !opt.selected && this.selectedSubjectCount >= this.maxSubjects;
   }
 
+  get selectedAvailabilityCount(): number {
+    return this.availabilitySelected.size;
+  }
+
+  isAvailabilitySelected(day: WeekdayCode, slot: LessonTimeSlotCode): boolean {
+    return this.availabilitySelected.has(availabilitySlotKey(day, slot));
+  }
+
+  onAvailabilityChange(day: WeekdayCode, slot: LessonTimeSlotCode, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const key = availabilitySlotKey(day, slot);
+    if (input.checked) this.availabilitySelected.add(key);
+    else this.availabilitySelected.delete(key);
+  }
+
+  private collectPreferredAvailability(): string[] {
+    return [...this.availabilitySelected];
+  }
+
   onSubjectChange(opt: SubjectOption, event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.checked && this.selectedSubjectCount >= this.maxSubjects) {
@@ -116,8 +161,8 @@ export class Onboarding {
     event.preventDefault();
     const form = event.target as HTMLFormElement;
 
-    const firstName = (form.elements.namedItem('fname') as HTMLInputElement)?.value?.trim() ?? '';
-    const lastName = (form.elements.namedItem('lname') as HTMLInputElement)?.value?.trim() ?? '';
+    const firstName = this.firstName.trim();
+    const lastName = this.lastName.trim();
     const ageRange = (form.elements.namedItem('age') as HTMLSelectElement)?.value ?? '';
     const gender = (form.elements.namedItem('gender') as HTMLSelectElement)?.value ?? '';
     const currentLevel =
@@ -140,6 +185,12 @@ export class Onboarding {
       return;
     }
 
+    const preferredAvailability = this.collectPreferredAvailability();
+    if (preferredAvailability.length === 0) {
+      this.submitError = 'Select at least one preferred lesson time.';
+      return;
+    }
+
     const body: SaveOnboardingRequest = {
       firstName,
       lastName,
@@ -148,18 +199,44 @@ export class Onboarding {
       currentLevel,
       lessonFrequency,
       subjectCodes,
+      preferredAvailability,
     };
 
     this.submitError = null;
-    this.onboardingApi
-      .save(body)
-      .pipe(switchMap(() => this.auth.markOnboardingCompleted()))
+    this.submitting.set(true);
+    this.auth
+      .getBearerToken$()
+      .pipe(
+        switchMap((token) => {
+          if (!token) {
+            return throwError(
+              () => new HttpErrorResponse({ status: 401, statusText: 'Not authenticated' }),
+            );
+          }
+          return this.onboardingApi.save(body);
+        }),
+        switchMap(() => this.auth.refreshServerProfile()),
+        switchMap(() => this.auth.markOnboardingCompleted().pipe(catchError(() => of(void 0)))),
+        finalize(() => this.submitting.set(false)),
+      )
       .subscribe({
-        next: () => void this.router.navigate(['/']),
-        error: (err: { error?: { message?: string }; message?: string }) => {
-          const msg = err?.error?.message ?? err?.message;
-          this.submitError =
-            typeof msg === 'string' ? msg : 'Could not submit your application. Try again.';
+        next: () => void this.router.navigate(['/dashboard']),
+        error: (err: unknown) => {
+          if (err instanceof HttpErrorResponse && err.status === 401) {
+            this.submitError = 'Your session expired. Please sign in again.';
+            void this.router.navigate(['/login']);
+            return;
+          }
+          const body = err instanceof HttpErrorResponse ? err.error : null;
+          const msg =
+            body && typeof body === 'object' && body !== null && 'message' in body
+              ? String((body as { message?: string }).message)
+              : err instanceof HttpErrorResponse
+                ? err.message
+                : err instanceof Error
+                  ? err.message
+                  : null;
+          this.submitError = msg || 'Could not submit your application. Try again.';
         },
       });
   }

@@ -20,11 +20,25 @@
           <div class="student-info__column">
             <div class="form-field">
               <label for="fname">First name</label>
-              <input type="text" id="fname" name="fname" autocomplete="given-name" />
+              <input
+                type="text"
+                id="fname"
+                name="fname"
+                autocomplete="given-name"
+                [(ngModel)]="firstName"
+                required
+              />
             </div>
             <div class="form-field">
               <label for="lname">Last name</label>
-              <input type="text" id="lname" name="lname" autocomplete="family-name" />
+              <input
+                type="text"
+                id="lname"
+                name="lname"
+                autocomplete="family-name"
+                [(ngModel)]="lastName"
+                required
+              />
             </div>
           </div>
           <div class="student-info__column">
@@ -98,8 +112,55 @@
         </div>
       </section>
 
+      <section class="onboarding-section" aria-labelledby="availability-heading">
+        <h3 id="availability-heading" class="onboarding-section__title">Preferred lesson times</h3>
+        <p class="onboarding-section__hint">
+          Tick when you are usually available ({{ selectedAvailabilityCount }} selected).
+        </p>
+        <div class="availability-table-wrap">
+          <table class="availability-table">
+            <caption class="visually-hidden">
+              Preferred availability by day and time of day
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" class="availability-table__corner">Day</th>
+                @for (slot of timeSlots; track slot.code) {
+                  <th scope="col" class="availability-table__slot-head">
+                    <span class="availability-table__slot-label">{{ slot.label }}</span>
+                    <span class="availability-table__slot-hint">{{ slot.hint }}</span>
+                  </th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (day of weekDays; track day.code) {
+                <tr>
+                  <th scope="row" class="availability-table__day">{{ day.label }}</th>
+                  @for (slot of timeSlots; track slot.code) {
+                    <td class="availability-table__cell">
+                      <label class="availability-table__choice">
+                        <input
+                          type="checkbox"
+                          [attr.name]="'avail-' + day.code + '-' + slot.code"
+                          [checked]="isAvailabilitySelected(day.code, slot.code)"
+                          (change)="onAvailabilityChange(day.code, slot.code, $event)"
+                        />
+                        <span class="visually-hidden">{{ day.label }} {{ slot.label }}</span>
+                      </label>
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <div class="onboarding-form__actions">
-        <button type="submit" class="onboarding-form__submit">Submit application</button>
+        <button type="submit" class="onboarding-form__submit" [disabled]="submitting()">
+          {{ submitting() ? 'Submitting…' : 'Submit application' }}
+        </button>
       </div>
     </form>
   }

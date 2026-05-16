@@ -1,6 +1,10 @@
 import { DatePipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import {
+  LESSON_TIME_SLOTS,
+  WEEKDAYS,
+} from '../../../core/models/onboarding.models';
 import { AdminApiService, type AdminStudentRow, type AdminUserRow } from '../../../core/services/admin-api.service';
 
 @Component({
@@ -53,6 +57,21 @@ export class AdminStudents {
         this.loading.set(false);
       },
     });
+  }
+
+  formatAvailability(codes: string[]): string {
+    if (!codes?.length) return '—';
+    return codes
+      .map((code) => {
+        const dash = code.indexOf('-');
+        if (dash < 0) return code;
+        const day = code.slice(0, dash);
+        const slot = code.slice(dash + 1);
+        const dayLabel = WEEKDAYS.find((d) => d.code === day)?.label ?? day;
+        const slotLabel = LESSON_TIME_SLOTS.find((s) => s.code === slot)?.label ?? slot;
+        return `${dayLabel} ${slotLabel}`;
+      })
+      .join(', ');
   }
 
   onCreateSubmit(event: Event): void {

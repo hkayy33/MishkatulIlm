@@ -1,0 +1,39 @@
+$accent-gold: #c59d5f;
+$text-dark: #1a1a1a;
+$text-muted: #5c574f;
+
+.dashboard {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 4rem;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  color: $text-dark;
+}
+
+h1 {
+  margin: 0 0 0.75rem;
+  font-family: Montserrat, 'Source Sans 3', system-ui, sans-serif;
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+.dashboard__welcome {
+  margin: 0 0 1rem;
+  font-size: 1.0625rem;
+}
+
+.dashboard__hint {
+  margin: 0;
+  color: $text-muted;
+  line-height: 1.5;
+
+  a {
+    color: $accent-gold;
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}

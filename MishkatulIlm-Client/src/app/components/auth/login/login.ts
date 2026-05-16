@@ -54,7 +54,7 @@ export class Login implements OnInit {
       next: () => {
         const u = this.auth.user();
         if (u?.isAdmin) void this.router.navigate(['/admin']);
-        else if (u?.onboardingCompleted) void this.router.navigate(['/']);
+        else if (u?.onboardingCompleted) void this.router.navigate(['/dashboard']);
         else void this.router.navigate(['/onboarding']);
       },
       error: (err: Error & { message?: string }) => {

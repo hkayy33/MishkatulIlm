@@ -88,6 +88,7 @@ public sealed class AdminController(
                 CurrentLevel = u.Onboarding.CurrentLevel,
                 LessonFrequency = u.Onboarding.LessonFrequency,
                 SubjectCodes = u.Onboarding.SubjectCodes,
+                PreferredAvailability = u.Onboarding.PreferredAvailability,
             })
             .ToListAsync(cancellationToken);
 

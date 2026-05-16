@@ -2,39 +2,36 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using MishkatulIlm_Server.Options;
 using MishkatulIlm_Server.Services;
 
 namespace MishkatulIlm_Server.Authentication;
 
+/// <summary>
+/// Runs as <see cref="IPostConfigureOptions{TOptions}"/> so settings apply after ASP.NET Core's
+/// default JwtBearer configuration (which can otherwise set ValidIssuer and reject Supabase tokens).
+/// </summary>
 public sealed class ConfigureSupabaseJwtBearerOptions(
     SupabaseJwtKeyProvider keyProvider,
     IOptions<SupabaseAuthOptions> supabaseOptions,
     IConfiguration configuration,
-    ILogger<ConfigureSupabaseJwtBearerOptions> logger) : IConfigureNamedOptions<JwtBearerOptions>
+    ILogger<ConfigureSupabaseJwtBearerOptions> logger) : IPostConfigureOptions<JwtBearerOptions>
 {
-    public void Configure(string? name, JwtBearerOptions options)
+    public void PostConfigure(string? name, JwtBearerOptions options)
     {
         if (name is not null && name != JwtBearerDefaults.AuthenticationScheme)
             return;
 
-        var supa = supabaseOptions.Value;
-        // Read URL from configuration directly as well — IOptions snapshot during JwtBearer setup
-        // has been wrong in some setups; this must match the project that mints the access token.
-        var supabaseUrlFromConfig = configuration["Supabase:Url"]?.Trim().TrimEnd('/') ?? string.Empty;
-        var supabaseUrl = !string.IsNullOrEmpty(supa.Url?.Trim())
-            ? supa.Url.Trim().TrimEnd('/')
-            : supabaseUrlFromConfig;
-
-        if (string.IsNullOrEmpty(supabaseUrl))
-            supabaseUrl = supabaseUrlFromConfig;
-
+        var supabaseUrl = ResolveSupabaseProjectUrl();
         var expectedIssuer = $"{supabaseUrl}/auth/v1";
+
+        options.Authority = null;
+        options.RequireHttpsMetadata = false;
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -44,12 +41,12 @@ public sealed class ConfigureSupabaseJwtBearerOptions(
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(2),
             TryAllIssuerSigningKeys = true,
+            ValidIssuer = expectedIssuer,
+            ValidIssuers = [expectedIssuer],
             ValidAudience = null,
-            ValidIssuer = null,
             AudienceValidator = (audiences, _, _) => HasAuthenticatedAudience(audiences),
-            IssuerValidator = (issuer, _, _) => ValidateSupabaseIssuer(issuer, supabaseUrl),
             IssuerSigningKeyResolver = (_, securityToken, kid, _) =>
-                ResolveSigningKeys(securityToken, kid, supa.JwtSecret),
+                ResolveSigningKeys(securityToken, kid, supabaseOptions.Value.JwtSecret),
         };
 
         options.MapInboundClaims = true;
@@ -61,7 +58,7 @@ public sealed class ConfigureSupabaseJwtBearerOptions(
                 JwtDiagnostics.TryLogBearerDiagnostics(logger, context.Request.Headers.Authorization.ToString());
                 logger.LogWarning(
                     context.Exception,
-                    "JWT rejected for {Path}. Expected issuer {Issuer} (Supabase:Url base {BaseUrl}).",
+                    "JWT rejected for {Path}. Expected issuer {Issuer} (Supabase:Url {BaseUrl}).",
                     context.Request.Path,
                     expectedIssuer,
                     supabaseUrl);
@@ -70,7 +67,23 @@ public sealed class ConfigureSupabaseJwtBearerOptions(
         };
     }
 
-    public void Configure(JwtBearerOptions options) => Configure(JwtBearerDefaults.AuthenticationScheme, options);
+    private string ResolveSupabaseProjectUrl()
+    {
+        var fromSection = supabaseOptions.Value.Url?.Trim().TrimEnd('/') ?? string.Empty;
+        var fromConfig = configuration["Supabase:Url"]?.Trim().TrimEnd('/') ?? string.Empty;
+        var supabaseUrl = !string.IsNullOrEmpty(fromSection) ? fromSection : fromConfig;
+
+        if (string.IsNullOrEmpty(supabaseUrl))
+        {
+            throw new InvalidOperationException(
+                "Supabase:Url is not configured. Set it to your project root (e.g. https://xxxx.supabase.co).");
+        }
+
+        if (supabaseUrl.EndsWith("/auth/v1", StringComparison.OrdinalIgnoreCase))
+            supabaseUrl = supabaseUrl[..^"/auth/v1".Length].TrimEnd('/');
+
+        return supabaseUrl;
+    }
 
     private static bool HasAuthenticatedAudience(IEnumerable<string>? audiences)
     {
@@ -83,51 +96,6 @@ public sealed class ConfigureSupabaseJwtBearerOptions(
         }
 
         return false;
-    }
-
-    /// <summary>
-    /// Supabase user JWT <c>iss</c> is normally <c>https://&lt;ref&gt;.supabase.co/auth/v1</c>.
-    /// Compare using <see cref="Uri"/> host/scheme/path so minor string differences do not reject valid tokens.
-    /// </summary>
-    private static string ValidateSupabaseIssuer(string? issuer, string supabaseProjectBaseUrl)
-    {
-        if (string.IsNullOrWhiteSpace(issuer))
-            throw new SecurityTokenInvalidIssuerException("The token has no issuer.");
-
-        var iss = issuer.Trim();
-        if (!Uri.TryCreate(iss, UriKind.Absolute, out var issUri))
-            throw new SecurityTokenInvalidIssuerException($"The issuer '{iss}' is not a valid absolute URI.");
-
-        if (!Uri.TryCreate(supabaseProjectBaseUrl, UriKind.Absolute, out var baseUri))
-            throw new SecurityTokenInvalidIssuerException(
-                $"Supabase:Url is not a valid absolute URI: '{supabaseProjectBaseUrl}'.");
-
-        if (!string.Equals(issUri.Host, baseUri.Host, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new SecurityTokenInvalidIssuerException(
-                $"The issuer host '{issUri.Host}' does not match configured Supabase host '{baseUri.Host}'. " +
-                $"Set Supabase:Url to https://{issUri.Host} (project root, no /auth/v1).");
-        }
-
-        if (!string.Equals(issUri.Scheme, baseUri.Scheme, StringComparison.OrdinalIgnoreCase))
-        {
-            // Allow issuer https when config says https — reject only obvious http/https mix against production host
-            if (!(string.Equals(issUri.Scheme, "https", StringComparison.OrdinalIgnoreCase) &&
-                  string.Equals(baseUri.Scheme, "https", StringComparison.OrdinalIgnoreCase)))
-            {
-                throw new SecurityTokenInvalidIssuerException(
-                    $"The issuer scheme '{issUri.Scheme}' does not match configured scheme '{baseUri.Scheme}'.");
-            }
-        }
-
-        var path = issUri.AbsolutePath.TrimEnd('/');
-        if (!path.StartsWith("/auth", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new SecurityTokenInvalidIssuerException(
-                $"The issuer path '{issUri.AbsolutePath}' is not under /auth. Expected something like /auth/v1.");
-        }
-
-        return iss;
     }
 
     private IEnumerable<SecurityKey> ResolveSigningKeys(

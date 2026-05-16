@@ -80,6 +80,7 @@
               <th>Email</th>
               <th>Level</th>
               <th>Subjects</th>
+              <th>Preferred times</th>
             </tr>
           </thead>
           <tbody>
@@ -89,6 +90,7 @@
                 <td>{{ s.email }}</td>
                 <td>{{ s.currentLevel }}</td>
                 <td>{{ s.subjectCodes.join(', ') }}</td>
+                <td class="admin-availability">{{ formatAvailability(s.preferredAvailability) }}</td>
               </tr>
             }
           </tbody>

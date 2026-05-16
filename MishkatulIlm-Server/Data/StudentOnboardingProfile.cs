@@ -12,4 +12,7 @@ public sealed class StudentOnboardingProfile
 
     /// <summary>Stored as JSON array in PostgreSQL (jsonb).</summary>
     public List<string> SubjectCodes { get; set; } = new();
+
+    /// <summary>Preferred lesson slots as DAY-SLOT codes (e.g. MON-MORNING) in jsonb.</summary>
+    public List<string> PreferredAvailability { get; set; } = new();
 }

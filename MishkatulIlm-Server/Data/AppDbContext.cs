@@ -32,6 +32,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.CurrentLevel).HasMaxLength(64).IsRequired();
             entity.Property(e => e.LessonFrequency).HasMaxLength(64).IsRequired();
             entity.Property(e => e.SubjectCodes).HasColumnType("jsonb").IsRequired();
+            entity.Property(e => e.PreferredAvailability).HasColumnType("jsonb").IsRequired();
         });
     }
 }

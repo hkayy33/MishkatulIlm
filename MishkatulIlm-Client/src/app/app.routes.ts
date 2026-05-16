@@ -8,12 +8,15 @@ import { Signup } from './components/auth/signup/signup';
 import { AuthCallback } from './components/auth/auth-callback/auth-callback';
 import { VerifyEmail } from './components/auth/verify-email/verify-email';
 import { adminGuard } from './core/guards/admin.guard';
+import { authGuard } from './core/guards/auth.guard';
+import { StudentDashboard } from './pages/student-dashboard/student-dashboard';
 
 export const routes: Routes = [
   { path: '', component: Homepage },
+  { path: 'dashboard', component: StudentDashboard, canActivate: [authGuard] },
   { path: 'privacy', component: PrivacyPolicy },
   { path: 'terms', component: TermsOfUse },
-  { path: 'onboarding', component: Onboarding },
+  { path: 'onboarding', component: Onboarding, canActivate: [authGuard] },
   { path: 'login', component: Login },
   { path: 'register', component: Signup },
   { path: 'verify-email', component: VerifyEmail },

@@ -32,6 +32,37 @@ export type SubjectCode =
   | 'ISLAMIC-STUDIES'
   | 'ISLAMIC-INHERITANCE';
 
+export type WeekdayCode = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
+
+export type LessonTimeSlotCode = 'MORNING' | 'AFTERNOON' | 'EVENING';
+
+/** Composite code sent to the API, e.g. MON-MORNING */
+export type PreferredAvailabilityCode = `${WeekdayCode}-${LessonTimeSlotCode}`;
+
+export const WEEKDAYS: ReadonlyArray<{ code: WeekdayCode; label: string }> = [
+  { code: 'MON', label: 'Mon' },
+  { code: 'TUE', label: 'Tue' },
+  { code: 'WED', label: 'Wed' },
+  { code: 'THU', label: 'Thu' },
+  { code: 'FRI', label: 'Fri' },
+  { code: 'SAT', label: 'Sat' },
+  { code: 'SUN', label: 'Sun' },
+];
+
+export const LESSON_TIME_SLOTS: ReadonlyArray<{
+  code: LessonTimeSlotCode;
+  label: string;
+  hint: string;
+}> = [
+  { code: 'MORNING', label: 'Morning', hint: '8am – 12pm' },
+  { code: 'AFTERNOON', label: 'Afternoon', hint: '12 – 5pm' },
+  { code: 'EVENING', label: 'Evening', hint: '5 – 9pm' },
+];
+
+export function availabilitySlotKey(day: WeekdayCode, slot: LessonTimeSlotCode): PreferredAvailabilityCode {
+  return `${day}-${slot}`;
+}
+
 /** Request body for saving student onboarding (updates users + student_onboarding_profiles). */
 export interface SaveOnboardingRequest {
   firstName: string;
@@ -41,4 +72,5 @@ export interface SaveOnboardingRequest {
   currentLevel: string;
   lessonFrequency: string;
   subjectCodes: string[];
+  preferredAvailability: string[];
 }

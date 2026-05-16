@@ -3,8 +3,12 @@ namespace MishkatulIlm_Server.Data;
 public static class ApplicationStatusCodes
 {
     public const string Pending = "PENDING";
+    public const string AwaitingReply = "AWAITING_REPLY";
     public const string Active = "ACTIVE";
     public const string Inactive = "INACTIVE";
+
+    public static bool IsPendingQueue(string status) =>
+        status is Pending or AwaitingReply;
 
     public static bool TryNormalize(string? value, out string normalized, out string? error)
     {
@@ -16,6 +20,7 @@ public static class ApplicationStatusCodes
         var key = value.Trim().ToUpperInvariant() switch
         {
             "PENDING" => Pending,
+            "AWAITING_REPLY" => AwaitingReply,
             "ACTIVE" => Active,
             "INACTIVE" => Inactive,
             _ => null,
@@ -23,7 +28,7 @@ public static class ApplicationStatusCodes
 
         if (key is null)
         {
-            error = "Status must be pending, active, or inactive.";
+            error = "Status must be pending, awaiting_reply, active, or inactive.";
             return false;
         }
 
@@ -36,6 +41,7 @@ public static class ApplicationStatusCodes
         {
             Active => "active",
             Inactive => "inactive",
+            AwaitingReply => "awaiting_reply",
             _ => "pending",
         };
 }

@@ -19,4 +19,18 @@ export class OnboardingApiService {
   save(body: SaveOnboardingRequest): Observable<void> {
     return this.http.post<void>(`${this.apiBaseUrl}/api/onboarding`, body);
   }
+
+  acceptScheduleProposal(): Observable<StudentApplicationResponse> {
+    return this.http.post<StudentApplicationResponse>(
+      `${this.apiBaseUrl}/api/onboarding/me/schedule-proposal/accept`,
+      {},
+    );
+  }
+
+  amendScheduleProposal(note: string): Observable<StudentApplicationResponse> {
+    return this.http.post<StudentApplicationResponse>(
+      `${this.apiBaseUrl}/api/onboarding/me/schedule-proposal/amend`,
+      { note },
+    );
+  }
 }

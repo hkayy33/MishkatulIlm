@@ -46,6 +46,34 @@
     color: #5c574f;
     background: rgba(45, 42, 38, 0.08);
   }
+
+  &--awaiting {
+    color: #2f4a6b;
+    background: rgba(91, 124, 153, 0.22);
+  }
+
+  &--amended {
+    color: #6b3f20;
+    background: rgba(197, 120, 60, 0.22);
+  }
+}
+
+.approve-amend-note {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: rgba(197, 120, 60, 0.1);
+  border: 1px solid rgba(197, 120, 60, 0.25);
+
+  h3 {
+    margin: 0 0 0.35rem;
+    font-size: 0.9rem;
+  }
+
+  p {
+    margin: 0;
+    white-space: pre-wrap;
+  }
 }
 
 .admin-btn--small {

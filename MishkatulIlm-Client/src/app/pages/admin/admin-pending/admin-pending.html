@@ -18,6 +18,7 @@
           <tr>
             <th>Student</th>
             <th>Location</th>
+            <th>Status</th>
             <th>Form</th>
             <th>Registered</th>
             <th>Actions</th>
@@ -38,6 +39,17 @@
                 }
               </td>
               <td>
+                @if (r.applicationStatus === 'awaiting_reply') {
+                  <span class="status-pill status-pill--awaiting">Awaiting reply</span>
+                } @else if (r.scheduleProposalStatus === 'student_amended') {
+                  <span class="status-pill status-pill--amended">Amend requested</span>
+                } @else if (r.onboardingCompleted) {
+                  <span class="status-pill status-pill--ready">Pending review</span>
+                } @else {
+                  <span class="status-pill status-pill--draft">Incomplete</span>
+                }
+              </td>
+              <td>
                 @if (r.onboardingCompleted) {
                   <span class="status-pill status-pill--ready">Ready</span>
                 } @else {
@@ -52,7 +64,11 @@
                   [disabled]="!r.onboardingCompleted || actionUserId() === r.userId"
                   (click)="openApprove(r)"
                 >
-                  Schedule lessons
+                  {{
+                    r.scheduleProposalStatus === 'student_amended' || r.applicationStatus === 'awaiting_reply'
+                      ? 'Revise schedule'
+                      : 'Schedule lessons'
+                  }}
                 </button>
                 @if (r.onboardingCompleted) {
                   <button
@@ -100,6 +116,13 @@
             </div>
           </dl>
         </section>
+
+        @if (target.scheduleProposalStatus === 'student_amended' && target.studentAmendNote) {
+          <div class="approve-amend-note">
+            <h3>Student availability note</h3>
+            <p>{{ target.studentAmendNote }}</p>
+          </div>
+        }
 
         @if (loadError()) {
           <p class="admin-error">{{ loadError() }}</p>
@@ -160,7 +183,7 @@
             [disabled]="!canConfirmSchedule() || actionUserId() === target.userId"
             (click)="confirmApprove()"
           >
-            {{ actionUserId() === target.userId ? 'Booking…' : 'Confirm schedule' }}
+            {{ actionUserId() === target.userId ? 'Sending…' : 'Send schedule to student' }}
           </button>
         </div>
       </div>

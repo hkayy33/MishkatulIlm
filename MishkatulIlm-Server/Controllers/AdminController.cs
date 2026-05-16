@@ -15,6 +15,7 @@ namespace MishkatulIlm_Server.Controllers;
 [Route("api/[controller]")]
 public sealed class AdminController(
     AppDbContext db,
+    ScheduleProposalService scheduleProposals,
     SupabaseAdminAuthClient supabaseAdmin,
     IOptions<AdminOptions> adminOptions,
     ILogger<AdminController> logger) : ControllerBase
@@ -140,61 +141,22 @@ public sealed class AdminController(
         if (planned.Count == 0)
             return BadRequest(new { message = "Could not plan lessons for this frequency and time." });
 
-        var rangeEnd = planned.Max(l => l.EndsAtUtc).AddHours(1);
-        var rangeStart = planned.Min(l => l.StartsAtUtc);
-        var existing = await db.LessonSlots
-            .Include(s => s.Student)
-            .Where(s => s.StartsAtUtc < rangeEnd && s.EndsAtUtc > rangeStart.AddMinutes(-1))
-            .ToListAsync(cancellationToken);
+        var conflictMessage = await scheduleProposals.ValidatePlannedLessonsAsync(user.Id, planned, cancellationToken);
+        if (conflictMessage is not null)
+            return Conflict(new { message = conflictMessage });
 
-        var booked = new List<LessonSlot>();
-        foreach (var lesson in planned)
-        {
-            var start = lesson.StartsAtUtc;
-            var end = lesson.EndsAtUtc;
-            var conflict = existing.FirstOrDefault(s => s.StartsAtUtc < end && s.EndsAtUtc > start);
-            if (conflict?.StudentUserId is not null && conflict.StudentUserId != user.Id)
-            {
-                return Conflict(
-                    new
-                    {
-                        message =
-                            $"The time {start:u} is already booked. Choose another slot or free the calendar.",
-                    });
-            }
-
-            if (conflict is not null)
-            {
-                conflict.StudentUserId = user.Id;
-                conflict.EndsAtUtc = end;
-                booked.Add(conflict);
-                continue;
-            }
-
-            var slot = new LessonSlot
-            {
-                Id = Guid.NewGuid(),
-                StartsAtUtc = start,
-                EndsAtUtc = end,
-                StudentUserId = user.Id,
-                CreatedAtUtc = DateTime.UtcNow,
-            };
-            db.LessonSlots.Add(slot);
-            existing.Add(slot);
-            booked.Add(slot);
-        }
-
-        user.ApplicationStatus = ApplicationStatusCodes.Active;
+        await scheduleProposals.CreateProposalAsync(user.Id, planned, cancellationToken);
+        user.ApplicationStatus = ApplicationStatusCodes.AwaitingReply;
         await db.SaveChangesAsync(cancellationToken);
 
-        var lessons = booked
-            .OrderBy(s => s.StartsAtUtc)
-            .Select(s => new ScheduledLessonDto
+        var proposed = planned
+            .OrderBy(l => l.StartsAtUtc)
+            .Select(l => new ScheduledLessonDto
             {
-                SlotId = s.Id,
-                StartsAtUtc = s.StartsAtUtc,
-                EndsAtUtc = s.EndsAtUtc,
-                DurationMinutes = (int)(s.EndsAtUtc - s.StartsAtUtc).TotalMinutes,
+                SlotId = Guid.Empty,
+                StartsAtUtc = l.StartsAtUtc,
+                EndsAtUtc = l.EndsAtUtc,
+                DurationMinutes = l.DurationMinutes,
             })
             .ToList();
 
@@ -203,8 +165,8 @@ public sealed class AdminController(
             {
                 UserId = user.Id,
                 ApplicationStatus = ApplicationStatusCodes.ToApiValue(user.ApplicationStatus),
-                LessonsBooked = lessons.Count,
-                ScheduledLessons = lessons,
+                LessonsBooked = proposed.Count,
+                ScheduledLessons = proposed,
             });
     }
 
@@ -350,13 +312,30 @@ public sealed class AdminController(
         var users = await db.Users
             .AsNoTracking()
             .Include(u => u.Onboarding)
-            .Where(u => !u.IsAdmin && u.ApplicationStatus == ApplicationStatusCodes.Pending)
+            .Where(u =>
+                !u.IsAdmin
+                && (u.ApplicationStatus == ApplicationStatusCodes.Pending
+                    || u.ApplicationStatus == ApplicationStatusCodes.AwaitingReply))
             .OrderByDescending(u => u.OnboardingCompleted)
             .ThenBy(u => u.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
+        var userIds = users.Select(u => u.Id).ToList();
+        var latestProposals = await db.ScheduleProposals
+            .AsNoTracking()
+            .Where(p => userIds.Contains(p.StudentUserId) && p.Status != ScheduleProposalCodes.Superseded)
+            .OrderByDescending(p => p.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var proposalByStudent = latestProposals
+            .GroupBy(p => p.StudentUserId)
+            .ToDictionary(g => g.Key, g => g.First());
+
         var rows = users
-            .Select(u => new AdminApplicationListItem
+            .Select(u =>
+            {
+                proposalByStudent.TryGetValue(u.Id, out var proposal);
+                return new AdminApplicationListItem
             {
                 UserId = u.Id,
                 Email = u.Email,
@@ -364,6 +343,10 @@ public sealed class AdminController(
                 LastName = u.LastName,
                 OnboardingCompleted = u.OnboardingCompleted,
                 ApplicationStatus = ApplicationStatusCodes.ToApiValue(u.ApplicationStatus),
+                ScheduleProposalStatus = proposal is null
+                    ? null
+                    : ScheduleProposalService.ToApiProposalStatus(proposal.Status),
+                StudentAmendNote = proposal?.StudentAmendNote,
                 CreatedAtUtc = u.CreatedAtUtc,
                 AgeRange = u.Onboarding?.AgeRange,
                 Gender = u.Onboarding?.Gender,
@@ -373,6 +356,7 @@ public sealed class AdminController(
                 LessonFrequency = u.Onboarding?.LessonFrequency,
                 SubjectCodes = u.Onboarding?.SubjectCodes ?? [],
                 PreferredAvailability = u.Onboarding?.PreferredAvailability ?? [],
+            };
             })
             .ToList();
 

@@ -16,5 +16,11 @@ public sealed class AppUser
     /// <summary>When true, the user may call admin APIs and open the admin dashboard.</summary>
     public bool IsAdmin { get; set; }
 
+    public DateTime? NextPaymentDueUtc { get; set; }
+    public decimal? LastPaymentAmount { get; set; }
+    public string LastPaymentCurrency { get; set; } = "GBP";
+    public DateTime? LastPaymentAtUtc { get; set; }
+    public DateTime? DeletionRequestedAtUtc { get; set; }
+
     public StudentOnboardingProfile? Onboarding { get; set; }
 }

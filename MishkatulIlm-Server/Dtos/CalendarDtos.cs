@@ -58,7 +58,7 @@ public sealed class ApproveApplicationRequest
 public sealed class ApproveApplicationResponse
 {
     public Guid UserId { get; init; }
-    public string ApplicationStatus { get; init; } = "active";
+    public string ApplicationStatus { get; init; } = "awaiting_reply";
     public int LessonsBooked { get; init; }
     public IReadOnlyList<ScheduledLessonDto> ScheduledLessons { get; init; } = Array.Empty<ScheduledLessonDto>();
 }

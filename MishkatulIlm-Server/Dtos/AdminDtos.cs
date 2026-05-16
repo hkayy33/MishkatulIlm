@@ -29,8 +29,11 @@ public sealed class AdminApplicationListItem
     public string FirstName { get; init; } = string.Empty;
     public string LastName { get; init; } = string.Empty;
     public bool OnboardingCompleted { get; init; }
-    /// <summary>pending | active | inactive</summary>
+    /// <summary>pending | awaiting_reply | active | inactive</summary>
     public string ApplicationStatus { get; init; } = "pending";
+    /// <summary>awaiting_student | student_amended | accepted | null</summary>
+    public string? ScheduleProposalStatus { get; init; }
+    public string? StudentAmendNote { get; init; }
     public DateTime CreatedAtUtc { get; init; }
     public string? AgeRange { get; init; }
     public string? Gender { get; init; }

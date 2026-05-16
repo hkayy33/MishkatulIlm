@@ -2,7 +2,10 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from '../tokens/api-base-url.token';
-import type { AdminApplicationStatus } from '../models/application-status.models';
+import type {
+  AdminApplicationStatus,
+  ScheduleProposalStatus,
+} from '../models/application-status.models';
 import type {
   AvailabilitySlotRow,
   BookingPreview,
@@ -32,6 +35,8 @@ export interface AdminApplicationRow {
   lastName: string;
   onboardingCompleted: boolean;
   applicationStatus: AdminApplicationStatus;
+  scheduleProposalStatus?: ScheduleProposalStatus | null;
+  studentAmendNote?: string | null;
   createdAtUtc: string;
   ageRange?: string | null;
   gender?: string | null;

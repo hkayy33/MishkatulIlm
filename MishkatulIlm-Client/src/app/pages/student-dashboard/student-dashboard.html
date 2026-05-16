@@ -1,4 +1,4 @@
-<section class="dashboard">
+<section class="dashboard" [class.dashboard--matched]="isMatched()">
   <header class="dashboard__header">
     <p class="dashboard__eyebrow">Student portal</p>
     <h1>My dashboard</h1>
@@ -22,11 +22,24 @@
     @let app = application();
     @let presentation = statusPresentation();
 
+    @if (isMatched()) {
+      <article class="status-card status-card--success status-card--compact">
+        <div class="status-card__top">
+          <div class="status-badge">
+            <span class="status-badge__dot" aria-hidden="true"></span>
+            <span class="status-badge__label">{{ presentation.label }}</span>
+          </div>
+          <p class="status-card__detail">{{ presentation.detail }}</p>
+        </div>
+      </article>
+      <app-student-matched-portal />
+    } @else {
     <article
       class="status-card"
       [class.status-card--pending]="presentation.tone === 'pending'"
       [class.status-card--review]="presentation.tone === 'review'"
       [class.status-card--success]="presentation.tone === 'success'"
+      [class.status-card--action]="presentation.tone === 'action'"
     >
       <div class="status-card__top">
         <div class="status-badge" [class.status-badge--pulse]="presentation.tone === 'review'">
@@ -72,6 +85,83 @@
       </ol>
     </article>
 
+    @if (app?.status === 'awaiting_reply' && scheduleProposal(); as proposal) {
+      <section class="schedule-proposal" aria-labelledby="proposal-heading">
+        <h2 id="proposal-heading">Proposed lesson schedule</h2>
+        <p class="schedule-proposal__lead">
+          Your teacher has suggested these lesson times. Accept to confirm, or amend if you need
+          different days.
+        </p>
+
+        @if (proposalScheduleSlots().length) {
+          <div class="schedule-proposal__pattern">
+            <p class="schedule-proposal__pattern-heading">Every:</p>
+            <ul class="schedule-proposal__pattern-list">
+              @for (slot of proposalScheduleSlots(); track slot) {
+                <li>{{ slot }}</li>
+              }
+            </ul>
+          </div>
+        }
+
+        @if (proposalError()) {
+          <p class="schedule-proposal__error" role="alert">{{ proposalError() }}</p>
+        }
+
+        @if (!showAmendForm()) {
+          <div class="schedule-proposal__actions">
+            <button
+              type="button"
+              class="dashboard-cta__btn"
+              [disabled]="proposalAction() !== 'idle'"
+              (click)="acceptProposal()"
+            >
+              {{ proposalAction() === 'accept' ? 'Accepting…' : 'Accept schedule' }}
+            </button>
+            <button
+              type="button"
+              class="dashboard-cta__btn dashboard-cta__btn--ghost"
+              [disabled]="proposalAction() !== 'idle'"
+              (click)="toggleAmendForm()"
+            >
+              Amend
+            </button>
+          </div>
+        } @else {
+          <div class="schedule-proposal__amend">
+            <label for="amend-note">
+              <span>When are you free?</span>
+              <textarea
+                id="amend-note"
+                rows="4"
+                [ngModel]="amendNote()"
+                (ngModelChange)="amendNote.set($event)"
+                placeholder="e.g. I can do Tuesday and Thursday evenings after 6pm, or Saturday mornings."
+              ></textarea>
+            </label>
+            <div class="schedule-proposal__actions">
+              <button
+                type="button"
+                class="dashboard-cta__btn"
+                [disabled]="proposalAction() !== 'idle'"
+                (click)="submitAmend()"
+              >
+                {{ proposalAction() === 'amend' ? 'Sending…' : 'Send availability note' }}
+              </button>
+              <button
+                type="button"
+                class="dashboard-cta__btn dashboard-cta__btn--ghost"
+                [disabled]="proposalAction() !== 'idle'"
+                (click)="toggleAmendForm()"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        }
+      </section>
+    }
+
     @if (app?.status === 'pending_application') {
       <section class="dashboard-cta" aria-labelledby="cta-heading">
         <h2 id="cta-heading">Next step</h2>
@@ -80,7 +170,7 @@
       </section>
     }
 
-    @if (app && app.summary && (app.status === 'under_review' || app.status === 'active')) {
+    @if (app && app.summary && app.status === 'under_review') {
       @let summary = app.summary;
       <section class="application-summary" aria-labelledby="summary-heading">
         <h2 id="summary-heading">Your submitted application</h2>
@@ -112,6 +202,7 @@
           Need to change something? Contact us and we can update your application.
         </p>
       </section>
+    }
     }
   }
 </section>

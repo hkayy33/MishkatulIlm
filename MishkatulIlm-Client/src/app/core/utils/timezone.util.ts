@@ -134,7 +134,17 @@ export function formatSlotRangeInZone(
   endsAtUtc: string,
   timeZone: string,
 ): string {
-  return `${formatTimeInZone(startsAtUtc, timeZone)} – ${formatTimeInZone(endsAtUtc, timeZone)}`;
+  try {
+    const day = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    }).format(new Date(startsAtUtc));
+    return `${day}, ${formatTimeInZone(startsAtUtc, timeZone)} – ${formatTimeInZone(endsAtUtc, timeZone)}`;
+  } catch {
+    return `${formatTimeInZone(startsAtUtc, timeZone)} – ${formatTimeInZone(endsAtUtc, timeZone)}`;
+  }
 }
 
 export function timeZoneOffsetLabel(fromZone: string, toZone: string, atUtc = new Date()): string {

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using MishkatulIlm_Server.Data;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MishkatulIlm_Server.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260516221204_AddScheduleProposals")]
+    partial class AddScheduleProposals
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -37,9 +40,6 @@ namespace MishkatulIlm_Server.Data.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime?>("DeletionRequestedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(320)
@@ -58,21 +58,6 @@ namespace MishkatulIlm_Server.Data.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
-                    b.Property<decimal?>("LastPaymentAmount")
-                        .HasPrecision(12, 2)
-                        .HasColumnType("numeric(12,2)");
-
-                    b.Property<DateTime?>("LastPaymentAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("LastPaymentCurrency")
-                        .IsRequired()
-                        .HasMaxLength(8)
-                        .HasColumnType("character varying(8)");
-
-                    b.Property<DateTime?>("NextPaymentDueUtc")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<bool>("OnboardingCompleted")
                         .HasColumnType("boolean");
 
@@ -89,11 +74,6 @@ namespace MishkatulIlm_Server.Data.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
-
-                    b.Property<string>("AttendanceStatus")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -114,35 +94,6 @@ namespace MishkatulIlm_Server.Data.Migrations
                     b.HasIndex("StudentUserId");
 
                     b.ToTable("lesson_slots", (string)null);
-                });
-
-            modelBuilder.Entity("MishkatulIlm_Server.Data.ScheduleChangeRequest", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Note")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.Property<Guid>("StudentUserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StudentUserId");
-
-                    b.ToTable("schedule_change_requests", (string)null);
                 });
 
             modelBuilder.Entity("MishkatulIlm_Server.Data.ScheduleProposal", b =>
@@ -270,17 +221,6 @@ namespace MishkatulIlm_Server.Data.Migrations
                         .WithMany()
                         .HasForeignKey("StudentUserId")
                         .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Student");
-                });
-
-            modelBuilder.Entity("MishkatulIlm_Server.Data.ScheduleChangeRequest", b =>
-                {
-                    b.HasOne("MishkatulIlm_Server.Data.AppUser", "Student")
-                        .WithMany()
-                        .HasForeignKey("StudentUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
 
                     b.Navigation("Student");
                 });

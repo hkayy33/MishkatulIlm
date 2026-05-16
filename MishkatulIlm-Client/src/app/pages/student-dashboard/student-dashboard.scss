@@ -11,6 +11,10 @@ $border: rgba(45, 42, 38, 0.1);
   padding: 2.5rem 1.5rem 4rem;
   font-family: 'Source Sans 3', system-ui, sans-serif;
   color: $text-dark;
+
+  &--matched {
+    max-width: 72rem;
+  }
 }
 
 .dashboard__header {
@@ -68,6 +72,13 @@ h1 {
     border-color: rgba(47, 122, 79, 0.3);
   }
 
+  &--action {
+    border-color: rgba(197, 157, 95, 0.45);
+    box-shadow:
+      0 1px 2px rgba(45, 42, 38, 0.04),
+      0 10px 28px rgba(197, 157, 95, 0.16);
+  }
+
   &--error {
     color: #8b2c2c;
     background: rgba(139, 44, 44, 0.06);
@@ -76,6 +87,10 @@ h1 {
 
   &--loading {
     pointer-events: none;
+  }
+
+  &--compact {
+    margin-bottom: 0;
   }
 }
 
@@ -384,6 +399,107 @@ h1 {
   &:hover {
     background: $accent-gold-hover;
     transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  &--ghost {
+    color: $text-dark;
+    background: transparent;
+    border: 1px solid rgba(45, 42, 38, 0.22);
+    box-shadow: none;
+
+    &:hover {
+      background: rgba(45, 42, 38, 0.05);
+    }
+  }
+}
+
+.schedule-proposal {
+  margin-top: 1.5rem;
+  padding: 1.25rem 1.35rem;
+  border-radius: 12px;
+  background: $card-bg;
+  border: 1px solid rgba(197, 157, 95, 0.35);
+  animation: card-enter 0.5s ease 0.1s both;
+
+  h2 {
+    margin: 0 0 0.35rem;
+    font-family: Montserrat, 'Source Sans 3', system-ui, sans-serif;
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+
+  &__lead {
+    margin: 0 0 1rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: $text-muted;
+  }
+
+  &__pattern {
+    margin: 0 0 1rem;
+  }
+
+  &__pattern-heading {
+    margin: 0 0 0.5rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: $text-dark;
+  }
+
+  &__pattern-list {
+    margin: 0;
+    padding-left: 1.25rem;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.55;
+    color: $text-dark;
+
+    li + li {
+      margin-top: 0.25rem;
+    }
+  }
+
+  &__error {
+    margin: 0 0 0.75rem;
+    color: #8b2c2c;
+    font-size: 0.88rem;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+  }
+
+  &__amend {
+    label {
+      display: block;
+      margin-bottom: 0.75rem;
+
+      span {
+        display: block;
+        margin-bottom: 0.35rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+    }
+
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.65rem 0.75rem;
+      font: inherit;
+      border-radius: 8px;
+      border: 1px solid rgba(45, 42, 38, 0.18);
+      resize: vertical;
+    }
   }
 }
 

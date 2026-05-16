@@ -1,0 +1,308 @@
+<div class="matched-shell">
+  <aside class="matched-side" aria-label="Student portal navigation">
+    <div class="matched-brand">Student portal</div>
+    <p class="matched-side__status">Matched with a teacher</p>
+    <nav class="matched-nav">
+      <button
+        type="button"
+        class="matched-nav__btn"
+        [class.is-active]="activeTab() === 'summary'"
+        (click)="setTab('summary')"
+      >
+        Summary
+      </button>
+      <button
+        type="button"
+        class="matched-nav__btn"
+        [class.is-active]="activeTab() === 'lessons'"
+        (click)="setTab('lessons')"
+      >
+        Lessons
+      </button>
+      <button
+        type="button"
+        class="matched-nav__btn"
+        [class.is-active]="activeTab() === 'payments'"
+        (click)="setTab('payments')"
+      >
+        Payments
+      </button>
+      <button
+        type="button"
+        class="matched-nav__btn"
+        [class.is-active]="activeTab() === 'account'"
+        (click)="setTab('account')"
+      >
+        Account
+      </button>
+    </nav>
+  </aside>
+
+  <section class="matched-content">
+    @if (store.actionMessage(); as msg) {
+      <p class="matched-banner matched-banner--success">{{ msg }}</p>
+    }
+    @if (store.actionError(); as err) {
+      <p class="matched-banner matched-banner--error" role="alert">{{ err }}</p>
+    }
+
+    @if (activeTab() === 'summary') {
+      <div class="matched-page">
+        <h1 class="matched-page-title">Summary</h1>
+        <p class="matched-page-lead">Your next lesson and payment at a glance.</p>
+
+        <div class="matched-cards matched-cards--summary">
+          <article class="matched-card matched-card--highlight">
+            <h2>Next lesson</h2>
+            @if (nextLesson(); as lesson) {
+              <p class="matched-card__value">{{ formatLessonInZone(lesson.startsAtUtc, lesson.endsAtUtc) }}</p>
+              <p class="matched-card__sub">
+                <span
+                  class="matched-lesson-list__badge"
+                  [class.matched-lesson-list__badge--no]="lesson.attendanceStatus === 'not_attending'"
+                >
+                  {{ attendanceLabel(lesson, false) }}
+                </span>
+              </p>
+              <button type="button" class="matched-summary-link" (click)="setTab('lessons')">
+                View calendar
+              </button>
+            } @else {
+              <p class="matched-card__value matched-card__value--muted">No upcoming lessons scheduled</p>
+            }
+          </article>
+
+          <article class="matched-card matched-card--highlight">
+            <h2>Next payment</h2>
+            @if (nextPaymentDue(); as due) {
+              <p class="matched-card__value">{{ due | date: 'fullDate' }}</p>
+              <button type="button" class="matched-summary-link" (click)="setTab('payments')">
+                View payments
+              </button>
+            } @else {
+              <p class="matched-card__value matched-card__value--muted">Not set yet</p>
+            }
+          </article>
+        </div>
+      </div>
+    }
+
+    @if (activeTab() === 'lessons') {
+      <div class="matched-page">
+        <h1 class="matched-page-title">Lessons</h1>
+        <p class="matched-page-lead">
+          Select a day on the calendar to mark each lesson as attending (default) or cannot attend.
+        </p>
+
+        @if (store.loadError()) {
+          <p class="matched-error" role="alert">{{ store.loadError() }}</p>
+        }
+
+        <app-student-lesson-calendar
+          [lessons]="store.lessons()"
+          [loading]="store.loading()"
+          [timeZoneId]="store.timeZoneId()"
+          [updatingSlotId]="store.updatingSlotId()"
+          (monthChanged)="store.onMonthChanged($event)"
+          (attendanceChange)="store.updateAttendance($event.slotId, $event.status)"
+        />
+
+        <div class="matched-lists">
+          <section aria-labelledby="upcoming-heading">
+            <h2 id="upcoming-heading" class="matched-section-heading">Upcoming this month</h2>
+            @if (upcomingLessons().length === 0) {
+              <p class="matched-muted">No upcoming lessons in this month.</p>
+            } @else {
+              <ul class="matched-lesson-list">
+                @for (lesson of upcomingLessons(); track lesson.slotId) {
+                  <li class="matched-lesson-list__item">
+                    <span class="matched-lesson-list__time">
+                      {{ formatLesson(lesson.startsAtUtc, lesson.endsAtUtc) }}
+                    </span>
+                    <span class="matched-lesson-list__actions">
+                      <span
+                        class="matched-lesson-list__badge"
+                        [class.matched-lesson-list__badge--no]="lesson.attendanceStatus === 'not_attending'"
+                      >
+                        {{ attendanceLabel(lesson, false) }}
+                      </span>
+                      <button
+                        type="button"
+                        class="matched-lesson-list__toggle"
+                        [disabled]="store.updatingSlotId() === lesson.slotId"
+                        (click)="toggleAttendance(lesson)"
+                      >
+                        {{ toggleAttendanceLabel(lesson) }}
+                      </button>
+                    </span>
+                  </li>
+                }
+              </ul>
+            }
+          </section>
+
+          <section aria-labelledby="past-heading">
+            <h2 id="past-heading" class="matched-section-heading">Past this month</h2>
+            @if (pastLessons().length === 0) {
+              <p class="matched-muted">No past lessons in this month yet.</p>
+            } @else {
+              <ul class="matched-lesson-list">
+                @for (lesson of pastLessons(); track lesson.slotId) {
+                  <li class="matched-lesson-list__item">
+                    <span class="matched-lesson-list__time">
+                      {{ formatLesson(lesson.startsAtUtc, lesson.endsAtUtc) }}
+                    </span>
+                    <span class="matched-lesson-list__actions">
+                      <span
+                        class="matched-lesson-list__badge"
+                        [class.matched-lesson-list__badge--no]="lesson.attendanceStatus === 'not_attending'"
+                      >
+                        {{ attendanceLabel(lesson, true) }}
+                      </span>
+                      <button
+                        type="button"
+                        class="matched-lesson-list__toggle"
+                        [disabled]="store.updatingSlotId() === lesson.slotId"
+                        (click)="toggleAttendance(lesson)"
+                      >
+                        {{ toggleAttendanceLabel(lesson) }}
+                      </button>
+                    </span>
+                  </li>
+                }
+              </ul>
+            }
+          </section>
+        </div>
+      </div>
+    }
+
+    @if (activeTab() === 'payments' && store.portalData(); as data) {
+      @let payment = data.portal.payment;
+      @let summary = data.portal.monthSummary;
+
+      <div class="matched-page">
+        <h1 class="matched-page-title">Payments</h1>
+        <p class="matched-page-lead">Your payment dates and a summary of lessons this month.</p>
+
+        <div class="matched-cards">
+          <article class="matched-card">
+            <h2>Next payment due</h2>
+            @if (payment.nextPaymentDueUtc) {
+              <p class="matched-card__value">{{ payment.nextPaymentDueUtc | date: 'mediumDate' }}</p>
+            } @else {
+              <p class="matched-card__value matched-card__value--muted">Not set yet</p>
+            }
+          </article>
+          <article class="matched-card">
+            <h2>Previous payment</h2>
+            @if (payment.lastPaymentAtUtc && payment.lastPaymentAmount != null) {
+              <p class="matched-card__value">
+                {{ payment.lastPaymentAmount | currency: payment.lastPaymentCurrency : 'symbol' : '1.0-2' }}
+              </p>
+              <p class="matched-card__sub">{{ payment.lastPaymentAtUtc | date: 'mediumDate' }}</p>
+            } @else {
+              <p class="matched-card__value matched-card__value--muted">No payments recorded yet</p>
+            }
+          </article>
+        </div>
+
+        <section class="matched-card matched-card--summary">
+          <h2>Lesson summary this month</h2>
+          <dl class="matched-summary-grid">
+            <div>
+              <dt>Past lessons</dt>
+              <dd>{{ summary.pastLessonsCount }}</dd>
+            </div>
+            <div>
+              <dt>Upcoming lessons</dt>
+              <dd>{{ summary.upcomingLessonsCount }}</dd>
+            </div>
+            <div>
+              <dt>Marked attending</dt>
+              <dd>{{ summary.attendingCount }}</dd>
+            </div>
+            <div>
+              <dt>Cannot attend</dt>
+              <dd>{{ summary.notAttendingCount }}</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+    }
+
+    @if (activeTab() === 'account' && store.portalData(); as data) {
+      <div class="matched-page">
+        <h1 class="matched-page-title">Account</h1>
+        <p class="matched-page-lead">
+          Request a new lesson schedule or delete your account if you no longer need lessons.
+        </p>
+
+        @if (data.portal.hasPendingScheduleChangeRequest) {
+          <p class="matched-muted">You have a pending schedule change request with your teacher.</p>
+        }
+
+        <section class="matched-account-block">
+          <h2>Schedule change</h2>
+          @if (!showScheduleChangeForm()) {
+            <button type="button" class="matched-btn matched-btn--ghost" (click)="showScheduleChangeForm.set(true)">
+              Request schedule change
+            </button>
+          } @else {
+            <div class="matched-form">
+              <label for="schedule-change-note">What would you like to change?</label>
+              <textarea
+                id="schedule-change-note"
+                rows="3"
+                [ngModel]="scheduleChangeNote()"
+                (ngModelChange)="scheduleChangeNote.set($event)"
+                placeholder="Describe the days and times that work better for you."
+              ></textarea>
+              <div class="matched-form__actions">
+                <button type="button" class="matched-btn" [disabled]="actionBusy()" (click)="submitScheduleChange()">
+                  Send request
+                </button>
+                <button type="button" class="matched-btn matched-btn--ghost" (click)="showScheduleChangeForm.set(false)">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          }
+        </section>
+
+        <section class="matched-account-block">
+          <h2>Delete account</h2>
+          @if (!showDeleteConfirm()) {
+            <button type="button" class="matched-btn matched-btn--danger" (click)="showDeleteConfirm.set(true)">
+              Delete account
+            </button>
+          } @else {
+            <div class="matched-form">
+              <p class="matched-muted">Type <strong>DELETE</strong> to confirm. This deactivates your account.</p>
+              <input
+                type="text"
+                [ngModel]="deleteConfirmText()"
+                (ngModelChange)="deleteConfirmText.set($event)"
+                placeholder="DELETE"
+                autocomplete="off"
+              />
+              <div class="matched-form__actions">
+                <button
+                  type="button"
+                  class="matched-btn matched-btn--danger"
+                  [disabled]="actionBusy()"
+                  (click)="confirmDeleteAccount()"
+                >
+                  Confirm deletion
+                </button>
+                <button type="button" class="matched-btn matched-btn--ghost" (click)="showDeleteConfirm.set(false)">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          }
+        </section>
+      </div>
+    }
+  </section>
+</div>

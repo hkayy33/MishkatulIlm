@@ -20,11 +20,11 @@ export class App {
     merge(
       of(null),
       this.router.events.pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd)),
-    ).pipe(map(() => !this.isAdminRoute(this.router.url))),
-    { initialValue: !this.isAdminRoute(this.router.url) },
+    ).pipe(map(() => !this.isStandaloneAppRoute(this.router.url))),
+    { initialValue: !this.isStandaloneAppRoute(this.router.url) },
   );
 
-  private isAdminRoute(rawUrl: string): boolean {
+  private isStandaloneAppRoute(rawUrl: string): boolean {
     const path = rawUrl.split('#')[0]?.split('?')[0] ?? '';
     return path.startsWith('/admin');
   }

@@ -1,7 +1,8 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { afterNextRender, Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { catchError, EMPTY, switchMap, take } from 'rxjs';
+import { catchError, EMPTY, finalize, switchMap, take } from 'rxjs';
 import type {
   ApplicationStep,
   StudentApplicationResponse,
@@ -9,22 +10,26 @@ import type {
 } from '../../core/models/application-status.models';
 import { OnboardingApiService } from '../../core/services/onboarding-api.service';
 import { AuthService } from '../../core/services/auth.service';
+import { formatHttpError } from '../../core/utils/http-error.util';
 import {
   formatAvailabilityCodes,
   labelFrequencyCode,
   labelLevelCode,
   labelSubjectCode,
 } from '../../core/utils/onboarding-labels';
+import { recurringLessonPatterns } from '../../core/utils/recurring-lesson-label';
+import { resolveTimeZoneId } from '../../core/utils/timezone.util';
+import { StudentMatchedPortal } from './student-matched-portal';
 
 interface StatusPresentation {
   label: string;
   detail: string;
-  tone: 'pending' | 'review' | 'success' | 'neutral';
+  tone: 'pending' | 'review' | 'success' | 'neutral' | 'action';
 }
 
 @Component({
   selector: 'app-student-dashboard',
-  imports: [RouterLink],
+  imports: [RouterLink, FormsModule, StudentMatchedPortal],
   templateUrl: './student-dashboard.html',
   styleUrl: './student-dashboard.scss',
 })
@@ -36,11 +41,19 @@ export class StudentDashboard {
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
   protected readonly application = signal<StudentApplicationResponse | null>(null);
+  protected readonly proposalAction = signal<'idle' | 'accept' | 'amend'>('idle');
+  protected readonly showAmendForm = signal(false);
+  protected readonly amendNote = signal('');
+  protected readonly proposalError = signal<string | null>(null);
 
   protected readonly labelSubjectCode = labelSubjectCode;
   protected readonly labelLevelCode = labelLevelCode;
   protected readonly labelFrequencyCode = labelFrequencyCode;
   protected readonly formatAvailabilityCodes = formatAvailabilityCodes;
+  protected readonly isMatched = computed(() => {
+    const status = this.application()?.status;
+    return status === 'matched' || status === 'active';
+  });
 
   protected readonly statusPresentation = computed((): StatusPresentation => {
     const status = this.application()?.status ?? 'pending_application';
@@ -54,8 +67,11 @@ export class StudentDashboard {
         return 33;
       case 'under_review':
         return 66;
+      case 'awaiting_reply':
+        return 80;
+      case 'matched':
       case 'active':
-        return 85;
+        return 100;
       case 'inactive':
         return 50;
       case 'approved':
@@ -70,6 +86,22 @@ export class StudentDashboard {
   protected readonly steps = computed((): ApplicationStep[] => {
     const status = this.application()?.status ?? 'pending_application';
     return buildApplicationSteps(status);
+  });
+
+  protected readonly scheduleProposal = computed(
+    () => this.application()?.scheduleProposal ?? null,
+  );
+
+  protected readonly proposalScheduleSlots = computed(() => {
+    const proposal = this.scheduleProposal();
+    if (!proposal?.plannedLessons?.length) return [];
+
+    const summary = this.application()?.summary;
+    const timeZone = summary?.country
+      ? resolveTimeZoneId(summary.country, summary.city ?? '')
+      : undefined;
+
+    return recurringLessonPatterns(proposal.plannedLessons, timeZone);
   });
 
   constructor() {
@@ -111,10 +143,58 @@ export class StudentDashboard {
       )
       .subscribe({
         next: (app) => {
-          this.application.set(app);
+          this.application.set(normalizeApplication(app));
           this.loading.set(false);
         },
       });
+  }
+
+  protected acceptProposal(): void {
+    if (this.proposalAction() !== 'idle') return;
+    this.proposalError.set(null);
+    this.proposalAction.set('accept');
+    this.onboardingApi
+      .acceptScheduleProposal()
+      .pipe(finalize(() => this.proposalAction.set('idle')))
+      .subscribe({
+        next: () => {
+          this.showAmendForm.set(false);
+          this.reloadApplication();
+        },
+        error: (err: unknown) => {
+          this.proposalError.set(formatHttpError(err, 'Could not accept the schedule.'));
+        },
+      });
+  }
+
+  protected submitAmend(): void {
+    const note = this.amendNote().trim();
+    if (note.length < 10) {
+      this.proposalError.set('Please describe which days and times work for you (at least 10 characters).');
+      return;
+    }
+    if (this.proposalAction() !== 'idle') return;
+
+    this.proposalError.set(null);
+    this.proposalAction.set('amend');
+    this.onboardingApi
+      .amendScheduleProposal(note)
+      .pipe(finalize(() => this.proposalAction.set('idle')))
+      .subscribe({
+        next: () => {
+          this.showAmendForm.set(false);
+          this.amendNote.set('');
+          this.reloadApplication();
+        },
+        error: (err: unknown) => {
+          this.proposalError.set(formatHttpError(err, 'Could not send your availability note.'));
+        },
+      });
+  }
+
+  protected toggleAmendForm(): void {
+    this.showAmendForm.update((v) => !v);
+    this.proposalError.set(null);
   }
 }
 
@@ -132,10 +212,17 @@ function statusPresentationFor(status: StudentApplicationStatus): StatusPresenta
         detail: 'Your application is with our team. We will email you about next steps.',
         tone: 'review',
       };
+    case 'awaiting_reply':
+      return {
+        label: 'Awaiting your reply',
+        detail: 'Review the proposed lesson times below and accept or request changes.',
+        tone: 'action',
+      };
+    case 'matched':
     case 'active':
       return {
-        label: 'Active',
-        detail: 'Your application is approved. We will contact you about lesson placement.',
+        label: 'Matched with a teacher',
+        detail: 'Your lesson schedule is confirmed. Use the calendar below to manage your lessons.',
         tone: 'success',
       };
     case 'inactive':
@@ -165,17 +252,42 @@ function statusPresentationFor(status: StudentApplicationStatus): StatusPresenta
   }
 }
 
+function normalizeApplication(app: StudentApplicationResponse): StudentApplicationResponse {
+  const raw = app as StudentApplicationResponse & {
+    ScheduleProposal?: StudentApplicationResponse['scheduleProposal'];
+  };
+  const proposal = app.scheduleProposal ?? raw.ScheduleProposal ?? null;
+  if (!proposal) {
+    return { ...app, scheduleProposal: null };
+  }
+
+  const lessons = (proposal.plannedLessons ?? []).map((l) => {
+    const row = l as typeof l & { StartsAtUtc?: string; EndsAtUtc?: string; DurationMinutes?: number };
+    return {
+      startsAtUtc: l.startsAtUtc ?? row.StartsAtUtc ?? '',
+      endsAtUtc: l.endsAtUtc ?? row.EndsAtUtc ?? '',
+      durationMinutes: l.durationMinutes ?? row.DurationMinutes ?? 60,
+    };
+  });
+
+  return {
+    ...app,
+    scheduleProposal: { ...proposal, plannedLessons: lessons },
+  };
+}
+
 function buildApplicationSteps(status: StudentApplicationStatus): ApplicationStep[] {
   const applicationComplete =
-    status !== 'pending_application' &&
-    status !== 'inactive';
+    status !== 'pending_application' && status !== 'inactive';
   const reviewReached =
     status === 'under_review' ||
+    status === 'awaiting_reply' ||
+    status === 'matched' ||
     status === 'active' ||
     status === 'approved' ||
     status === 'enrolled';
-  const approved =
-    status === 'active' || status === 'approved' || status === 'enrolled';
+  const matched =
+    status === 'matched' || status === 'active' || status === 'approved' || status === 'enrolled';
   const enrolled = status === 'enrolled';
 
   return [
@@ -199,15 +311,15 @@ function buildApplicationSteps(status: StudentApplicationStatus): ApplicationSte
       description: reviewReached
         ? 'Our team is reviewing your application.'
         : 'We review applications after you submit the form.',
-      state: approved || enrolled ? 'complete' : reviewReached ? 'current' : 'upcoming',
+      state: matched || enrolled ? 'complete' : reviewReached ? 'current' : 'upcoming',
     },
     {
       id: 'matched',
       title: 'Matched with a teacher',
-      description: enrolled
-        ? 'You are enrolled and ready for lessons.'
+      description: matched
+        ? 'You are matched and can manage your lessons below.'
         : 'We will match you when a suitable teacher is available.',
-      state: enrolled ? 'complete' : approved ? 'current' : 'upcoming',
+      state: enrolled || matched ? 'complete' : 'upcoming',
     },
   ];
 }

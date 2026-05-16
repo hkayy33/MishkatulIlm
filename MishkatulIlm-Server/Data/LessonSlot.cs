@@ -8,5 +8,6 @@ public sealed class LessonSlot
     public DateTime EndsAtUtc { get; set; }
     public Guid? StudentUserId { get; set; }
     public AppUser? Student { get; set; }
+    public string AttendanceStatus { get; set; } = AttendanceStatusCodes.Attending;
     public DateTime CreatedAtUtc { get; set; }
 }

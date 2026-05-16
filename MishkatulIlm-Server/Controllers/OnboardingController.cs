@@ -15,6 +15,7 @@ namespace MishkatulIlm_Server.Controllers;
 [Route("api/[controller]")]
 public sealed class OnboardingController(
     AppDbContext db,
+    ScheduleProposalService scheduleProposals,
     IWebHostEnvironment env,
     ILogger<OnboardingController> logger) : ControllerBase
 {
@@ -46,11 +47,21 @@ public sealed class OnboardingController(
         {
             summary = new StudentApplicationSummary
             {
+                Country = profile.Country,
+                City = profile.City,
                 CurrentLevel = profile.CurrentLevel,
                 LessonFrequency = profile.LessonFrequency,
                 SubjectCodes = profile.SubjectCodes,
                 PreferredAvailability = profile.PreferredAvailability,
             };
+        }
+
+        ScheduleProposalDto? proposalDto = null;
+        if (user.ApplicationStatus == ApplicationStatusCodes.AwaitingReply)
+        {
+            var proposal = await scheduleProposals.GetOpenProposalForStudentAsync(user.Id, cancellationToken);
+            if (proposal is not null)
+                proposalDto = ScheduleProposalService.ToDto(proposal);
         }
 
         return Ok(
@@ -59,6 +70,93 @@ public sealed class OnboardingController(
                 Status = status,
                 OnboardingCompleted = user.OnboardingCompleted,
                 Summary = summary,
+                ScheduleProposal = proposalDto,
+            });
+    }
+
+    [HttpPost("me/schedule-proposal/accept")]
+    public async Task<IActionResult> AcceptScheduleProposal(CancellationToken cancellationToken)
+    {
+        if (!User.TryGetSupabaseUserId(out var userId))
+            return Unauthorized();
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+        if (user is null)
+            return NotFound(new { message = "Account not found." });
+
+        if (user.ApplicationStatus != ApplicationStatusCodes.AwaitingReply)
+            return BadRequest(new { message = "There is no schedule waiting for your response." });
+
+        var proposal = await db.ScheduleProposals
+            .FirstOrDefaultAsync(
+                p => p.StudentUserId == userId && p.Status == ScheduleProposalCodes.AwaitingStudent,
+                cancellationToken);
+
+        if (proposal is null)
+            return NotFound(new { message = "Schedule proposal not found." });
+
+        try
+        {
+            await scheduleProposals.BookPlannedLessonsAsync(userId, proposal.PlannedLessons, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+
+        proposal.Status = ScheduleProposalCodes.Accepted;
+        proposal.UpdatedAtUtc = DateTime.UtcNow;
+        user.ApplicationStatus = ApplicationStatusCodes.Active;
+        if (user.NextPaymentDueUtc is null)
+            user.NextPaymentDueUtc = DateTime.UtcNow.Date.AddMonths(1);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Ok(
+            new StudentApplicationResponse
+            {
+                Status = "matched",
+                OnboardingCompleted = user.OnboardingCompleted,
+            });
+    }
+
+    [HttpPost("me/schedule-proposal/amend")]
+    public async Task<IActionResult> AmendScheduleProposal(
+        [FromBody] AmendScheduleProposalRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetSupabaseUserId(out var userId))
+            return Unauthorized();
+
+        var note = request.Note.Trim();
+        if (note.Length < 10)
+            return BadRequest(new { message = "Please describe which days and times work for you (at least 10 characters)." });
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+        if (user is null)
+            return NotFound(new { message = "Account not found." });
+
+        if (user.ApplicationStatus != ApplicationStatusCodes.AwaitingReply)
+            return BadRequest(new { message = "There is no schedule waiting for your response." });
+
+        var proposal = await db.ScheduleProposals
+            .FirstOrDefaultAsync(
+                p => p.StudentUserId == userId && p.Status == ScheduleProposalCodes.AwaitingStudent,
+                cancellationToken);
+
+        if (proposal is null)
+            return NotFound(new { message = "Schedule proposal not found." });
+
+        proposal.Status = ScheduleProposalCodes.StudentAmended;
+        proposal.StudentAmendNote = note;
+        proposal.UpdatedAtUtc = DateTime.UtcNow;
+        user.ApplicationStatus = ApplicationStatusCodes.Pending;
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Ok(
+            new StudentApplicationResponse
+            {
+                Status = "under_review",
+                OnboardingCompleted = user.OnboardingCompleted,
             });
     }
 
@@ -154,7 +252,9 @@ public sealed class OnboardingController(
         }
 
         user.OnboardingCompleted = true;
-        if (user.ApplicationStatus is not ApplicationStatusCodes.Active and not ApplicationStatusCodes.Inactive)
+        if (user.ApplicationStatus is not ApplicationStatusCodes.Active
+            and not ApplicationStatusCodes.Inactive
+            and not ApplicationStatusCodes.AwaitingReply)
             user.ApplicationStatus = ApplicationStatusCodes.Pending;
 
         try
@@ -187,9 +287,11 @@ public sealed class OnboardingController(
     private static string ResolveStudentApplicationStatus(AppUser user)
     {
         if (user.ApplicationStatus == ApplicationStatusCodes.Active)
-            return "active";
+            return "matched";
         if (user.ApplicationStatus == ApplicationStatusCodes.Inactive)
             return "inactive";
+        if (user.ApplicationStatus == ApplicationStatusCodes.AwaitingReply)
+            return "awaiting_reply";
         return user.OnboardingCompleted ? "under_review" : "pending_application";
     }
 

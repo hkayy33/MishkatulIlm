@@ -8,6 +8,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<StudentOnboardingProfile> StudentOnboardingProfiles => Set<StudentOnboardingProfile>();
     public DbSet<LessonSlot> LessonSlots => Set<LessonSlot>();
     public DbSet<SchedulingSettings> SchedulingSettings => Set<SchedulingSettings>();
+    public DbSet<ScheduleProposal> ScheduleProposals => Set<ScheduleProposal>();
+    public DbSet<ScheduleChangeRequest> ScheduleChangeRequests => Set<ScheduleChangeRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -21,6 +23,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.LastName).HasMaxLength(120).IsRequired();
             entity.Property(e => e.IsAdmin).IsRequired();
             entity.Property(e => e.ApplicationStatus).HasMaxLength(16).IsRequired();
+            entity.Property(e => e.LastPaymentCurrency).HasMaxLength(8).IsRequired();
+            entity.Property(e => e.LastPaymentAmount).HasPrecision(12, 2);
             entity.HasOne(e => e.Onboarding)
                 .WithOne(e => e.User)
                 .HasForeignKey<StudentOnboardingProfile>(e => e.UserId);
@@ -50,6 +54,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany()
                 .HasForeignKey(e => e.StudentUserId)
                 .OnDelete(DeleteBehavior.SetNull);
+            entity.Property(e => e.AttendanceStatus).HasMaxLength(16).IsRequired();
+        });
+
+        modelBuilder.Entity<ScheduleChangeRequest>(entity =>
+        {
+            entity.ToTable("schedule_change_requests");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.StudentUserId);
+            entity.Property(e => e.Note).HasMaxLength(4000).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(16).IsRequired();
+            entity.HasOne(e => e.Student)
+                .WithMany()
+                .HasForeignKey(e => e.StudentUserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<SchedulingSettings>(entity =>
@@ -60,6 +78,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.TutorCountry).HasMaxLength(120).IsRequired();
             entity.Property(e => e.TutorCity).HasMaxLength(120).IsRequired();
             entity.Property(e => e.TutorTimeZoneId).HasMaxLength(64).IsRequired();
+        });
+
+        modelBuilder.Entity<ScheduleProposal>(entity =>
+        {
+            entity.ToTable("schedule_proposals");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.StudentUserId);
+            entity.Property(e => e.Status).HasMaxLength(32).IsRequired();
+            entity.Property(e => e.PlannedLessons).HasColumnType("jsonb").IsRequired();
+            entity.Property(e => e.StudentAmendNote).HasMaxLength(4000);
+            entity.HasOne(e => e.Student)
+                .WithMany()
+                .HasForeignKey(e => e.StudentUserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

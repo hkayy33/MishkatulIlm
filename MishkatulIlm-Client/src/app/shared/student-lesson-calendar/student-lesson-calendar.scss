@@ -1,0 +1,157 @@
+.stu-cal {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+
+  @media (min-width: 900px) {
+    grid-template-columns: 1fr minmax(260px, 320px);
+  }
+}
+
+.stu-cal__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.stu-cal__nav {
+  border: 1px solid rgba(45, 42, 38, 0.15);
+  background: #fff;
+  border-radius: 8px;
+  width: 2rem;
+  height: 2rem;
+  cursor: pointer;
+}
+
+.stu-cal__label {
+  font-weight: 600;
+}
+
+.stu-cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.stu-cal__head {
+  font-size: 0.72rem;
+  text-align: center;
+  color: #7a7368;
+  padding: 0.25rem;
+}
+
+.stu-cal__cell {
+  min-height: 3.5rem;
+  border: 1px solid rgba(45, 42, 38, 0.1);
+  border-radius: 8px;
+  background: #fffef9;
+  padding: 0.25rem;
+  cursor: pointer;
+  text-align: left;
+
+  &--selected {
+    border-color: #c59d5f;
+    box-shadow: 0 0 0 1px #c59d5f;
+  }
+
+  &--has-lessons {
+    background: rgba(197, 157, 95, 0.12);
+  }
+
+  &--empty {
+    border: none;
+    background: transparent;
+    cursor: default;
+  }
+}
+
+.stu-cal__daynum {
+  display: block;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.stu-cal__count {
+  display: block;
+  font-size: 0.65rem;
+  color: #6b5420;
+}
+
+.stu-cal__side {
+  border: 1px solid rgba(45, 42, 38, 0.1);
+  border-radius: 12px;
+  padding: 1rem;
+  background: #fffef9;
+}
+
+.stu-cal__side-title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.stu-cal__muted {
+  margin: 0;
+  color: #7a7368;
+  font-size: 0.9rem;
+}
+
+.stu-cal__lessons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.stu-cal__lesson-time {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.stu-cal__lesson--past {
+  opacity: 0.75;
+}
+
+.stu-cal__attendance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stu-cal__status {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(47, 122, 79, 0.15);
+  color: #2f5a3f;
+
+  &--no {
+    background: rgba(139, 44, 44, 0.12);
+    color: #8b2c2c;
+  }
+}
+
+.stu-cal__toggle {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.82rem;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid rgba(28, 27, 24, 0.2);
+  background: #fff;
+  color: #3a3834;
+
+  &:hover:not(:disabled) {
+    background: #faf8f4;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}

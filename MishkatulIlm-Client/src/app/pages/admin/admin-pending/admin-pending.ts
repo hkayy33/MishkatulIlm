@@ -209,9 +209,9 @@ export class AdminPending {
     this.loadError.set(null);
     this.adminApi.approveApplication(row.userId, weekOne).subscribe({
       next: () => {
-        this.rows.update((list) => list.filter((r) => r.userId !== row.userId));
         this.actionUserId.set(null);
         this.closeApprove();
+        this.reload();
       },
       error: (err: { error?: { message?: string } }) => {
         this.loadError.set(err?.error?.message ?? 'Could not approve application.');

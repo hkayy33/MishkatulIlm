@@ -9,10 +9,14 @@ public sealed class StudentApplicationResponse
     public bool OnboardingCompleted { get; init; }
 
     public StudentApplicationSummary? Summary { get; init; }
+
+    public ScheduleProposalDto? ScheduleProposal { get; init; }
 }
 
 public sealed class StudentApplicationSummary
 {
+    public string Country { get; init; } = string.Empty;
+    public string City { get; init; } = string.Empty;
     public string CurrentLevel { get; init; } = string.Empty;
     public string LessonFrequency { get; init; } = string.Empty;
     public IReadOnlyList<string> SubjectCodes { get; init; } = Array.Empty<string>();

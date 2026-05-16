@@ -56,7 +56,9 @@ export class Signup {
             });
             return;
           }
-          void this.router.navigate(['/onboarding']);
+          const u = this.auth.user();
+          if (u?.isAdmin) void this.router.navigate(['/admin']);
+          else void this.router.navigate(['/onboarding']);
         },
         error: (err: Error & { message?: string }) => {
           this.submitError = err?.message || 'Could not create your account. Try again.';

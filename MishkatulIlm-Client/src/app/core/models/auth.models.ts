@@ -19,6 +19,8 @@ export interface AuthUser {
   firstName: string;
   lastName: string;
   onboardingCompleted: boolean;
+  /** From the API after profile load; false until `/api/users/me` succeeds. */
+  isAdmin: boolean;
 }
 
 /** Result of register when email confirmation is enabled in Supabase. */

@@ -1,0 +1,25 @@
+@use '../admin-page.shared';
+
+.admin-subtitle {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.2rem;
+  margin: 0 0 0.65rem;
+
+  &--spaced {
+    margin-top: 2rem;
+  }
+}
+
+.admin-tight-top {
+  margin-top: 0.65rem;
+  margin-bottom: 0;
+}
+
+.admin-success {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  color: #1f5f3a;
+}
+
+.admin-span-row {
+  grid-column: 1 / -1;
+}

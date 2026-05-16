@@ -10,5 +10,8 @@ public sealed class AppUser
     public DateTime CreatedAtUtc { get; set; }
     public bool OnboardingCompleted { get; set; }
 
+    /// <summary>When true, the user may call admin APIs and open the admin dashboard.</summary>
+    public bool IsAdmin { get; set; }
+
     public StudentOnboardingProfile? Onboarding { get; set; }
 }

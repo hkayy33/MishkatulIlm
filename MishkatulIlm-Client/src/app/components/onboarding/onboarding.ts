@@ -1,6 +1,6 @@
-import { Component, inject } from '@angular/core';
+import { afterNextRender, Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { switchMap } from 'rxjs';
+import { catchError, firstValueFrom, of, switchMap } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import type { SaveOnboardingRequest } from '../../core/models/onboarding.models';
 import { OnboardingApiService } from '../../core/services/onboarding-api.service';
@@ -29,6 +29,24 @@ export class Onboarding {
   private readonly router = inject(Router);
 
   submitError: string | null = null;
+
+  constructor() {
+    // Login only reads `isAdmin` from the API. If /me failed earlier or the row was fixed in the DB
+    // after sign-in, refresh here so admins are not stuck on onboarding.
+    afterNextRender(() => {
+      if (!this.auth.isAuthenticated()) return;
+      void firstValueFrom(
+        this.auth.syncServerProfile().pipe(
+          switchMap(() => this.auth.refreshServerProfile()),
+          catchError(() => of(void 0)),
+        ),
+      ).then(() => {
+        const u = this.auth.user();
+        if (u?.isAdmin) void this.router.navigateByUrl('/admin', { replaceUrl: true });
+        else if (u?.onboardingCompleted) void this.router.navigateByUrl('/', { replaceUrl: true });
+      });
+    });
+  }
 
   readonly maxSubjects = 4;
 

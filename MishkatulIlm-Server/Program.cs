@@ -8,6 +8,8 @@ using MishkatulIlm_Server.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.SectionName));
+
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
@@ -35,8 +37,19 @@ builder.Services.AddSingleton<SupabaseJwtKeyProvider>();
 builder.Services.AddHostedService<SupabaseJwksRefreshWorker>();
 builder.Services.AddSingleton<IConfigureNamedOptions<JwtBearerOptions>, ConfigureSupabaseJwtBearerOptions>();
 
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<SupabaseAdminAuthClient>();
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer();
+
+// Other components can set ValidIssuer/ValidIssuers on JwtBearerOptions after our Supabase config.
+// That bypasses IssuerValidator and rejects tokens whose iss does not match byte-for-byte.
+builder.Services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+{
+    options.TokenValidationParameters.ValidIssuer = null;
+    options.TokenValidationParameters.ValidIssuers = null;
+});
 
 builder.Services.AddAuthorization();
 

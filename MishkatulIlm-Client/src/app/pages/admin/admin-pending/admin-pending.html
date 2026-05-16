@@ -1,0 +1,33 @@
+<div class="admin-page">
+  <h1 class="admin-title">Pending applications</h1>
+  <p class="admin-lead">Users who have not finished onboarding yet.</p>
+
+  @if (loading()) {
+    <p class="admin-muted">Loading…</p>
+  } @else if (loadError()) {
+    <p class="admin-error">{{ loadError() }}</p>
+  } @else if (rows().length === 0) {
+    <p class="admin-muted">No pending applications.</p>
+  } @else {
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Registered</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of rows(); track r.userId) {
+            <tr>
+              <td>{{ r.firstName }} {{ r.lastName }}</td>
+              <td>{{ r.email }}</td>
+              <td>{{ r.createdAtUtc | date: 'medium' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

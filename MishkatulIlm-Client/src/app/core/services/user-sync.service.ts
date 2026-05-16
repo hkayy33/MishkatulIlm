@@ -1,11 +1,11 @@
-import { HttpBackend, HttpClient } from '@angular/common/http';
+import { HttpBackend, HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { catchError, Observable, of } from 'rxjs';
 import { API_BASE_URL } from '../tokens/api-base-url.token';
 
 /**
- * Syncs the Supabase user into the .NET `users` table via a dedicated HTTP client built from
- * {@link HttpBackend} so the request does not go through interceptors (avoids AuthService ↔ HttpClient cycles).
+ * POST /api/users/sync — backfill/patch the app `users` row (created at signup by a DB trigger on `auth.users`).
+ * Uses {@link HttpBackend} so the request does not go through interceptors (avoids AuthService ↔ HttpClient cycles).
  */
 @Injectable({ providedIn: 'root' })
 export class UserSyncService {
@@ -21,12 +21,19 @@ export class UserSyncService {
     return this.http
       .post<void>(url, {}, { headers: { Authorization: `Bearer ${accessToken}` } })
       .pipe(
-        catchError((err: { status?: number; message?: string }) => {
-          console.warn(
-            '[UserSyncService] POST /api/users/sync failed:',
-            err?.status,
-            err?.message ?? err,
-          );
+        catchError((err: unknown) => {
+          if (err instanceof HttpErrorResponse) {
+            console.warn(
+              '[UserSyncService] POST /api/users/sync failed:',
+              url,
+              'status=',
+              err.status,
+              'body=',
+              err.error,
+            );
+          } else {
+            console.warn('[UserSyncService] POST /api/users/sync failed:', url, err);
+          }
           return of(void 0);
         }),
       );

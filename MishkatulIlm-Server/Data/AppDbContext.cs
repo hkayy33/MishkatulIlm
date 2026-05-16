@@ -17,6 +17,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.Email).HasMaxLength(320).IsRequired();
             entity.Property(e => e.FirstName).HasMaxLength(120).IsRequired();
             entity.Property(e => e.LastName).HasMaxLength(120).IsRequired();
+            entity.Property(e => e.IsAdmin).IsRequired();
             entity.HasOne(e => e.Onboarding)
                 .WithOne(e => e.User)
                 .HasForeignKey<StudentOnboardingProfile>(e => e.UserId);

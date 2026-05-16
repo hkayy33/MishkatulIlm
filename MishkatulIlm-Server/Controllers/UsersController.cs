@@ -4,20 +4,72 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using MishkatulIlm_Server.Authentication;
 using MishkatulIlm_Server.Data;
+using MishkatulIlm_Server.Dtos;
+using MishkatulIlm_Server.Options;
+using MishkatulIlm_Server.Services;
 
 namespace MishkatulIlm_Server.Controllers;
 
-/// <summary>Ensures a <c>users</c> row exists for the current Supabase user (register/login hit Supabase first; this syncs your API DB).</summary>
+/// <summary>
+/// App profile for the signed-in Supabase user. Rows are created by the <c>auth.users</c> DB trigger at signup;
+/// <see cref="Sync"/> backfills if needed and applies admin promotion from config.
+/// </summary>
 [ApiController]
 [Authorize]
 [Route("api/[controller]")]
-public sealed class UsersController(AppDbContext db, ILogger<UsersController> logger) : ControllerBase
+public sealed class UsersController(
+    AppDbContext db,
+    IOptions<AdminOptions> adminOptions,
+    ILogger<UsersController> logger) : ControllerBase
 {
+    [HttpGet("me")]
+    public async Task<IActionResult> Me(CancellationToken cancellationToken)
+    {
+        if (!User.TryGetSupabaseUserId(out var userId))
+            return Unauthorized();
+
+        var email =
+            User.FindFirstValue(ClaimTypes.Email)
+            ?? User.FindFirstValue(JwtRegisteredClaimNames.Email)
+            ?? User.FindFirstValue("email")
+            ?? string.Empty;
+
+        var (metaFirst, metaLast) = ReadNamesFromUserMetadataClaim();
+
+        var row = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+        if (row is null)
+        {
+            return Ok(
+                new UserMeResponse
+                {
+                    UserId = userId,
+                    Email = email,
+                    FirstName = metaFirst,
+                    LastName = metaLast,
+                    OnboardingCompleted = false,
+                    IsAdmin = adminOptions.Value.IsPromotedAdminEmail(email),
+                });
+        }
+
+        return Ok(
+            new UserMeResponse
+            {
+                UserId = row.Id,
+                Email = row.Email,
+                FirstName = row.FirstName,
+                LastName = row.LastName,
+                OnboardingCompleted = row.OnboardingCompleted,
+                IsAdmin = row.IsAdmin,
+            });
+    }
+
     [HttpPost("sync")]
     public async Task<IActionResult> Sync(CancellationToken cancellationToken)
     {
-        if (!TryGetSupabaseUserId(User, out var userId))
+        if (!User.TryGetSupabaseUserId(out var userId))
         {
             logger.LogWarning(
                 "User sync: could not parse user id from JWT. Claim types present: {ClaimTypes}",
@@ -35,58 +87,27 @@ public sealed class UsersController(AppDbContext db, ILogger<UsersController> lo
             email = $"{userId:N}@supabase-sync.local";
 
         var (firstName, lastName) = ReadNamesFromUserMetadataClaim();
+        var promoted = adminOptions.Value.IsPromotedAdminEmail(email);
 
-        if (await db.Users.AnyAsync(u => u.Id == userId, cancellationToken))
-        {
-            logger.LogInformation("User sync: {UserId} already exists, skipping insert.", userId);
-            return NoContent();
-        }
-
-        var user = new AppUser
-        {
-            Id = userId,
-            Email = email,
-            FirstName = firstName,
-            LastName = lastName,
-            CreatedAtUtc = DateTime.UtcNow,
-            OnboardingCompleted = false,
-        };
-
-        db.Users.Add(user);
         try
         {
-            await db.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("User sync: created profile row for {UserId} ({Email}).", userId, email);
+            await UserProfileProvisioner.EnsureAsync(
+                db,
+                userId,
+                email,
+                firstName,
+                lastName,
+                promoted,
+                onboardingCompleted: null,
+                cancellationToken);
         }
         catch (DbUpdateException ex)
         {
-            logger.LogWarning(ex, "User sync: could not insert {UserId}", userId);
+            logger.LogWarning(ex, "User sync: could not ensure profile for {UserId}", userId);
             return Conflict(new { message = "User profile could not be created." });
         }
 
         return NoContent();
-    }
-
-    private static bool TryGetSupabaseUserId(ClaimsPrincipal user, out Guid userId)
-    {
-        var candidates = new[]
-        {
-            user.FindFirstValue(ClaimTypes.NameIdentifier),
-            user.FindFirstValue(JwtRegisteredClaimNames.Sub),
-            user.FindFirstValue("sub"),
-            user.FindFirstValue("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"),
-        };
-
-        foreach (var raw in candidates)
-        {
-            if (string.IsNullOrWhiteSpace(raw))
-                continue;
-            if (Guid.TryParse(raw.Trim(), out userId))
-                return true;
-        }
-
-        userId = default;
-        return false;
     }
 
     private (string FirstName, string LastName) ReadNamesFromUserMetadataClaim()

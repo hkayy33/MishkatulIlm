@@ -15,6 +15,7 @@ import {
 } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import type { AuthUser, LoginRequest, RegisterRequest, RegisterResult } from '../models/auth.models';
+import { UserProfileService } from './user-profile.service';
 import { UserSyncService } from './user-sync.service';
 
 /**
@@ -30,6 +31,7 @@ export class AuthService {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly zone = inject(NgZone);
   private readonly userSync = inject(UserSyncService);
+  private readonly userProfile = inject(UserProfileService);
 
   private client: SupabaseClient | null = null;
 
@@ -47,12 +49,36 @@ export class AuthService {
     this.client = this.createSupabaseClient();
 
     void this.client.auth.getSession().then(({ data }) => {
-      this.zone.run(() => this.applySession(data.session));
+      this.zone.run(() => {
+        this.applySession(data.session);
+        if (data.session?.access_token) {
+          this.pushSessionToServer();
+        }
+      });
     });
 
     this.client.auth.onAuthStateChange((_event, session) => {
-      this.zone.run(() => this.applySession(session));
+      this.zone.run(() => {
+        this.applySession(session);
+        if (session?.access_token) {
+          this.pushSessionToServer();
+        }
+      });
     });
+  }
+
+  /**
+   * Loads the app profile from the API and applies admin promotion if needed.
+   * The `users` row is created in Postgres when Supabase inserts into `auth.users` (DB trigger).
+   */
+  private pushSessionToServer(): void {
+    if (!this.apiConfigured() || !this._accessToken()) return;
+    void firstValueFrom(
+      this.syncServerProfile().pipe(
+        switchMap(() => this.refreshServerProfile().pipe(catchError(() => of(void 0)))),
+        catchError(() => of(void 0)),
+      ),
+    );
   }
 
   private createSupabaseClient(): SupabaseClient {
@@ -86,11 +112,30 @@ export class AuthService {
   }
 
   /**
-   * Creates the `users` row in your API database (register/login only talk to Supabase until this runs).
-   * Safe to call repeatedly; the server no-ops if the row already exists.
+   * Backfills or updates the API `users` row (trigger creates it at signup; this promotes admins and fills gaps).
+   * Safe to call repeatedly.
    */
   syncServerProfile(): Observable<void> {
     return this.userSync.syncWithBearer(this.getBearerToken());
+  }
+
+  /** Loads `isAdmin` and onboarding flags from the API into {@link user}. */
+  refreshServerProfile(): Observable<void> {
+    const token = this._accessToken();
+    if (!token || !this.apiConfigured()) return of(void 0);
+    return this.userProfile.getMe(token).pipe(
+      tap((me) => {
+        this._user.set({
+          userId: me.userId,
+          email: me.email,
+          firstName: me.firstName,
+          lastName: me.lastName,
+          onboardingCompleted: me.onboardingCompleted,
+          isAdmin: me.isAdmin,
+        });
+      }),
+      map(() => void 0),
+    );
   }
 
   register(body: RegisterRequest): Observable<RegisterResult> {
@@ -115,6 +160,7 @@ export class AuthService {
         if (data.session) {
           this.applySession(data.session);
           return this.syncServerProfile().pipe(
+            switchMap(() => this.refreshServerProfile().pipe(catchError(() => of(void 0)))),
             map(() => ({ needsEmailConfirmation: false } satisfies RegisterResult)),
           );
         }
@@ -170,9 +216,8 @@ export class AuthService {
 
       if (session) {
         await firstValueFrom(this.syncServerProfile().pipe(catchError(() => of(void 0))));
-        const meta = (session.user.user_metadata ?? {}) as Record<string, unknown>;
-        const done = meta['onboarding_completed'] === true;
-        await this.router.navigateByUrl(done ? '/' : '/onboarding', { replaceUrl: true });
+        await firstValueFrom(this.refreshServerProfile().pipe(catchError(() => of(void 0))));
+        await this.navigateAfterAuthenticated();
       } else {
         await this.router.navigateByUrl('/login?authError=session', { replaceUrl: true });
       }
@@ -184,13 +229,25 @@ export class AuthService {
       if (recovered) {
         this.zone.run(() => this.applySession(recovered));
         await firstValueFrom(this.syncServerProfile().pipe(catchError(() => of(void 0))));
-        const meta = (recovered.user.user_metadata ?? {}) as Record<string, unknown>;
-        const done = meta['onboarding_completed'] === true;
-        await this.router.navigateByUrl(done ? '/' : '/onboarding', { replaceUrl: true });
+        await firstValueFrom(this.refreshServerProfile().pipe(catchError(() => of(void 0))));
+        await this.navigateAfterAuthenticated();
         return;
       }
       await this.router.navigateByUrl('/login?authError=verify', { replaceUrl: true });
     }
+  }
+
+  private async navigateAfterAuthenticated(): Promise<void> {
+    const u = this._user();
+    if (u?.isAdmin) {
+      await this.router.navigateByUrl('/admin', { replaceUrl: true });
+      return;
+    }
+    if (u?.onboardingCompleted) {
+      await this.router.navigateByUrl('/', { replaceUrl: true });
+      return;
+    }
+    await this.router.navigateByUrl('/onboarding', { replaceUrl: true });
   }
 
   login(body: LoginRequest): Observable<void> {
@@ -205,6 +262,7 @@ export class AuthService {
         this.applySession(data.session);
       }),
       switchMap(() => this.syncServerProfile()),
+      switchMap(() => this.refreshServerProfile().pipe(catchError(() => of(void 0)))),
     );
   }
 
@@ -229,6 +287,8 @@ export class AuthService {
         return from(client.auth.getSession());
       }),
       tap(({ data }) => this.applySession(data.session)),
+      switchMap(() => this.syncServerProfile()),
+      switchMap(() => this.refreshServerProfile().pipe(catchError(() => of(void 0)))),
       map(() => void 0),
     );
   }
@@ -251,6 +311,7 @@ export class AuthService {
       firstName,
       lastName,
       onboardingCompleted,
+      isAdmin: false,
     });
   }
 

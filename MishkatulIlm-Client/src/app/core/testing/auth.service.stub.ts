@@ -21,6 +21,7 @@ export function createAuthServiceStub(): AuthService {
         firstName: 'Test',
         lastName: 'User',
         onboardingCompleted: false,
+        isAdmin: false,
       });
       return of(void 0);
     },
@@ -32,6 +33,7 @@ export function createAuthServiceStub(): AuthService {
     resendSignupConfirmation: () => of(void 0),
     handleAuthRedirectResult: () => Promise.resolve(),
     syncServerProfile: () => of(void 0),
+    refreshServerProfile: () => of(void 0),
     clearSession: () => {
       token.set(null);
       user.set(null);

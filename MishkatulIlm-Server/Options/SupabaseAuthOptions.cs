@@ -12,4 +12,9 @@ public sealed class SupabaseAuthOptions
     /// Only needed while some access tokens are still signed with HS256. ECC (ES256) tokens use JWKS automatically.
     /// </summary>
     public string JwtSecret { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Service role key (Dashboard → Project Settings → API). Required for server-side user creation; never expose to the client.
+    /// </summary>
+    public string ServiceRoleKey { get; set; } = string.Empty;
 }

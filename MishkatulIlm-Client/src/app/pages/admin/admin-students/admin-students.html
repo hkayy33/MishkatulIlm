@@ -1,0 +1,99 @@
+<div class="admin-page">
+  <h1 class="admin-title">Students &amp; users</h1>
+  <p class="admin-lead">Everyone in your database, plus onboarded student profiles. Create Supabase accounts from here.</p>
+
+  <section class="admin-card">
+    <h2 class="admin-card-title">Create account</h2>
+    <form class="admin-form-grid" (submit)="onCreateSubmit($event)">
+      <div class="admin-field">
+        <label for="c-first">First name</label>
+        <input id="c-first" name="cFirst" [(ngModel)]="createFirst" autocomplete="given-name" />
+      </div>
+      <div class="admin-field">
+        <label for="c-last">Last name</label>
+        <input id="c-last" name="cLast" [(ngModel)]="createLast" autocomplete="family-name" />
+      </div>
+      <div class="admin-field">
+        <label for="c-email">Email</label>
+        <input id="c-email" name="cEmail" type="email" [(ngModel)]="createEmail" autocomplete="email" />
+      </div>
+      <div class="admin-field">
+        <label for="c-pass">Temporary password</label>
+        <input id="c-pass" name="cPass" type="password" [(ngModel)]="createPassword" autocomplete="new-password" />
+      </div>
+      <div class="admin-actions admin-span-row">
+        <label class="admin-check">
+          <input type="checkbox" [(ngModel)]="createIsAdmin" name="cAdmin" />
+          Admin access
+        </label>
+        <button class="admin-btn" type="submit" [disabled]="creating()">
+          {{ creating() ? 'Creating…' : 'Create account' }}
+        </button>
+      </div>
+    </form>
+    @if (createError()) {
+      <p class="admin-error admin-tight-top">{{ createError() }}</p>
+    }
+    @if (createOk()) {
+      <p class="admin-success admin-tight-top">{{ createOk() }}</p>
+    }
+  </section>
+
+  @if (loading()) {
+    <p class="admin-muted">Loading…</p>
+  } @else if (loadError()) {
+    <p class="admin-error">{{ loadError() }}</p>
+  } @else {
+    <h2 class="admin-subtitle">All users</h2>
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Onboarding</th>
+            <th>Registered</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (u of users(); track u.userId) {
+            <tr>
+              <td>{{ u.firstName }} {{ u.lastName }}</td>
+              <td>{{ u.email }}</td>
+              <td>{{ u.onboardingCompleted ? 'Complete' : 'Pending' }}</td>
+              <td>{{ u.createdAtUtc | date: 'medium' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="admin-subtitle admin-subtitle--spaced">Onboarded students</h2>
+    @if (students().length === 0) {
+      <p class="admin-muted">No completed onboarding profiles yet.</p>
+    } @else {
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Level</th>
+              <th>Subjects</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (s of students(); track s.userId) {
+              <tr>
+                <td>{{ s.firstName }} {{ s.lastName }}</td>
+                <td>{{ s.email }}</td>
+                <td>{{ s.currentLevel }}</td>
+                <td>{{ s.subjectCodes.join(', ') }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</div>

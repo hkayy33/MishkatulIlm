@@ -1,7 +1,11 @@
 <div class="app-shell">
-  <app-nav-bar></app-nav-bar>
-  <main class="app-main">
+  @if (showMarketingShell()) {
+    <app-nav-bar />
+  }
+  <main class="app-main" [class.app-main--plain]="!showMarketingShell()">
     <router-outlet />
   </main>
-  <app-footer></app-footer>
+  @if (showMarketingShell()) {
+    <app-footer />
+  }
 </div>

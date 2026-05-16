@@ -43,6 +43,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/admin/admin-calendar/admin-calendar').then((m) => m.AdminCalendar),
       },
+      {
+        path: 'details',
+        loadComponent: () =>
+          import('./pages/admin/admin-details/admin-details').then((m) => m.AdminDetails),
+      },
     ],
   },
 ];

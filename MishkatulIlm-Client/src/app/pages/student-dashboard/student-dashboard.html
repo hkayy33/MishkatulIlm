@@ -1,17 +1,117 @@
 <section class="dashboard">
-  <h1>My dashboard</h1>
-  @if (auth.user(); as u) {
-    <p class="dashboard__welcome">
-      Welcome back, {{ u.firstName || 'student' }}.
-    </p>
-    @if (!u.onboardingCompleted) {
-      <p class="dashboard__hint">
-        Complete your
-        <a routerLink="/onboarding">student onboarding</a>
-        so we can match you with the right programs.
-      </p>
-    } @else {
-      <p class="dashboard__hint">Your application is on file. We will be in touch about next steps.</p>
+  <header class="dashboard__header">
+    <p class="dashboard__eyebrow">Student portal</p>
+    <h1>My dashboard</h1>
+    @if (auth.user(); as u) {
+      <p class="dashboard__welcome">Welcome back, {{ u.firstName || 'student' }}.</p>
+    }
+  </header>
+
+  @if (loading()) {
+    <div class="status-card status-card--loading" aria-busy="true">
+      <div class="status-card__skeleton status-card__skeleton--badge"></div>
+      <div class="status-card__skeleton status-card__skeleton--line"></div>
+      <div class="status-card__skeleton status-card__skeleton--steps"></div>
+    </div>
+  } @else if (loadError()) {
+    <div class="status-card status-card--error" role="alert">
+      <p>{{ loadError() }}</p>
+      <button type="button" class="dashboard__retry" (click)="reloadApplication()">Try again</button>
+    </div>
+  } @else {
+    @let app = application();
+    @let presentation = statusPresentation();
+
+    <article
+      class="status-card"
+      [class.status-card--pending]="presentation.tone === 'pending'"
+      [class.status-card--review]="presentation.tone === 'review'"
+      [class.status-card--success]="presentation.tone === 'success'"
+    >
+      <div class="status-card__top">
+        <div class="status-badge" [class.status-badge--pulse]="presentation.tone === 'review'">
+          <span class="status-badge__dot" aria-hidden="true"></span>
+          <span class="status-badge__label">{{ presentation.label }}</span>
+        </div>
+        <p class="status-card__detail">{{ presentation.detail }}</p>
+      </div>
+
+      <div class="progress-track" aria-hidden="true">
+        <div class="progress-track__fill" [style.width.%]="progressPercent()"></div>
+      </div>
+
+      <ol class="status-steps">
+        @for (step of steps(); track step.id) {
+          <li
+            class="status-step"
+            [class.status-step--complete]="step.state === 'complete'"
+            [class.status-step--current]="step.state === 'current'"
+            [class.status-step--upcoming]="step.state === 'upcoming'"
+          >
+            <span class="status-step__marker" aria-hidden="true">
+              @if (step.state === 'complete') {
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none">
+                  <path
+                    d="M3.5 8.2 6.4 11 12.5 5"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              } @else if (step.state === 'current') {
+                <span class="status-step__pulse"></span>
+              }
+            </span>
+            <div class="status-step__body">
+              <h2 class="status-step__title">{{ step.title }}</h2>
+              <p class="status-step__desc">{{ step.description }}</p>
+            </div>
+          </li>
+        }
+      </ol>
+    </article>
+
+    @if (app?.status === 'pending_application') {
+      <section class="dashboard-cta" aria-labelledby="cta-heading">
+        <h2 id="cta-heading">Next step</h2>
+        <p>Complete the student application form so our team can review your request.</p>
+        <a routerLink="/onboarding" class="dashboard-cta__btn">Continue application</a>
+      </section>
+    }
+
+    @if (app && app.summary && (app.status === 'under_review' || app.status === 'active')) {
+      @let summary = app.summary;
+      <section class="application-summary" aria-labelledby="summary-heading">
+        <h2 id="summary-heading">Your submitted application</h2>
+        <dl class="application-summary__grid">
+          <div>
+            <dt>Level</dt>
+            <dd>{{ labelLevelCode(summary.currentLevel) }}</dd>
+          </div>
+          <div>
+            <dt>Lesson frequency</dt>
+            <dd>{{ labelFrequencyCode(summary.lessonFrequency) }}</dd>
+          </div>
+          <div class="application-summary__span">
+            <dt>Subjects</dt>
+            <dd>
+              <ul class="application-summary__tags">
+                @for (code of summary.subjectCodes; track code) {
+                  <li>{{ labelSubjectCode(code) }}</li>
+                }
+              </ul>
+            </dd>
+          </div>
+          <div class="application-summary__span">
+            <dt>Preferred times</dt>
+            <dd>{{ formatAvailabilityCodes(summary.preferredAvailability) }}</dd>
+          </div>
+        </dl>
+        <p class="application-summary__note">
+          Need to change something? Contact us and we can update your application.
+        </p>
+      </section>
     }
   }
 </section>

@@ -22,6 +22,31 @@ public sealed class AdminUserListItem
     public DateTime CreatedAtUtc { get; init; }
 }
 
+public sealed class AdminApplicationListItem
+{
+    public Guid UserId { get; init; }
+    public string Email { get; init; } = string.Empty;
+    public string FirstName { get; init; } = string.Empty;
+    public string LastName { get; init; } = string.Empty;
+    public bool OnboardingCompleted { get; init; }
+    /// <summary>pending | active | inactive</summary>
+    public string ApplicationStatus { get; init; } = "pending";
+    public DateTime CreatedAtUtc { get; init; }
+    public string? AgeRange { get; init; }
+    public string? Gender { get; init; }
+    public string? Country { get; init; }
+    public string? City { get; init; }
+    public string? CurrentLevel { get; init; }
+    public string? LessonFrequency { get; init; }
+    public IReadOnlyList<string> SubjectCodes { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> PreferredAvailability { get; init; } = Array.Empty<string>();
+}
+
+public sealed class SetApplicationStatusRequest
+{
+    public string Status { get; set; } = string.Empty;
+}
+
 public sealed class AdminStudentListItem
 {
     public Guid UserId { get; init; }
@@ -34,6 +59,7 @@ public sealed class AdminStudentListItem
     public string LessonFrequency { get; init; } = string.Empty;
     public IReadOnlyList<string> SubjectCodes { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> PreferredAvailability { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<ScheduledLessonDto> ScheduledLessons { get; init; } = Array.Empty<ScheduledLessonDto>();
 }
 
 public sealed class AdminCreateUserRequest

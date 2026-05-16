@@ -136,3 +136,12 @@
 /Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/tr/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
 /Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/zh-Hans/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
 /Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/zh-Hant/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.resources.dll
+/Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/ClosedXML.dll
+/Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/ClosedXML.Parser.dll
+/Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/CountryStateCityLibrary.dll
+/Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/DocumentFormat.OpenXml.dll
+/Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/DocumentFormat.OpenXml.Framework.dll
+/Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/ExcelNumberFormat.dll
+/Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/RBush.dll
+/Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/SixLabors.Fonts.dll
+/Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/System.IO.Packaging.dll

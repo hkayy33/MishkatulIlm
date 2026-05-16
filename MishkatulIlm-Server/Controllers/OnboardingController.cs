@@ -20,6 +20,48 @@ public sealed class OnboardingController(
 {
     public const int MaxSubjects = 4;
 
+    [HttpGet("me")]
+    public async Task<IActionResult> GetMyApplication(CancellationToken cancellationToken)
+    {
+        if (!User.TryGetSupabaseUserId(out var userId))
+            return Unauthorized();
+
+        var user = await db.Users.AsNoTracking()
+            .Include(u => u.Onboarding)
+            .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+
+        if (user is null)
+        {
+            return Ok(
+                new StudentApplicationResponse
+                {
+                    Status = "pending_application",
+                    OnboardingCompleted = false,
+                });
+        }
+
+        var status = ResolveStudentApplicationStatus(user);
+        StudentApplicationSummary? summary = null;
+        if (user.Onboarding is { } profile)
+        {
+            summary = new StudentApplicationSummary
+            {
+                CurrentLevel = profile.CurrentLevel,
+                LessonFrequency = profile.LessonFrequency,
+                SubjectCodes = profile.SubjectCodes,
+                PreferredAvailability = profile.PreferredAvailability,
+            };
+        }
+
+        return Ok(
+            new StudentApplicationResponse
+            {
+                Status = status,
+                OnboardingCompleted = user.OnboardingCompleted,
+                Summary = summary,
+            });
+    }
+
     [HttpPost]
     public async Task<IActionResult> Save([FromBody] SaveOnboardingRequest request, CancellationToken cancellationToken)
     {
@@ -37,6 +79,9 @@ public sealed class OnboardingController(
 
         if (!LessonAvailabilityCodes.TryNormalize(request.PreferredAvailability, out var availability, out var availabilityError))
             return BadRequest(new { message = availabilityError });
+
+        if (!LessonFrequencyRules.TryValidate(request.LessonFrequency, distinct.Count, out var frequencyError))
+            return BadRequest(new { message = frequencyError });
 
         var email =
             User.FindFirstValue(ClaimTypes.Email)
@@ -87,6 +132,8 @@ public sealed class OnboardingController(
                 UserId = user.Id,
                 AgeRange = request.AgeRange.Trim(),
                 Gender = request.Gender.Trim(),
+                Country = request.Country.Trim(),
+                City = request.City.Trim(),
                 CurrentLevel = request.CurrentLevel.Trim(),
                 LessonFrequency = request.LessonFrequency.Trim(),
                 SubjectCodes = distinct,
@@ -98,6 +145,8 @@ public sealed class OnboardingController(
         {
             profile.AgeRange = request.AgeRange.Trim();
             profile.Gender = request.Gender.Trim();
+            profile.Country = request.Country.Trim();
+            profile.City = request.City.Trim();
             profile.CurrentLevel = request.CurrentLevel.Trim();
             profile.LessonFrequency = request.LessonFrequency.Trim();
             profile.SubjectCodes = distinct;
@@ -105,6 +154,8 @@ public sealed class OnboardingController(
         }
 
         user.OnboardingCompleted = true;
+        if (user.ApplicationStatus is not ApplicationStatusCodes.Active and not ApplicationStatusCodes.Inactive)
+            user.ApplicationStatus = ApplicationStatusCodes.Pending;
 
         try
         {
@@ -131,6 +182,15 @@ public sealed class OnboardingController(
             .AnyAsync(u => u.Email == email && u.Id != user.Id, cancellationToken);
         if (!taken)
             user.Email = email;
+    }
+
+    private static string ResolveStudentApplicationStatus(AppUser user)
+    {
+        if (user.ApplicationStatus == ApplicationStatusCodes.Active)
+            return "active";
+        if (user.ApplicationStatus == ApplicationStatusCodes.Inactive)
+            return "inactive";
+        return user.OnboardingCompleted ? "under_review" : "pending_application";
     }
 
     private static bool IsUniqueEmailViolation(DbUpdateException ex) =>

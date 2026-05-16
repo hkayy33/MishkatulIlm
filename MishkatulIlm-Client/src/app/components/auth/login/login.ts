@@ -1,6 +1,7 @@
 import { isPlatformBrowser } from '@angular/common';
 import { Component, inject, OnInit, PLATFORM_ID } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { take } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
@@ -34,6 +35,17 @@ export class Login implements OnInit {
       this.submitError =
         'We could not establish a session from that link. Try signing in with your email and password.';
     }
+
+    this.auth
+      .whenSessionReady$()
+      .pipe(take(1))
+      .subscribe((ready) => {
+        if (!ready) return;
+        const u = this.auth.user();
+        if (u?.isAdmin) void this.router.navigate(['/admin'], { replaceUrl: true });
+        else if (u?.onboardingCompleted) void this.router.navigate(['/dashboard'], { replaceUrl: true });
+        else void this.router.navigate(['/onboarding'], { replaceUrl: true });
+      });
   }
 
   onSubmit(event: Event): void {

@@ -7,6 +7,8 @@ public sealed class StudentOnboardingProfile
 
     public string AgeRange { get; set; } = string.Empty;
     public string Gender { get; set; } = string.Empty;
+    public string Country { get; set; } = string.Empty;
+    public string City { get; set; } = string.Empty;
     public string CurrentLevel { get; set; } = string.Empty;
     public string LessonFrequency { get; set; } = string.Empty;
 

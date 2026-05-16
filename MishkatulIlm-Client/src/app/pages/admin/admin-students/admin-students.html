@@ -1,6 +1,6 @@
 <div class="admin-page">
-  <h1 class="admin-title">Students &amp; users</h1>
-  <p class="admin-lead">Everyone in your database, plus onboarded student profiles. Create Supabase accounts from here.</p>
+  <h1 class="admin-title">Active students</h1>
+  <p class="admin-lead">Students you have approved with scheduled lesson slots.</p>
 
   <section class="admin-card">
     <h2 class="admin-card-title">Create account</h2>
@@ -43,59 +43,42 @@
     <p class="admin-muted">Loading…</p>
   } @else if (loadError()) {
     <p class="admin-error">{{ loadError() }}</p>
+  } @else if (students().length === 0) {
+    <p class="admin-muted">No active students yet. Approve pending applications with lesson slots first.</p>
   } @else {
-    <h2 class="admin-subtitle">All users</h2>
     <div class="admin-table-wrap">
       <table class="admin-table">
         <thead>
           <tr>
             <th>Name</th>
             <th>Email</th>
-            <th>Onboarding</th>
-            <th>Registered</th>
+            <th>Level</th>
+            <th>Scheduled lessons</th>
+            <th>Subjects</th>
           </tr>
         </thead>
         <tbody>
-          @for (u of users(); track u.userId) {
+          @for (s of students(); track s.userId) {
             <tr>
-              <td>{{ u.firstName }} {{ u.lastName }}</td>
-              <td>{{ u.email }}</td>
-              <td>{{ u.onboardingCompleted ? 'Complete' : 'Pending' }}</td>
-              <td>{{ u.createdAtUtc | date: 'medium' }}</td>
+              <td>{{ s.firstName }} {{ s.lastName }}</td>
+              <td>{{ s.email }}</td>
+              <td>{{ s.currentLevel }}</td>
+              <td class="lessons-cell">
+                @if (s.scheduledLessons.length === 0) {
+                  <span class="admin-muted">None</span>
+                } @else {
+                  <ul class="lesson-list">
+                    @for (lesson of s.scheduledLessons; track lesson.slotId) {
+                      <li>{{ formatLesson(lesson.startsAtUtc, lesson.endsAtUtc) }}</li>
+                    }
+                  </ul>
+                }
+              </td>
+              <td>{{ formatSubjects(s.subjectCodes) }}</td>
             </tr>
           }
         </tbody>
       </table>
     </div>
-
-    <h2 class="admin-subtitle admin-subtitle--spaced">Onboarded students</h2>
-    @if (students().length === 0) {
-      <p class="admin-muted">No completed onboarding profiles yet.</p>
-    } @else {
-      <div class="admin-table-wrap">
-        <table class="admin-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Level</th>
-              <th>Subjects</th>
-              <th>Preferred times</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (s of students(); track s.userId) {
-              <tr>
-                <td>{{ s.firstName }} {{ s.lastName }}</td>
-                <td>{{ s.email }}</td>
-                <td>{{ s.currentLevel }}</td>
-                <td>{{ s.subjectCodes.join(', ') }}</td>
-                <td class="admin-availability">{{ formatAvailability(s.preferredAvailability) }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    }
   }
 </div>

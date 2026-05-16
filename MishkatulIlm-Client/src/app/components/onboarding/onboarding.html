@@ -60,6 +60,32 @@
             </div>
           </div>
         </div>
+        <div class="student-info student-info--location">
+          <app-searchable-select
+            inputId="country"
+              label="Country"
+              autocomplete="country-name"
+              placeholder="Type to search countries…"
+              [(value)]="selectedCountryId"
+              [options]="allCountries"
+              [disabled]="loadingCountries()"
+              [loading]="loadingCountries()"
+              (valueChange)="onCountrySelected($event)"
+            />
+          <app-searchable-select
+            inputId="city"
+            label="City"
+            autocomplete="address-level2"
+            placeholder="Type to search cities…"
+            [(value)]="selectedCityName"
+            [options]="allCities"
+            [disabled]="!selectedCountryId || loadingCities()"
+            [loading]="loadingCities()"
+          />
+        </div>
+        @if (locationLoadError) {
+          <p class="onboarding-location-error" role="alert">{{ locationLoadError }}</p>
+        }
       </section>
 
       <section class="onboarding-section" aria-labelledby="subjects-heading">
@@ -103,11 +129,21 @@
           </div>
           <div class="form-field">
             <label for="lesson-frequency">Desired lesson frequency</label>
-            <select id="lesson-frequency" name="lesson-frequency">
-              @for (opt of lessonFrequencies; track opt.value + opt.label) {
+            <select
+              id="lesson-frequency"
+              name="lesson-frequency"
+              [(ngModel)]="selectedLessonFrequency"
+              required
+            >
+              @for (opt of availableLessonFrequencies; track opt.value + opt.label) {
                 <option [value]="opt.value">{{ opt.label }}</option>
               }
             </select>
+            @if (lessonFrequencyHint) {
+              <p class="onboarding-section__hint onboarding-section__hint--inline">
+                {{ lessonFrequencyHint }}
+              </p>
+            }
           </div>
         </div>
       </section>

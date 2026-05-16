@@ -29,6 +29,11 @@ namespace MishkatulIlm_Server.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ApplicationStatus")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -61,6 +66,69 @@ namespace MishkatulIlm_Server.Data.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("MishkatulIlm_Server.Data.LessonSlot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("EndsAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("StartsAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("StudentUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartsAtUtc");
+
+                    b.HasIndex("StudentUserId");
+
+                    b.ToTable("lesson_slots", (string)null);
+                });
+
+            modelBuilder.Entity("MishkatulIlm_Server.Data.SchedulingSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("TutorCity")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("TutorCountry")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("TutorDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("TutorTimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("scheduling_settings", (string)null);
+                });
+
             modelBuilder.Entity("MishkatulIlm_Server.Data.StudentOnboardingProfile", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -70,6 +138,16 @@ namespace MishkatulIlm_Server.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Country")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
 
                     b.Property<string>("CurrentLevel")
                         .IsRequired()
@@ -97,6 +175,16 @@ namespace MishkatulIlm_Server.Data.Migrations
                     b.HasKey("UserId");
 
                     b.ToTable("student_onboarding_profiles", (string)null);
+                });
+
+            modelBuilder.Entity("MishkatulIlm_Server.Data.LessonSlot", b =>
+                {
+                    b.HasOne("MishkatulIlm_Server.Data.AppUser", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Student");
                 });
 
             modelBuilder.Entity("MishkatulIlm_Server.Data.StudentOnboardingProfile", b =>

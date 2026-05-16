@@ -1,0 +1,57 @@
+<div
+  class="searchable-select"
+  [class.searchable-select--open]="open()"
+  [class.searchable-select--disabled]="disabled() || loading()"
+>
+  <label [for]="inputId()">{{ label() }}</label>
+  <div class="searchable-select__control">
+    <input
+      type="text"
+      role="combobox"
+      [id]="inputId()"
+      [name]="inputId()"
+      [attr.autocomplete]="autocomplete()"
+      [attr.aria-expanded]="open()"
+      [attr.aria-controls]="listboxId"
+      [attr.aria-activedescendant]="
+        open() && filteredOptions().length
+          ? inputId() + '-opt-' + highlightedIndex()
+          : null
+      "
+      [placeholder]="placeholder()"
+      [disabled]="disabled() || loading()"
+      [value]="searchQuery()"
+      (input)="onInput($event)"
+      (focus)="onFocus()"
+      (blur)="onBlur()"
+      (keydown)="onKeydown($event)"
+    />
+    @if (loading()) {
+      <span class="searchable-select__spinner" aria-hidden="true"></span>
+    }
+  </div>
+  @if (open() && !disabled() && !loading()) {
+    @if (filteredOptions().length > 0) {
+      <ul
+        class="searchable-select__list"
+        role="listbox"
+        [id]="listboxId"
+      >
+        @for (opt of filteredOptions(); track opt.value; let i = $index) {
+          <li
+            role="option"
+            [id]="inputId() + '-opt-' + i"
+            class="searchable-select__option"
+            [class.searchable-select__option--active]="isHighlighted(i)"
+            [attr.aria-selected]="value() === opt.value"
+            (mousedown)="selectOption(opt, $event)"
+          >
+            {{ opt.label }}
+          </li>
+        }
+      </ul>
+    } @else if (searchQuery().trim()) {
+      <p class="searchable-select__empty" role="status">No matches</p>
+    }
+  }
+</div>

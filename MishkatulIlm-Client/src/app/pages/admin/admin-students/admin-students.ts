@@ -1,23 +1,19 @@
-import { DatePipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import {
-  LESSON_TIME_SLOTS,
-  WEEKDAYS,
-} from '../../../core/models/onboarding.models';
-import { AdminApiService, type AdminStudentRow, type AdminUserRow } from '../../../core/services/admin-api.service';
+import { labelSubjectCode } from '../../../core/utils/onboarding-labels';
+import { formatSlotRange } from '../../../core/utils/datetime-local';
+import { AdminApiService, type AdminStudentRow } from '../../../core/services/admin-api.service';
 
 @Component({
   selector: 'app-admin-students',
   standalone: true,
-  imports: [DatePipe, FormsModule],
+  imports: [FormsModule],
   templateUrl: './admin-students.html',
   styleUrl: './admin-students.scss',
 })
 export class AdminStudents {
   private readonly adminApi = inject(AdminApiService);
 
-  protected readonly users = signal<AdminUserRow[]>([]);
   protected readonly students = signal<AdminStudentRow[]>([]);
   protected readonly loadError = signal<string | null>(null);
   protected readonly createError = signal<string | null>(null);
@@ -38,40 +34,24 @@ export class AdminStudents {
   reload(): void {
     this.loading.set(true);
     this.loadError.set(null);
-    this.adminApi.listUsers().subscribe({
-      next: (list) => {
-        this.users.set(list);
-        this.adminApi.listStudents().subscribe({
-          next: (s) => {
-            this.students.set(s);
-            this.loading.set(false);
-          },
-          error: () => {
-            this.loadError.set('Could not load students.');
-            this.loading.set(false);
-          },
-        });
+    this.adminApi.listStudents().subscribe({
+      next: (s) => {
+        this.students.set(s);
+        this.loading.set(false);
       },
       error: () => {
-        this.loadError.set('Could not load users.');
+        this.loadError.set('Could not load active students.');
         this.loading.set(false);
       },
     });
   }
 
-  formatAvailability(codes: string[]): string {
-    if (!codes?.length) return '—';
-    return codes
-      .map((code) => {
-        const dash = code.indexOf('-');
-        if (dash < 0) return code;
-        const day = code.slice(0, dash);
-        const slot = code.slice(dash + 1);
-        const dayLabel = WEEKDAYS.find((d) => d.code === day)?.label ?? day;
-        const slotLabel = LESSON_TIME_SLOTS.find((s) => s.code === slot)?.label ?? slot;
-        return `${dayLabel} ${slotLabel}`;
-      })
-      .join(', ');
+  formatLesson(startsAtUtc: string, endsAtUtc: string): string {
+    return formatSlotRange(startsAtUtc, endsAtUtc);
+  }
+
+  formatSubjects(codes: string[]): string {
+    return codes.map((c) => labelSubjectCode(c)).join(', ');
   }
 
   onCreateSubmit(event: Event): void {

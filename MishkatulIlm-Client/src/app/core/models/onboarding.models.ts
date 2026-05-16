@@ -56,7 +56,7 @@ export const LESSON_TIME_SLOTS: ReadonlyArray<{
 }> = [
   { code: 'MORNING', label: 'Morning', hint: '8am – 12pm' },
   { code: 'AFTERNOON', label: 'Afternoon', hint: '12 – 5pm' },
-  { code: 'EVENING', label: 'Evening', hint: '5 – 9pm' },
+  { code: 'EVENING', label: 'Evening', hint: '5 – 10pm' },
 ];
 
 export function availabilitySlotKey(day: WeekdayCode, slot: LessonTimeSlotCode): PreferredAvailabilityCode {
@@ -69,6 +69,8 @@ export interface SaveOnboardingRequest {
   lastName: string;
   ageRange: string;
   gender: string;
+  country: string;
+  city: string;
   currentLevel: string;
   lessonFrequency: string;
   subjectCodes: string[];

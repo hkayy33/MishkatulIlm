@@ -44,6 +44,8 @@ builder.Services.AddSingleton<IPostConfigureOptions<JwtBearerOptions>, Configure
 
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<SupabaseAdminAuthClient>();
+builder.Services.AddScoped<SchedulingSettingsService>();
+builder.Services.AddSingleton<LocationCatalogService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer();

@@ -60,6 +60,7 @@ public static class UserProfileProvisioner
             LastName = lastName,
             CreatedAtUtc = DateTime.UtcNow,
             OnboardingCompleted = onboardingCompleted ?? false,
+            ApplicationStatus = ApplicationStatusCodes.Pending,
             IsAdmin = isAdmin,
         };
 

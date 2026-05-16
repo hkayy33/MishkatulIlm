@@ -1,7 +1,20 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from '../tokens/api-base-url.token';
+import type { AdminApplicationStatus } from '../models/application-status.models';
+import type {
+  AvailabilitySlotRow,
+  BookingPreview,
+  CreateLessonSlotBody,
+  LessonSlotRow,
+  ScheduledLessonRow,
+  WeekOneLessonPick,
+} from '../models/calendar.models';
+import type {
+  SchedulingSettings,
+  UpdateSchedulingSettingsBody,
+} from '../models/scheduling-settings.models';
 
 export interface AdminUserRow {
   userId: string;
@@ -10,6 +23,24 @@ export interface AdminUserRow {
   lastName: string;
   onboardingCompleted: boolean;
   createdAtUtc: string;
+}
+
+export interface AdminApplicationRow {
+  userId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  onboardingCompleted: boolean;
+  applicationStatus: AdminApplicationStatus;
+  createdAtUtc: string;
+  ageRange?: string | null;
+  gender?: string | null;
+  country?: string | null;
+  city?: string | null;
+  currentLevel?: string | null;
+  lessonFrequency?: string | null;
+  subjectCodes: string[];
+  preferredAvailability: string[];
 }
 
 export interface AdminStudentRow {
@@ -23,6 +54,7 @@ export interface AdminStudentRow {
   lessonFrequency: string;
   subjectCodes: string[];
   preferredAvailability: string[];
+  scheduledLessons: ScheduledLessonRow[];
 }
 
 export interface AdminCreateUserBody {
@@ -46,15 +78,71 @@ export class AdminApiService {
     return this.http.get<AdminUserRow[]>(this.base('/users'));
   }
 
-  listPendingApplications(): Observable<AdminUserRow[]> {
-    return this.http.get<AdminUserRow[]>(this.base('/applications/pending'));
+  listPendingApplications(): Observable<AdminApplicationRow[]> {
+    return this.http.get<AdminApplicationRow[]>(this.base('/applications/pending'));
+  }
+
+  getAvailability(
+    fromUtc: string,
+    toUtc: string,
+    forStudentUserId?: string,
+    /** 0 = picker mode (per-slot durations). Use 30/60/120 to filter the grid. */
+    durationMinutes = 0,
+  ): Observable<AvailabilitySlotRow[]> {
+    let params = new HttpParams()
+      .set('fromUtc', fromUtc)
+      .set('toUtc', toUtc)
+      .set('durationMinutes', String(durationMinutes));
+    if (forStudentUserId) params = params.set('forStudentUserId', forStudentUserId);
+    return this.http.get<AvailabilitySlotRow[]>(this.base('/calendar/availability'), { params });
+  }
+
+  previewBooking(userId: string, weekOneLessons: WeekOneLessonPick[]): Observable<BookingPreview> {
+    return this.http.post<BookingPreview>(this.base('/calendar/preview-booking'), {
+      userId,
+      weekOneLessons,
+    });
+  }
+
+  approveApplication(userId: string, weekOneLessons: WeekOneLessonPick[]): Observable<void> {
+    return this.http.post<void>(this.base(`/applications/${userId}/approve`), {
+      weekOneLessons,
+    });
+  }
+
+  clearAllLessonSlots(): Observable<{ message: string; removed: number }> {
+    return this.http.delete<{ message: string; removed: number }>(this.base('/calendar/slots'));
+  }
+
+  setApplicationStatus(userId: string, status: AdminApplicationStatus): Observable<void> {
+    return this.http.patch<void>(this.base(`/applications/${userId}/status`), { status });
   }
 
   listStudents(): Observable<AdminStudentRow[]> {
     return this.http.get<AdminStudentRow[]>(this.base('/students'));
   }
 
+  listCalendarSlots(fromUtc: string, toUtc: string): Observable<LessonSlotRow[]> {
+    return this.getAvailability(fromUtc, toUtc) as unknown as Observable<LessonSlotRow[]>;
+  }
+
+  createCalendarSlot(body: CreateLessonSlotBody): Observable<LessonSlotRow> {
+    return this.http.post<LessonSlotRow>(this.base('/calendar/slots'), body);
+  }
+
+  deleteCalendarSlot(slotId: string): Observable<void> {
+    return this.http.delete<void>(this.base(`/calendar/slots/${slotId}`));
+  }
+
   createUser(body: AdminCreateUserBody): Observable<{ userId: string }> {
     return this.http.post<{ userId: string }>(this.base('/users'), body);
+  }
+
+  getSchedulingSettings(): Observable<SchedulingSettings> {
+    return this.http.get<SchedulingSettings>(this.base('/settings/scheduling'));
+  }
+
+  updateSchedulingSettings(body: UpdateSchedulingSettingsBody): Observable<SchedulingSettings> {
+    return this.http.put<SchedulingSettings>(this.base('/settings/scheduling'), body);
   }
 }

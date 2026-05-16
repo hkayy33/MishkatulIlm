@@ -16,6 +16,12 @@ public sealed class SaveOnboardingRequest
     [Required, MaxLength(64)]
     public string Gender { get; set; } = string.Empty;
 
+    [Required, MaxLength(120)]
+    public string Country { get; set; } = string.Empty;
+
+    [Required, MaxLength(120)]
+    public string City { get; set; } = string.Empty;
+
     [Required, MaxLength(64)]
     public string CurrentLevel { get; set; } = string.Empty;
 

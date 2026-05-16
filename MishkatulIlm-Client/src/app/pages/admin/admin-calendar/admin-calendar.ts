@@ -1,44 +1,74 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
+import { AdminApiService } from '../../../core/services/admin-api.service';
+import type { AvailabilitySlotRow } from '../../../core/models/calendar.models';
+import { SchedulingSettingsService } from '../../../core/services/scheduling-settings.service';
+import { monthUtcRange } from '../../../core/utils/datetime-local';
+import { AdminLessonCalendar } from '../../../shared/admin-lesson-calendar/admin-lesson-calendar';
 
 @Component({
   selector: 'app-admin-calendar',
   standalone: true,
-  imports: [],
+  imports: [AdminLessonCalendar],
   templateUrl: './admin-calendar.html',
   styleUrl: './admin-calendar.scss',
 })
 export class AdminCalendar {
-  /** Month being viewed (local). */
-  protected readonly viewMonth = signal(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  private readonly adminApi = inject(AdminApiService);
+  private readonly schedulingSettings = inject(SchedulingSettingsService);
 
-  protected readonly monthLabel = computed(() => {
-    const d = this.viewMonth();
-    return d.toLocaleString(undefined, { month: 'long', year: 'numeric' });
-  });
+  protected readonly tutorSettings = computed(() => this.schedulingSettings.settings());
 
-  protected readonly grid = computed(() => {
-    const start = this.viewMonth();
-    const year = start.getFullYear();
-    const month = start.getMonth();
-    const firstDow = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
+  protected readonly availability = signal<AvailabilitySlotRow[]>([]);
+  protected readonly loading = signal(true);
+  protected readonly loadError = signal<string | null>(null);
+  protected readonly clearMessage = signal<string | null>(null);
+  protected readonly clearing = signal(false);
+  private viewMonth = new Date();
 
-    const cells: { date: Date | null; inMonth: boolean }[] = [];
-    for (let i = 0; i < firstDow; i++) cells.push({ date: null, inMonth: false });
-    for (let day = 1; day <= daysInMonth; day++) {
-      cells.push({ date: new Date(year, month, day), inMonth: true });
-    }
-    while (cells.length % 7 !== 0) cells.push({ date: null, inMonth: false });
-    return cells;
-  });
-
-  prevMonth(): void {
-    const d = this.viewMonth();
-    this.viewMonth.set(new Date(d.getFullYear(), d.getMonth() - 1, 1));
+  constructor() {
+    void this.schedulingSettings.ensureLoaded();
+    this.reloadMonth(new Date());
   }
 
-  nextMonth(): void {
-    const d = this.viewMonth();
-    this.viewMonth.set(new Date(d.getFullYear(), d.getMonth() + 1, 1));
+  protected onMonthChanged(month: Date): void {
+    this.viewMonth = month;
+    this.reloadMonth(month);
+  }
+
+  protected clearAllSlots(): void {
+    if (!confirm('Delete all lesson slots? This cannot be undone.')) return;
+
+    this.clearing.set(true);
+    this.clearMessage.set(null);
+    this.loadError.set(null);
+    this.adminApi.clearAllLessonSlots().subscribe({
+      next: (res) => {
+        this.clearMessage.set(res.message);
+        this.clearing.set(false);
+        this.reloadMonth(this.viewMonth);
+      },
+      error: () => {
+        this.loadError.set('Could not clear lesson slots.');
+        this.clearing.set(false);
+      },
+    });
+  }
+
+  private reloadMonth(month: Date): void {
+    this.loading.set(true);
+    this.loadError.set(null);
+    const range = monthUtcRange(month);
+    const to = new Date(range.toUtc);
+    to.setUTCDate(to.getUTCDate() + 35);
+    this.adminApi.getAvailability(range.fromUtc, to.toISOString(), undefined, 0).subscribe({
+        next: (list) => {
+          this.availability.set(list ?? []);
+          this.loading.set(false);
+        },
+        error: () => {
+          this.loadError.set('Could not load calendar.');
+          this.loading.set(false);
+        },
+      });
   }
 }

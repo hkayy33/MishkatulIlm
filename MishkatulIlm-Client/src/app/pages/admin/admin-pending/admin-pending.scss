@@ -1,1 +1,260 @@
 @use '../admin-page.shared';
+
+.admin-table--pending {
+  min-width: 720px;
+}
+
+.cell-sub {
+  font-size: 0.82rem;
+  color: #6f6a62;
+  margin-top: 0.15rem;
+}
+
+.prefs-cell {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  max-width: 22rem;
+
+  strong {
+    font-weight: 600;
+    color: #4a453e;
+  }
+}
+
+.actions-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 9rem;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+
+  &--ready {
+    color: #6b5420;
+    background: rgba(197, 157, 95, 0.2);
+  }
+
+  &--draft {
+    color: #5c574f;
+    background: rgba(45, 42, 38, 0.08);
+  }
+}
+
+.admin-btn--small {
+  padding: 0.4rem 0.65rem;
+  font-size: 0.8rem;
+}
+
+.admin-btn--ghost {
+  background: transparent;
+  color: #5c574f;
+  border: 1px solid rgba(45, 42, 38, 0.2);
+  box-shadow: none;
+}
+
+.approve-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(28, 27, 24, 0.45);
+}
+
+.approve-dialog {
+  width: 100%;
+  max-width: 28rem;
+
+  &--wide {
+    max-width: 36rem;
+  }
+
+  &--schedule {
+    max-width: min(56rem, 96vw);
+  }
+  max-height: 85vh;
+  overflow: auto;
+  background: #fffef9;
+  border-radius: 12px;
+  padding: 1.35rem;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+
+  h2 {
+    margin: 0 0 0.35rem;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.2rem;
+  }
+}
+
+.approve-hint {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: #5c574f;
+
+  &--count {
+    margin-top: -0.5rem;
+    font-weight: 600;
+    color: #6b5420;
+  }
+}
+
+.slot-picker {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid rgba(28, 27, 24, 0.1);
+  border-radius: 8px;
+
+  li {
+    border-bottom: 1px solid rgba(28, 27, 24, 0.06);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  label {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.55rem 0.65rem;
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 0.88rem;
+    cursor: pointer;
+
+    &:hover {
+      background: #faf8f4;
+    }
+  }
+}
+
+.approve-details {
+  margin-bottom: 1.25rem;
+
+  h3 {
+    margin: 0 0 0.65rem;
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #5c584f;
+  }
+}
+
+.approve-details__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 1rem;
+  margin: 0;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.88rem;
+
+  dt {
+    margin: 0;
+    font-weight: 600;
+    color: #7a7368;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+  }
+
+  dd {
+    margin: 0;
+    color: #1c1b18;
+  }
+
+  &__span {
+    grid-column: 1 / -1;
+  }
+}
+
+.approve-duration {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  max-width: 14rem;
+
+  label {
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #5c584f;
+  }
+
+  select {
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 0.95rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid rgba(28, 27, 24, 0.18);
+    border-radius: 6px;
+    background: #fff;
+  }
+}
+
+.approve-schedule h3 {
+  margin: 0 0 0.35rem;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #5c584f;
+}
+
+.approve-preview {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0.75rem;
+  background: rgba(47, 122, 79, 0.1);
+  border-radius: 8px;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.9rem;
+
+  p {
+    margin: 0 0 0.5rem;
+  }
+
+  &__list {
+    margin: 0;
+    padding-left: 1.1rem;
+    max-height: 10rem;
+    overflow-y: auto;
+    font-size: 0.85rem;
+    line-height: 1.45;
+  }
+}
+
+.slot-picker--scroll {
+  max-height: 200px;
+}
+
+.slot-picker label.is-selected {
+  background: rgba(197, 157, 95, 0.15);
+  font-weight: 600;
+}
+
+.approve-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.admin-lead a {
+  color: #8b7355;
+  font-weight: 600;
+}

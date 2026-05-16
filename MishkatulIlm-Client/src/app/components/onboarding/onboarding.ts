@@ -13,6 +13,16 @@ import {
   WEEKDAYS,
 } from '../../core/models/onboarding.models';
 import { OnboardingApiService } from '../../core/services/onboarding-api.service';
+import { LocationsApiService } from '../../core/services/locations-api.service';
+import {
+  SearchableSelect,
+  type SearchableSelectOption,
+} from '../../shared/searchable-select/searchable-select';
+import {
+  allowedLessonFrequencyCodes,
+  isLessonFrequencyAllowed,
+  lessonFrequencyConstraintHint,
+} from '../../core/utils/lesson-frequency-rules';
 import { Auth } from '../auth/auth';
 
 interface SelectOption {
@@ -28,17 +38,26 @@ interface SubjectOption {
 
 @Component({
   selector: 'app-onboarding',
-  imports: [Auth, FormsModule],
+  imports: [Auth, FormsModule, SearchableSelect],
   templateUrl: './onboarding.html',
   styleUrl: './onboarding.scss',
 })
 export class Onboarding {
   protected readonly auth = inject(AuthService);
   private readonly onboardingApi = inject(OnboardingApiService);
+  private readonly locationsApi = inject(LocationsApiService);
   private readonly router = inject(Router);
 
   submitError: string | null = null;
   submitting = signal(false);
+  loadingCountries = signal(false);
+  loadingCities = signal(false);
+  locationLoadError: string | null = null;
+
+  allCountries: SearchableSelectOption[] = [];
+  allCities: SearchableSelectOption[] = [];
+  selectedCountryId = '';
+  selectedCityName = '';
 
   firstName = '';
   lastName = '';
@@ -64,8 +83,48 @@ export class Onboarding {
         if (u?.lastName) this.lastName = u.lastName;
         if (u?.isAdmin) void this.router.navigateByUrl('/admin', { replaceUrl: true });
         else if (u?.onboardingCompleted) void this.router.navigateByUrl('/dashboard', { replaceUrl: true });
+        else this.loadCountries();
       });
     });
+  }
+
+  private loadCountries(): void {
+    this.loadingCountries.set(true);
+    this.locationLoadError = null;
+    this.locationsApi
+      .getCountries()
+      .pipe(finalize(() => this.loadingCountries.set(false)))
+      .subscribe({
+        next: (items) => {
+          this.allCountries = items.map((c) => ({ value: c.code, label: c.name }));
+        },
+        error: () => {
+          this.locationLoadError = 'Could not load countries. Refresh the page to try again.';
+        },
+      });
+  }
+
+  onCountrySelected(countryId: string): void {
+    this.selectedCountryId = countryId;
+    this.selectedCityName = '';
+    this.allCities = [];
+
+    const id = Number(countryId);
+    if (!id) return;
+
+    this.loadingCities.set(true);
+    this.locationLoadError = null;
+    this.locationsApi
+      .getCities(id)
+      .pipe(finalize(() => this.loadingCities.set(false)))
+      .subscribe({
+        next: (items) => {
+          this.allCities = items.map((c) => ({ value: c.name, label: c.name }));
+        },
+        error: () => {
+          this.locationLoadError = 'Could not load cities for this country. Try selecting the country again.';
+        },
+      });
   }
 
   readonly maxSubjects = 4;
@@ -96,8 +155,7 @@ export class Onboarding {
     { value: 'ADVANCED', label: 'Advanced' },
   ];
 
-  readonly lessonFrequencies: SelectOption[] = [
-    { value: '', label: 'Select lesson frequency' },
+  private readonly allLessonFrequencyOptions: SelectOption[] = [
     { value: 'BIWEEKLY', label: 'Every two weeks' },
     { value: 'ONCE-WEEK', label: 'Once per week' },
     { value: 'TWICE-WEEK', label: 'Twice per week' },
@@ -105,6 +163,20 @@ export class Onboarding {
     { value: 'FOUR-PLUS-WEEK', label: 'Four or more times per week' },
     { value: 'FLEXIBLE', label: 'Flexible (to be agreed)' },
   ];
+
+  selectedLessonFrequency = '';
+
+  get availableLessonFrequencies(): SelectOption[] {
+    const allowed = new Set(allowedLessonFrequencyCodes(this.selectedSubjectCount));
+    return [
+      { value: '', label: 'Select lesson frequency' },
+      ...this.allLessonFrequencyOptions.filter((o) => allowed.has(o.value)),
+    ];
+  }
+
+  get lessonFrequencyHint(): string | null {
+    return lessonFrequencyConstraintHint(this.selectedSubjectCount);
+  }
 
   readonly weekDays = WEEKDAYS;
   readonly timeSlots = LESSON_TIME_SLOTS;
@@ -155,6 +227,16 @@ export class Onboarding {
       return;
     }
     opt.selected = input.checked;
+    this.enforceLessonFrequencyForSubjects();
+  }
+
+  private enforceLessonFrequencyForSubjects(): void {
+    if (
+      this.selectedLessonFrequency &&
+      !isLessonFrequencyAllowed(this.selectedLessonFrequency, this.selectedSubjectCount)
+    ) {
+      this.selectedLessonFrequency = '';
+    }
   }
 
   onSubmit(event: Event): void {
@@ -165,23 +247,30 @@ export class Onboarding {
     const lastName = this.lastName.trim();
     const ageRange = (form.elements.namedItem('age') as HTMLSelectElement)?.value ?? '';
     const gender = (form.elements.namedItem('gender') as HTMLSelectElement)?.value ?? '';
+    const country =
+      this.allCountries.find((o) => o.value === this.selectedCountryId)?.label?.trim() ?? '';
+    const city = this.selectedCityName.trim();
     const currentLevel =
       (form.elements.namedItem('current-level') as HTMLSelectElement)?.value ?? '';
-    const lessonFrequency =
-      (form.elements.namedItem('lesson-frequency') as HTMLSelectElement)?.value ?? '';
-
+    const lessonFrequency = this.selectedLessonFrequency.trim();
     const subjectCodes = this.subjectOptions.filter((o) => o.selected).map((o) => o.value);
 
     if (!firstName || !lastName) {
       this.submitError = 'Please enter your first and last name.';
       return;
     }
-    if (!ageRange || !gender || !currentLevel || !lessonFrequency) {
-      this.submitError = 'Please complete all dropdown fields.';
+    if (!ageRange || !gender || !country || !city || !currentLevel || !lessonFrequency) {
+      this.submitError = 'Please complete all fields including country and city.';
       return;
     }
     if (subjectCodes.length === 0) {
       this.submitError = 'Select at least one subject.';
+      return;
+    }
+    if (!isLessonFrequencyAllowed(lessonFrequency, subjectCodes.length)) {
+      this.submitError =
+        lessonFrequencyConstraintHint(subjectCodes.length) ??
+        'Choose a lesson frequency that matches your subject selection.';
       return;
     }
 
@@ -196,6 +285,8 @@ export class Onboarding {
       lastName,
       ageRange,
       gender,
+      country,
+      city,
       currentLevel,
       lessonFrequency,
       subjectCodes,

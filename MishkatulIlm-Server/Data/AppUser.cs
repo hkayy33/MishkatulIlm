@@ -10,6 +10,9 @@ public sealed class AppUser
     public DateTime CreatedAtUtc { get; set; }
     public bool OnboardingCompleted { get; set; }
 
+    /// <summary>PENDING, ACTIVE, or INACTIVE — admin-managed student application lifecycle.</summary>
+    public string ApplicationStatus { get; set; } = ApplicationStatusCodes.Pending;
+
     /// <summary>When true, the user may call admin APIs and open the admin dashboard.</summary>
     public bool IsAdmin { get; set; }
 

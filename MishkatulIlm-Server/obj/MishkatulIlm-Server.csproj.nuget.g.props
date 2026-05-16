@@ -12,6 +12,16 @@
   <ItemGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
     <SourceRoot Include="/Users/hassan/.nuget/packages/" />
   </ItemGroup>
+  <ItemGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
+    <EmbeddedResource Include="$(NuGetPackageRoot)countrystatecitylibrary/1.2.7/contentFiles/any/any/Files/countries.xlsx" Condition="Exists('$(NuGetPackageRoot)countrystatecitylibrary/1.2.7/contentFiles/any/any/Files/countries.xlsx')">
+      <NuGetPackageId>CountryStateCityLibrary</NuGetPackageId>
+      <NuGetPackageVersion>1.2.7</NuGetPackageVersion>
+      <NuGetItemType>EmbeddedResource</NuGetItemType>
+      <Pack>false</Pack>
+      <Private>False</Private>
+      <Link>Files/countries.xlsx</Link>
+    </EmbeddedResource>
+  </ItemGroup>
   <ImportGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
     <Import Project="$(NuGetPackageRoot)microsoft.entityframeworkcore/9.0.7/buildTransitive/net8.0/Microsoft.EntityFrameworkCore.props" Condition="Exists('$(NuGetPackageRoot)microsoft.entityframeworkcore/9.0.7/buildTransitive/net8.0/Microsoft.EntityFrameworkCore.props')" />
     <Import Project="$(NuGetPackageRoot)microsoft.codeanalysis.analyzers/3.3.4/buildTransitive/Microsoft.CodeAnalysis.Analyzers.props" Condition="Exists('$(NuGetPackageRoot)microsoft.codeanalysis.analyzers/3.3.4/buildTransitive/Microsoft.CodeAnalysis.Analyzers.props')" />

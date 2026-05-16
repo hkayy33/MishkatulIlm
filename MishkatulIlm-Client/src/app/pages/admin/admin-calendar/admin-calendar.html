@@ -1,25 +1,33 @@
-<div class="admin-page">
-  <h1 class="admin-title">Calendar</h1>
-  <p class="admin-lead">Month view for scheduling. Hook this grid to your events API when you are ready.</p>
+<div class="admin-page admin-calendar-page">
+  <h1 class="admin-title">Lesson calendar</h1>
+  <p class="admin-lead">
+    Select a day to see 30-minute slots from 8am–10pm UTC. Grey rows are booked.
+  </p>
 
-  <div class="cal-toolbar">
-    <button type="button" class="cal-nav" (click)="prevMonth()" aria-label="Previous month">‹</button>
-    <div class="cal-label">{{ monthLabel() }}</div>
-    <button type="button" class="cal-nav" (click)="nextMonth()" aria-label="Next month">›</button>
+  <div class="cal-toolbar-actions">
+    <button
+      type="button"
+      class="admin-btn admin-btn--ghost admin-btn--small"
+      [disabled]="clearing()"
+      (click)="clearAllSlots()"
+    >
+      {{ clearing() ? 'Clearing…' : 'Clear all slots' }}
+    </button>
   </div>
 
-  <div class="cal-grid" role="grid" aria-label="Month calendar">
-    @for (label of ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; track label) {
-      <div class="cal-head" role="columnheader">{{ label }}</div>
-    }
-    @for (cell of grid(); track $index) {
-      @if (cell.date) {
-        <div class="cal-cell cal-cell--day" role="gridcell">
-          <span class="cal-daynum">{{ cell.date.getDate() }}</span>
-        </div>
-      } @else {
-        <div class="cal-cell cal-cell--empty" role="gridcell"></div>
-      }
-    }
-  </div>
+  @if (loadError()) {
+    <p class="admin-error admin-tight">{{ loadError() }}</p>
+  }
+  @if (clearMessage()) {
+    <p class="admin-success admin-tight">{{ clearMessage() }}</p>
+  }
+
+  <app-admin-lesson-calendar
+    [availability]="availability()"
+    [loading]="loading()"
+    [pickMode]="false"
+    [tutorTimeZoneId]="tutorSettings()?.tutorTimeZoneId ?? 'UTC'"
+    [tutorDisplayName]="tutorSettings()?.tutorDisplayName ?? 'Tutor'"
+    (monthChanged)="onMonthChanged($event)"
+  />
 </div>

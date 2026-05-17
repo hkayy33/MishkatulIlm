@@ -63,9 +63,41 @@ export class StudentMatchedPortal implements OnInit {
     () => this.store.portalData()?.portal?.payment?.nextPaymentDueUtc ?? null,
   );
 
+  protected readonly payment = computed(() => this.store.portalData()?.portal?.payment ?? null);
+
   protected readonly requiresInitialPayment = computed(
-    () => this.store.portalData()?.portal?.payment?.requiresInitialPayment ?? false,
+    () => this.payment()?.requiresInitialPayment ?? false,
   );
+
+  protected readonly paymentOverdue = computed(() => this.payment()?.paymentOverdue ?? false);
+
+  protected readonly subscriptionPastDue = computed(() => this.payment()?.subscriptionPastDue ?? false);
+
+  protected readonly canMakePayment = computed(() => this.payment()?.canMakePayment ?? false);
+
+  protected readonly hasActiveSubscription = computed(
+    () => this.payment()?.hasActiveSubscription ?? false,
+  );
+
+  protected readonly subscriptionCancelAtPeriodEnd = computed(
+    () => this.payment()?.subscriptionCancelAtPeriodEnd ?? false,
+  );
+
+  protected readonly subscriptionPeriodEnd = computed(
+    () => this.payment()?.subscriptionCurrentPeriodEndUtc ?? null,
+  );
+
+  protected readonly canCancelSubscription = computed(
+    () => this.payment()?.canCancelSubscription ?? false,
+  );
+
+  protected readonly showSubscriptionManage = computed(
+    () =>
+      this.canCancelSubscription() ||
+      (this.subscriptionCancelAtPeriodEnd() && this.subscriptionPeriodEnd() != null),
+  );
+
+  protected readonly showCancelSubscriptionConfirm = signal(false);
 
   protected readonly scheduleChangeUpdate = computed(() => {
     const update = this.store.portalData()?.portal?.scheduleChangeUpdate ?? null;
@@ -132,7 +164,7 @@ export class StudentMatchedPortal implements OnInit {
     this.activeTab.set(tab);
     if (tab === 'summary') {
       this.store.reloadPortalForWeek(this.summaryWeekStart());
-    } else if (tab === 'lessons') {
+    } else if (tab === 'lessons' || tab === 'payments' || tab === 'account') {
       this.store.reloadPortal();
     }
   }
@@ -225,7 +257,7 @@ export class StudentMatchedPortal implements OnInit {
   }
 
   protected makePayment(): void {
-    if (this.paymentBusy() || !this.requiresInitialPayment()) return;
+    if (this.paymentBusy() || !this.canMakePayment()) return;
 
     this.paymentBusy.set(true);
     this.store.actionError.set(null);
@@ -238,6 +270,26 @@ export class StudentMatchedPortal implements OnInit {
         },
         error: (err: unknown) => {
           this.store.actionError.set(formatHttpError(err, 'Could not start payment.'));
+        },
+      });
+  }
+
+  protected cancelSubscription(): void {
+    if (this.paymentBusy() || !this.canCancelSubscription()) return;
+
+    this.paymentBusy.set(true);
+    this.store.actionError.set(null);
+    this.studentApi
+      .cancelSubscription()
+      .pipe(finalize(() => this.paymentBusy.set(false)))
+      .subscribe({
+        next: (res) => {
+          this.store.actionMessage.set(res.message);
+          this.showCancelSubscriptionConfirm.set(false);
+          this.store.reloadPortal();
+        },
+        error: (err: unknown) => {
+          this.store.actionError.set(formatHttpError(err, 'Could not cancel your subscription.'));
         },
       });
   }
@@ -255,6 +307,8 @@ export class StudentMatchedPortal implements OnInit {
       .subscribe({
         next: (res) => {
           this.store.actionMessage.set(res.message);
+          this.showDeleteConfirm.set(false);
+          this.deleteConfirmText.set('');
           this.auth.logout();
           void this.router.navigate(['/']);
         },

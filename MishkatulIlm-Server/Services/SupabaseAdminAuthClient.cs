@@ -109,7 +109,7 @@ public sealed class SupabaseAdminAuthClient(
         var client = httpClientFactory.CreateClient();
         using var req = new HttpRequestMessage(
             HttpMethod.Delete,
-            $"{baseUrl}/auth/v1/admin/users/{userId:D}");
+            $"{baseUrl}/auth/v1/admin/users/{userId:D}?should_soft_delete=false");
 
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _opts.ServiceRoleKey);
         req.Headers.TryAddWithoutValidation("apikey", _opts.ServiceRoleKey);

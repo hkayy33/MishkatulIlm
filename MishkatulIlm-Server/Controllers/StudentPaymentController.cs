@@ -19,6 +19,7 @@ public sealed class StudentPaymentController(
     AppDbContext db,
     IOptions<StripeOptions> stripeOptions,
     StripePaymentRecorder paymentRecorder,
+    StripeSubscriptionService subscriptionService,
     StripeCheckoutPriceResolver priceResolver) : ControllerBase
 {
     [HttpPost("checkout-session")]
@@ -35,10 +36,7 @@ public sealed class StudentPaymentController(
                 new { message = "Online payments are not configured yet. Please contact support." });
         }
 
-        var user = await db.Users
-            .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Id == userId && !u.IsAdmin, cancellationToken);
-
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId && !u.IsAdmin, cancellationToken);
         if (user is null)
             return NotFound(new { message = "Account not found." });
 
@@ -48,8 +46,16 @@ public sealed class StudentPaymentController(
                 new { message = "Payments are available after you accept your lesson schedule." });
         }
 
-        if (user.LastPaymentAtUtc is not null)
-            return BadRequest(new { message = "Your initial payment has already been recorded." });
+        var payment = StudentPaymentSummaryBuilder.Build(user);
+        if (!payment.CanMakePayment)
+        {
+            return BadRequest(new
+            {
+                message = payment.HasActiveSubscription
+                    ? "You already have an active monthly subscription."
+                    : "Online payment is not required right now.",
+            });
+        }
 
         var (priceId, priceError) = await priceResolver.ResolvePriceIdAsync(cancellationToken);
         if (priceId is null)
@@ -59,13 +65,12 @@ public sealed class StudentPaymentController(
                 new { message = priceError ?? "Could not resolve Stripe price." });
         }
 
+        StripeConfiguration.ApiKey = options.SecretKey;
         var clientBase = options.ClientAppUrl.Trim().TrimEnd('/');
         var sessionService = new SessionService();
-        var session = await sessionService.CreateAsync(
-            new SessionCreateOptions
+        var sessionOptions = new SessionCreateOptions
             {
                 Mode = "subscription",
-                CustomerEmail = user.Email,
                 ClientReferenceId = userId.ToString(),
                 Metadata = new Dictionary<string, string> { ["user_id"] = userId.ToString() },
                 LineItems =
@@ -78,8 +83,14 @@ public sealed class StudentPaymentController(
                 ],
                 SuccessUrl = $"{clientBase}/dashboard?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
                 CancelUrl = $"{clientBase}/dashboard?payment=cancelled",
-            },
-            cancellationToken: cancellationToken);
+            };
+
+        if (!string.IsNullOrWhiteSpace(user.StripeCustomerId))
+            sessionOptions.Customer = user.StripeCustomerId;
+        else
+            sessionOptions.CustomerEmail = user.Email;
+
+        var session = await sessionService.CreateAsync(sessionOptions, cancellationToken: cancellationToken);
 
         if (string.IsNullOrWhiteSpace(session.Url))
             return StatusCode(StatusCodes.Status502BadGateway, new { message = "Could not start checkout." });
@@ -124,5 +135,26 @@ public sealed class StudentPaymentController(
         }
 
         return Ok(new { message = "Payment recorded. Thank you!" });
+    }
+
+    [HttpPost("cancel-subscription")]
+    public async Task<IActionResult> CancelSubscription(CancellationToken cancellationToken)
+    {
+        if (!User.TryGetSupabaseUserId(out var userId))
+            return Unauthorized();
+
+        var (success, error, periodEndUtc) =
+            await subscriptionService.CancelAtPeriodEndAsync(userId, cancellationToken);
+
+        if (!success)
+            return BadRequest(new { message = error });
+
+        return Ok(new
+        {
+            message = periodEndUtc is null
+                ? "Your monthly payments have been cancelled."
+                : $"Your subscription will end on {periodEndUtc:MMMM d, yyyy}. You can keep using lessons until then.",
+            subscriptionCurrentPeriodEndUtc = periodEndUtc,
+        });
     }
 }

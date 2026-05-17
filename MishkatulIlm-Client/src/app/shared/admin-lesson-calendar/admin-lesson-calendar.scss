@@ -244,15 +244,31 @@
   &--outside {
     background: repeating-linear-gradient(
       -45deg,
-      #f0eeea,
-      #f0eeea 6px,
-      #e8e5df 6px,
-      #e8e5df 12px
+      #f5f2ec,
+      #f5f2ec 6px,
+      #ebe6dc 6px,
+      #ebe6dc 12px
     );
-    cursor: not-allowed;
+    cursor: pointer;
+    box-shadow: inset 0 0 0 1px rgba(107, 84, 32, 0.22);
+
+    &:hover:not(:disabled) {
+      background: repeating-linear-gradient(
+        -45deg,
+        rgba(197, 157, 95, 0.2),
+        rgba(197, 157, 95, 0.2) 6px,
+        rgba(197, 157, 95, 0.12) 6px,
+        rgba(197, 157, 95, 0.12) 12px
+      );
+    }
+
+    .slot-row__time {
+      color: #1c1b18;
+    }
 
     .slot-row__status {
-      color: #8a8478;
+      color: #6b5420;
+      font-weight: 600;
     }
   }
 
@@ -280,7 +296,7 @@
 
   &:disabled:not(.slot-row--selected-start):not(.slot-row--selected-range):not(.slot-row--confirmed):not(
       .slot-row--booked-student
-    ) {
+    ):not(.slot-row--outside) {
     opacity: 0.55;
     cursor: not-allowed;
   }

@@ -21,6 +21,14 @@ public sealed class StudentPaymentSummaryDto
 
     /// <summary>True when the student must pay before their first lesson.</summary>
     public bool RequiresInitialPayment { get; init; }
+
+    public bool PaymentOverdue { get; init; }
+    public bool HasActiveSubscription { get; init; }
+    public bool SubscriptionCancelAtPeriodEnd { get; init; }
+    public DateTime? SubscriptionCurrentPeriodEndUtc { get; init; }
+    public bool SubscriptionPastDue { get; init; }
+    public bool CanMakePayment { get; init; }
+    public bool CanCancelSubscription { get; init; }
 }
 
 public sealed class StudentLessonMonthSummaryDto

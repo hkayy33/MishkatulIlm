@@ -56,4 +56,11 @@ export class StudentApiService {
       sessionId,
     });
   }
+
+  cancelSubscription(): Observable<{ message: string; subscriptionCurrentPeriodEndUtc?: string | null }> {
+    return this.http.post<{ message: string; subscriptionCurrentPeriodEndUtc?: string | null }>(
+      `${this.apiBaseUrl}/api/student/cancel-subscription`,
+      {},
+    );
+  }
 }

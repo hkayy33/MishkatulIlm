@@ -3,6 +3,7 @@ import { finalize, forkJoin } from 'rxjs';
 import { monthsTouchingWeek, startOfWeekMonday } from '../utils/week-schedule.util';
 import type {
   StudentLessonRow,
+  StudentPaymentSummary,
   StudentPortalResponse,
   StudentScheduleChangeUpdate,
 } from '../models/student-portal.models';
@@ -174,21 +175,7 @@ function normalizePortalResponse(raw: StudentPortalResponse): StudentPortalRespo
     .filter((l): l is StudentLessonRow => l !== null);
 
   const paymentRaw = portalRaw.payment ?? (portalRaw as { Payment?: StudentPortalResponse['portal']['payment'] }).Payment;
-  const payment = paymentRaw
-    ? {
-        ...paymentRaw,
-        requiresInitialPayment:
-          paymentRaw.requiresInitialPayment ??
-          (paymentRaw as { RequiresInitialPayment?: boolean }).RequiresInitialPayment ??
-          paymentRaw.lastPaymentAtUtc == null,
-      }
-    : {
-        nextPaymentDueUtc: null,
-        lastPaymentAmount: null,
-        lastPaymentCurrency: 'GBP',
-        lastPaymentAtUtc: null,
-        requiresInitialPayment: true,
-      };
+  const payment = normalizePaymentSummary(paymentRaw);
 
   const portal = {
     ...portalRaw,
@@ -289,5 +276,52 @@ function normalizeLessonRow(
     durationMinutes: lesson.durationMinutes ?? 60,
     attendanceStatus: status === 'not_attending' ? 'not_attending' : 'attending',
     studentNote: note,
+  };
+}
+
+function normalizePaymentSummary(
+  paymentRaw: StudentPaymentSummary | null | undefined,
+): StudentPaymentSummary {
+  const p = paymentRaw as StudentPaymentSummary & {
+    RequiresInitialPayment?: boolean;
+    PaymentOverdue?: boolean;
+    HasActiveSubscription?: boolean;
+    SubscriptionCancelAtPeriodEnd?: boolean;
+    SubscriptionCurrentPeriodEndUtc?: string | null;
+    SubscriptionPastDue?: boolean;
+    CanMakePayment?: boolean;
+    CanCancelSubscription?: boolean;
+  };
+
+  if (!paymentRaw) {
+    return {
+      nextPaymentDueUtc: null,
+      lastPaymentAmount: null,
+      lastPaymentCurrency: 'GBP',
+      lastPaymentAtUtc: null,
+      requiresInitialPayment: true,
+      paymentOverdue: false,
+      hasActiveSubscription: false,
+      subscriptionCancelAtPeriodEnd: false,
+      subscriptionCurrentPeriodEndUtc: null,
+      subscriptionPastDue: false,
+      canMakePayment: true,
+      canCancelSubscription: false,
+    };
+  }
+
+  return {
+    ...paymentRaw,
+    requiresInitialPayment:
+      paymentRaw.requiresInitialPayment ?? p.RequiresInitialPayment ?? paymentRaw.lastPaymentAtUtc == null,
+    paymentOverdue: paymentRaw.paymentOverdue ?? p.PaymentOverdue ?? false,
+    hasActiveSubscription: paymentRaw.hasActiveSubscription ?? p.HasActiveSubscription ?? false,
+    subscriptionCancelAtPeriodEnd:
+      paymentRaw.subscriptionCancelAtPeriodEnd ?? p.SubscriptionCancelAtPeriodEnd ?? false,
+    subscriptionCurrentPeriodEndUtc:
+      paymentRaw.subscriptionCurrentPeriodEndUtc ?? p.SubscriptionCurrentPeriodEndUtc ?? null,
+    subscriptionPastDue: paymentRaw.subscriptionPastDue ?? p.SubscriptionPastDue ?? false,
+    canMakePayment: paymentRaw.canMakePayment ?? p.CanMakePayment ?? false,
+    canCancelSubscription: paymentRaw.canCancelSubscription ?? p.CanCancelSubscription ?? false,
   };
 }

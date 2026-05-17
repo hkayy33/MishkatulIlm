@@ -20,6 +20,13 @@ public sealed class AppUser
     public decimal? LastPaymentAmount { get; set; }
     public string LastPaymentCurrency { get; set; } = "GBP";
     public DateTime? LastPaymentAtUtc { get; set; }
+
+    public string? StripeCustomerId { get; set; }
+    public string? StripeSubscriptionId { get; set; }
+    public string? StripeSubscriptionStatus { get; set; }
+    public bool StripeSubscriptionCancelAtPeriodEnd { get; set; }
+    public DateTime? StripeSubscriptionPeriodEndUtc { get; set; }
+    public string? LastStripeInvoiceId { get; set; }
     public DateTime? DeletionRequestedAtUtc { get; set; }
 
     /// <summary>Optional note from the student for their tutor (admin dashboard).</summary>

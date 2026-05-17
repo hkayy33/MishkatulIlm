@@ -485,7 +485,6 @@ export class AdminLessonCalendar {
       return 'booked-student';
     }
     if (!effectiveSlot.isAvailable) return 'booked';
-    if (effectiveSlot.matchesStudentPreference === false) return 'outside-preference';
 
     const startMs = new Date(effectiveSlot.startsAtUtc).getTime();
     if (draftStart) {
@@ -499,6 +498,7 @@ export class AdminLessonCalendar {
     }
 
     if (this.isCoveredByConfirmedLesson(effectiveSlot.startsAtUtc)) return 'confirmed';
+    if (effectiveSlot.matchesStudentPreference === false) return 'outside-preference';
     return 'open';
   }
 

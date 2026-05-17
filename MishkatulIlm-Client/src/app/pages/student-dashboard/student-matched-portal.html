@@ -49,7 +49,24 @@
     @if (activeTab() === 'summary') {
       <div class="matched-page">
         <h1 class="matched-page-title">Summary</h1>
-        <p class="matched-page-lead">Your next lesson and payment at a glance.</p>
+        <p class="matched-page-lead">Your week at a glance, plus next lesson and payment.</p>
+
+        @if (requiresInitialPayment()) {
+          <div class="matched-payment-cta" role="region" aria-labelledby="payment-required-heading">
+            <div>
+              <h2 id="payment-required-heading">Payment required</h2>
+              <p>Complete your first payment before your lessons begin.</p>
+            </div>
+            <button
+              type="button"
+              class="matched-btn"
+              [disabled]="paymentBusy()"
+              (click)="makePayment()"
+            >
+              {{ paymentBusy() ? 'Opening checkout…' : 'Make payment' }}
+            </button>
+          </div>
+        }
 
         <div class="matched-cards matched-cards--summary">
           <article class="matched-card matched-card--highlight">
@@ -74,7 +91,17 @@
 
           <article class="matched-card matched-card--highlight">
             <h2>Next payment</h2>
-            @if (nextPaymentDue(); as due) {
+            @if (requiresInitialPayment()) {
+              <p class="matched-card__value matched-card__value--muted">Payment required before your first lesson</p>
+              <button
+                type="button"
+                class="matched-btn matched-btn--compact"
+                [disabled]="paymentBusy()"
+                (click)="makePayment()"
+              >
+                {{ paymentBusy() ? 'Opening checkout…' : 'Make payment' }}
+              </button>
+            } @else if (nextPaymentDue(); as due) {
               <p class="matched-card__value">{{ due | date: 'fullDate' }}</p>
               <button type="button" class="matched-summary-link" (click)="setTab('payments')">
                 View payments
@@ -84,6 +111,62 @@
             }
           </article>
         </div>
+
+        @if (scheduleChangeUpdate(); as update) {
+          <section
+            class="matched-updates"
+            [class.matched-updates--pending]="update.status === 'pending'"
+            [class.matched-updates--resolved]="update.status === 'resolved'"
+            [class.matched-updates--declined]="update.status === 'declined'"
+            aria-labelledby="schedule-updates-heading"
+          >
+            <h2 id="schedule-updates-heading" class="matched-section-title">Updates</h2>
+            <article class="matched-update-card">
+              <button
+                type="button"
+                class="matched-update-card__close"
+                aria-label="Close update"
+                (click)="dismissUpdate(update)"
+              >
+                Close
+              </button>
+              <p class="matched-update-card__title">{{ scheduleUpdateTitle(update) }}</p>
+              <p class="matched-update-card__lead">{{ scheduleUpdateLead(update) }}</p>
+              <p class="matched-update-card__meta">
+                Submitted {{ update.createdAtUtc | date: 'medium' }}
+                @if (update.resolvedAtUtc && update.status !== 'pending') {
+                  · Updated {{ update.resolvedAtUtc | date: 'medium' }}
+                }
+              </p>
+              <div class="matched-update-card__quote">
+                <span class="matched-update-card__label">Your request</span>
+                <p>{{ update.requestNote }}</p>
+              </div>
+              @if (update.adminMessage) {
+                <div class="matched-update-card__quote matched-update-card__quote--admin">
+                  <span class="matched-update-card__label">Message from your teacher</span>
+                  <p>{{ update.adminMessage }}</p>
+                </div>
+              }
+              @if (update.status === 'pending') {
+                <button type="button" class="matched-summary-link" (click)="setTab('account')">
+                  View in account settings
+                </button>
+              }
+            </article>
+          </section>
+        }
+
+        <app-student-week-schedule
+          [lessons]="store.lessons()"
+          [loading]="store.loading()"
+          [timeZoneId]="store.timeZoneId()"
+          [updatingSlotId]="store.updatingSlotId()"
+          [weekStart]="summaryWeekStart()"
+          (weekChanged)="onSummaryWeekChanged($event)"
+          (attendanceChange)="store.updateAttendance($event.slotId, $event.status)"
+          (lessonNoteChange)="store.saveLessonNote($event.slotId, $event.note)"
+        />
       </div>
     }
 
@@ -91,7 +174,7 @@
       <div class="matched-page">
         <h1 class="matched-page-title">Lessons</h1>
         <p class="matched-page-lead">
-          Select a day on the calendar to mark each lesson as attending (default) or cannot attend.
+          Select a day, then a lesson to set attendance or add an optional note for your teacher.
         </p>
 
         @if (store.loadError()) {
@@ -105,6 +188,7 @@
           [updatingSlotId]="store.updatingSlotId()"
           (monthChanged)="store.onMonthChanged($event)"
           (attendanceChange)="store.updateAttendance($event.slotId, $event.status)"
+          (lessonNoteChange)="store.saveLessonNote($event.slotId, $event.note)"
         />
 
         <div class="matched-lists">
@@ -185,10 +269,29 @@
         <h1 class="matched-page-title">Payments</h1>
         <p class="matched-page-lead">Your payment dates and a summary of lessons this month.</p>
 
+        @if (requiresInitialPayment()) {
+          <div class="matched-payment-cta matched-payment-cta--page" role="region" aria-labelledby="payments-required-heading">
+            <div>
+              <h2 id="payments-required-heading">First payment</h2>
+              <p>Pay now to confirm your place before your first lesson.</p>
+            </div>
+            <button
+              type="button"
+              class="matched-btn"
+              [disabled]="paymentBusy()"
+              (click)="makePayment()"
+            >
+              {{ paymentBusy() ? 'Opening checkout…' : 'Make payment' }}
+            </button>
+          </div>
+        }
+
         <div class="matched-cards">
           <article class="matched-card">
             <h2>Next payment due</h2>
-            @if (payment.nextPaymentDueUtc) {
+            @if (requiresInitialPayment()) {
+              <p class="matched-card__value matched-card__value--muted">Due before your first lesson</p>
+            } @else if (payment.nextPaymentDueUtc) {
               <p class="matched-card__value">{{ payment.nextPaymentDueUtc | date: 'mediumDate' }}</p>
             } @else {
               <p class="matched-card__value matched-card__value--muted">Not set yet</p>
@@ -238,13 +341,14 @@
           Request a new lesson schedule or delete your account if you no longer need lessons.
         </p>
 
-        @if (data.portal.hasPendingScheduleChangeRequest) {
-          <p class="matched-muted">You have a pending schedule change request with your teacher.</p>
-        }
-
         <section class="matched-account-block">
           <h2>Schedule change</h2>
-          @if (!showScheduleChangeForm()) {
+          @if (hasPendingScheduleChange()) {
+            <p class="matched-muted">
+              You already have a pending request. Your teacher will respond soon — your lessons and
+              portal stay available in the meantime.
+            </p>
+          } @else if (!showScheduleChangeForm()) {
             <button type="button" class="matched-btn matched-btn--ghost" (click)="showScheduleChangeForm.set(true)">
               Request schedule change
             </button>
@@ -278,7 +382,9 @@
             </button>
           } @else {
             <div class="matched-form">
-              <p class="matched-muted">Type <strong>DELETE</strong> to confirm. This deactivates your account.</p>
+              <p class="matched-muted">
+                Type <strong>DELETE</strong> to confirm. This permanently deletes your account and cannot be undone.
+              </p>
               <input
                 type="text"
                 [ngModel]="deleteConfirmText()"

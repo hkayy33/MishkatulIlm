@@ -1,4 +1,5 @@
 import type { AvailabilitySlotRow } from '../models/calendar.models';
+import { parseLessonAttendanceStatus } from './attendance.util';
 
 /** Matches LessonScheduleService day window (UTC). */
 export const SCHEDULE_DAY_START_HOUR_UTC = 8;
@@ -19,6 +20,16 @@ export function utcCivilDayKeyFromCalendarDate(date: Date): string {
 export function utcCivilDayKeyFromIso(isoUtc: string): string {
   const d = new Date(isoUtc);
   return utcCivilDayKey(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+/** Calendar date (y-m-d) of an instant in a given IANA time zone. */
+export function calendarDayKeyInZone(isoUtc: string, timeZoneId: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timeZoneId,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(isoUtc));
 }
 
 export function normalizeSlotStartIso(isoUtc: string): string {
@@ -84,7 +95,11 @@ export function normalizeAvailabilityRows(
       IsAvailable?: boolean;
       MatchesStudentPreference?: boolean;
       AvailableDurationMinutes?: number[];
+      SlotId?: string | null;
+      StudentUserId?: string | null;
       StudentName?: string | null;
+      AttendanceStatus?: string | null;
+      StudentLessonNote?: string | null;
     };
     const startsAtUtc = normalizeSlotStartIso(String(row.startsAtUtc ?? raw.StartsAtUtc ?? ''));
     const endsRaw = row.endsAtUtc ?? raw.EndsAtUtc;
@@ -97,6 +112,13 @@ export function normalizeAvailabilityRows(
     const availableDurationMinutes =
       row.availableDurationMinutes ?? raw.AvailableDurationMinutes ?? [];
 
+    const studentUserId = row.studentUserId ?? raw.StudentUserId ?? null;
+    const slotId = row.slotId ?? raw.SlotId ?? null;
+    const attendanceRaw = row.attendanceStatus ?? raw.AttendanceStatus ?? null;
+    const noteRaw = row.studentLessonNote ?? raw.StudentLessonNote ?? null;
+    const studentLessonNote =
+      typeof noteRaw === 'string' && noteRaw.trim().length > 0 ? noteRaw.trim() : null;
+
     return {
       ...row,
       startsAtUtc,
@@ -104,7 +126,11 @@ export function normalizeAvailabilityRows(
       isAvailable,
       matchesStudentPreference,
       availableDurationMinutes: isAvailable ? availableDurationMinutes : [],
+      slotId: slotId ? String(slotId) : null,
+      studentUserId: studentUserId ? String(studentUserId) : null,
       studentName: row.studentName ?? raw.StudentName ?? null,
+      attendanceStatus: studentUserId ? parseLessonAttendanceStatus(attendanceRaw) : null,
+      studentLessonNote: studentUserId ? studentLessonNote : null,
     };
   });
 }

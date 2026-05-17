@@ -9,5 +9,7 @@ public sealed class LessonSlot
     public Guid? StudentUserId { get; set; }
     public AppUser? Student { get; set; }
     public string AttendanceStatus { get; set; } = AttendanceStatusCodes.Attending;
+    /// <summary>Optional note from the student for this lesson (visible to tutor).</summary>
+    public string? StudentNote { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 }

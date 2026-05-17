@@ -51,6 +51,161 @@ public sealed class AdminController(
     public Task<IActionResult> ListPendingApplications(CancellationToken cancellationToken) =>
         ListPendingApplicationsCore(cancellationToken);
 
+    [HttpGet("dashboard/badge-counts")]
+    public async Task<IActionResult> GetBadgeCounts(CancellationToken cancellationToken)
+    {
+        if (!await IsCurrentUserAdminAsync(cancellationToken))
+            return Forbid();
+
+        var pendingApplications = await db.Users.AsNoTracking().CountAsync(
+            u =>
+                !u.IsAdmin
+                && (u.ApplicationStatus == ApplicationStatusCodes.Pending
+                    || u.ApplicationStatus == ApplicationStatusCodes.AwaitingReply),
+            cancellationToken);
+
+        var pendingScheduleChanges = await db.ScheduleChangeRequests.AsNoTracking().CountAsync(
+            r => r.Status == ScheduleChangeRequestCodes.Pending,
+            cancellationToken);
+
+        return Ok(
+            new AdminBadgeCountsDto
+            {
+                PendingApplications = pendingApplications,
+                PendingScheduleChanges = pendingScheduleChanges,
+            });
+    }
+
+    [HttpGet("schedule-change-requests/pending")]
+    public async Task<IActionResult> ListPendingScheduleChangeRequests(CancellationToken cancellationToken)
+    {
+        if (!await IsCurrentUserAdminAsync(cancellationToken))
+            return Forbid();
+
+        var rows = await db.ScheduleChangeRequests
+            .AsNoTracking()
+            .Include(r => r.Student)
+            .ThenInclude(s => s.Onboarding)
+            .Where(r => r.Status == ScheduleChangeRequestCodes.Pending)
+            .OrderByDescending(r => r.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var items = rows
+            .Select(r =>
+            {
+                var onboarding = r.Student.Onboarding;
+                return new AdminScheduleChangeRequestListItem
+                {
+                    Id = r.Id,
+                    StudentUserId = r.StudentUserId,
+                    StudentName = $"{r.Student.FirstName} {r.Student.LastName}".Trim(),
+                    Email = r.Student.Email,
+                    Note = r.Note,
+                    CreatedAtUtc = r.CreatedAtUtc,
+                    AgeRange = onboarding?.AgeRange,
+                    Gender = onboarding?.Gender,
+                    Country = onboarding?.Country,
+                    City = onboarding?.City,
+                    CurrentLevel = onboarding?.CurrentLevel,
+                    LessonFrequency = onboarding?.LessonFrequency,
+                    SubjectCodes = onboarding?.SubjectCodes ?? [],
+                    PreferredAvailability = onboarding?.PreferredAvailability ?? [],
+                };
+            })
+            .ToList();
+
+        return Ok(items);
+    }
+
+    [HttpPost("schedule-change-requests/{requestId:guid}/resolve")]
+    public async Task<IActionResult> ResolveScheduleChangeRequest(
+        Guid requestId,
+        [FromBody] ApproveApplicationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!await IsCurrentUserAdminAsync(cancellationToken))
+            return Forbid();
+
+        var row = await db.ScheduleChangeRequests
+            .Include(r => r.Student)
+            .ThenInclude(s => s.Onboarding)
+            .FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
+
+        if (row is null)
+            return NotFound(new { message = "Schedule change request not found." });
+
+        if (row.Status != ScheduleChangeRequestCodes.Pending)
+            return BadRequest(new { message = "This request is no longer pending." });
+
+        var profile = row.Student.Onboarding;
+        if (profile is null)
+            return BadRequest(new { message = "Student onboarding profile is missing." });
+
+        if (row.Student.ApplicationStatus != ApplicationStatusCodes.Active)
+            return BadRequest(new { message = "Only active students can have schedules changed this way." });
+
+        if (!TryPlanLessonsFromRescheduleRequest(request, profile, out var planned, out var planError))
+            return BadRequest(new { message = planError });
+
+        var conflictMessage = await scheduleProposals.ValidatePlannedLessonsAsync(
+            row.StudentUserId,
+            planned,
+            cancellationToken);
+        if (conflictMessage is not null)
+            return Conflict(new { message = conflictMessage });
+
+        try
+        {
+            await scheduleProposals.RescheduleStudentLessonsAsync(row.StudentUserId, planned, cancellationToken);
+            await scheduleProposals.SupersedeOpenProposalsForStudentAsync(
+                row.StudentUserId,
+                cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+
+        var now = DateTime.UtcNow;
+        row.Status = ScheduleChangeRequestCodes.Resolved;
+        row.ResolvedAtUtc = now;
+        row.AdminResponseMessage = null;
+        await db.SaveChangesAsync(cancellationToken);
+
+        var message = planned.Count > 0
+            ? "The student's lessons have been rescheduled."
+            : "The student's lessons have been cleared.";
+        return Ok(new { message });
+    }
+
+    [HttpPost("schedule-change-requests/{requestId:guid}/decline")]
+    public async Task<IActionResult> DeclineScheduleChangeRequest(
+        Guid requestId,
+        [FromBody] DeclineScheduleChangeRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!await IsCurrentUserAdminAsync(cancellationToken))
+            return Forbid();
+
+        var message = request.Message.Trim();
+        if (message.Length < 10)
+            return BadRequest(new { message = "Please include a message for the student (at least 10 characters)." });
+
+        var row = await db.ScheduleChangeRequests.FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
+        if (row is null)
+            return NotFound(new { message = "Schedule change request not found." });
+
+        if (row.Status != ScheduleChangeRequestCodes.Pending)
+            return BadRequest(new { message = "This request is no longer pending." });
+
+        row.Status = ScheduleChangeRequestCodes.Declined;
+        row.AdminResponseMessage = message;
+        row.ResolvedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Ok(new { message = "The student has been notified on their dashboard." });
+    }
+
     [HttpPost("applications/{userId:guid}/approve")]
     public async Task<IActionResult> ApproveApplication(
         Guid userId,
@@ -230,21 +385,39 @@ public sealed class AdminController(
                 }).ToList(),
                 cancellationToken);
 
+        var now = DateTime.UtcNow;
         var rows = activeStudents
-            .Where(u => u.Onboarding is not null)
-            .Select(u => new AdminStudentListItem
+            .Select(u =>
             {
-                UserId = u.Id,
-                Email = u.Email,
-                FirstName = u.FirstName,
-                LastName = u.LastName,
-                AgeRange = u.Onboarding!.AgeRange,
-                Gender = u.Onboarding.Gender,
-                CurrentLevel = u.Onboarding.CurrentLevel,
-                LessonFrequency = u.Onboarding.LessonFrequency,
-                SubjectCodes = u.Onboarding.SubjectCodes,
-                PreferredAvailability = u.Onboarding.PreferredAvailability,
-                ScheduledLessons = lessonsByStudent.GetValueOrDefault(u.Id) ?? [],
+                var onboarding = u.Onboarding;
+                var studentLessons = lessonsByStudent.GetValueOrDefault(u.Id) ?? [];
+                var nextLessonSlot = studentLessons
+                    .Where(l => l.EndsAtUtc > now)
+                    .OrderBy(l => l.StartsAtUtc)
+                    .FirstOrDefault();
+                return new AdminStudentListItem
+                {
+                    UserId = u.Id,
+                    Email = u.Email,
+                    FirstName = u.FirstName,
+                    LastName = u.LastName,
+                    HasMadePayment = u.LastPaymentAtUtc is not null,
+                    NextPaymentDueUtc = u.LastPaymentAtUtc is not null ? u.NextPaymentDueUtc : null,
+                    NextLesson = nextLessonSlot,
+                    PhoneNumber = string.IsNullOrWhiteSpace(onboarding?.PhoneNumber)
+                        ? null
+                        : onboarding.PhoneNumber,
+                    Location = FormatStudentLocation(onboarding),
+                    Country = TrimOrNull(onboarding?.Country),
+                    City = TrimOrNull(onboarding?.City),
+                    AgeRange = onboarding?.AgeRange,
+                    Gender = onboarding?.Gender,
+                    CurrentLevel = onboarding?.CurrentLevel,
+                    LessonFrequency = onboarding?.LessonFrequency,
+                    SubjectCodes = onboarding?.SubjectCodes ?? [],
+                    PreferredAvailability = onboarding?.PreferredAvailability ?? [],
+                    ScheduledLessons = studentLessons,
+                };
             })
             .ToList();
 
@@ -369,5 +542,138 @@ public sealed class AdminController(
             return false;
 
         return await db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.IsAdmin, cancellationToken);
+    }
+
+    private static string? TrimOrNull(string? value)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed;
+    }
+
+    private static string? FormatStudentLocation(StudentOnboardingProfile? onboarding)
+    {
+        if (onboarding is null)
+            return null;
+
+        var city = onboarding.City.Trim();
+        var country = onboarding.Country.Trim();
+        if (city.Length == 0 && country.Length == 0)
+            return null;
+        if (city.Length > 0 && country.Length > 0)
+            return $"{city}, {country}";
+        return city.Length > 0 ? city : country;
+    }
+
+    private static bool TryPlanLessonsFromRescheduleRequest(
+        ApproveApplicationRequest request,
+        StudentOnboardingProfile profile,
+        out List<PlannedLessonSlotDto> planned,
+        out string planError)
+    {
+        planned = [];
+        planError = string.Empty;
+
+        if (request.WeekOneLessons is not { Count: > 0 })
+            return true;
+
+        if (!LessonScheduleService.TryValidateWeekOneLessons(
+                request.WeekOneLessons,
+                profile.LessonFrequency,
+                out planError,
+                requireExactWeekOneCount: false))
+            return false;
+
+        planned = LessonScheduleService.PlanFromWeekOneLessons(
+            request.WeekOneLessons,
+            profile.LessonFrequency);
+        return true;
+    }
+
+    private static bool TryPlanLessonsFromApproveRequest(
+        ApproveApplicationRequest request,
+        StudentOnboardingProfile profile,
+        out List<PlannedLessonSlotDto> planned,
+        out string planError)
+    {
+        planned = [];
+        planError = string.Empty;
+
+        if (request.WeekOneLessons is { Count: > 0 })
+        {
+            if (!LessonScheduleService.TryValidateWeekOneLessons(
+                    request.WeekOneLessons,
+                    profile.LessonFrequency,
+                    out planError))
+                return false;
+
+            planned = LessonScheduleService.PlanFromWeekOneLessons(
+                request.WeekOneLessons,
+                profile.LessonFrequency);
+            return planned.Count > 0;
+        }
+
+        if (request.WeekOneLessonStartsUtc is { Count: > 0 })
+        {
+            if (!LessonScheduleService.TryNormalizeDuration(
+                    request.DurationMinutes,
+                    out var duration,
+                    out planError))
+                return false;
+
+            if (!LessonScheduleService.TryValidateWeekOneSlots(
+                    request.WeekOneLessonStartsUtc,
+                    profile.LessonFrequency,
+                    duration,
+                    out planError))
+                return false;
+
+            planned = LessonScheduleService.PlanFromWeekOneSlots(
+                request.WeekOneLessonStartsUtc,
+                profile.LessonFrequency,
+                duration);
+            return planned.Count > 0;
+        }
+
+        if (request.AnchorStartsAtUtc == default)
+        {
+            planError = "Schedule lessons by selecting slots in the start week.";
+            return false;
+        }
+
+        if (!LessonScheduleService.TryNormalizeDuration(
+                request.DurationMinutes,
+                out var anchorDuration,
+                out planError))
+            return false;
+
+        var anchor = DateTime.SpecifyKind(request.AnchorStartsAtUtc, DateTimeKind.Utc);
+        if (anchor < DateTime.UtcNow.AddMinutes(-5))
+        {
+            planError = "Cannot start scheduling in the past.";
+            return false;
+        }
+
+        if (!LessonScheduleService.FitsDayWindow(anchor, anchorDuration))
+        {
+            planError = "Lesson does not fit between 8am and 10pm UTC.";
+            return false;
+        }
+
+        planned = LessonScheduleService.PlanMonthlyLessonStarts(
+                anchor,
+                profile.LessonFrequency,
+                profile.PreferredAvailability)
+            .Select(start => new PlannedLessonSlotDto
+            {
+                StartsAtUtc = start,
+                EndsAtUtc = LessonScheduleService.SlotEnd(start, anchorDuration),
+                DurationMinutes = anchorDuration,
+            })
+            .ToList();
+
+        if (planned.Count == 0)
+            planError = "Could not plan lessons for this frequency and time.";
+
+        return planned.Count > 0;
     }
 }

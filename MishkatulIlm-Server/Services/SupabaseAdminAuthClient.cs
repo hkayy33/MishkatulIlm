@@ -95,4 +95,43 @@ public sealed class SupabaseAdminAuthClient(
             return null;
         }
     }
+
+    /// <summary>Permanently removes a Supabase auth user. Returns false if not configured or the API call fails.</summary>
+    public async Task<bool> DeleteUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        if (!IsConfigured)
+        {
+            logger.LogWarning("Supabase admin user delete skipped: ServiceRoleKey or Url not configured.");
+            return false;
+        }
+
+        var baseUrl = _opts.Url.Trim().TrimEnd('/');
+        var client = httpClientFactory.CreateClient();
+        using var req = new HttpRequestMessage(
+            HttpMethod.Delete,
+            $"{baseUrl}/auth/v1/admin/users/{userId:D}");
+
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _opts.ServiceRoleKey);
+        req.Headers.TryAddWithoutValidation("apikey", _opts.ServiceRoleKey);
+
+        try
+        {
+            var res = await client.SendAsync(req, cancellationToken);
+            if (res.IsSuccessStatusCode)
+                return true;
+
+            var body = await res.Content.ReadAsStringAsync(cancellationToken);
+            logger.LogWarning(
+                "Supabase admin delete user failed ({Status}) for {UserId}: {Body}",
+                (int)res.StatusCode,
+                userId,
+                body);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Supabase admin delete user HTTP failure for {UserId}", userId);
+            return false;
+        }
+    }
 }

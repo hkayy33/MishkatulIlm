@@ -1,6 +1,6 @@
 <div class="admin-page">
   <h1 class="admin-title">Active students</h1>
-  <p class="admin-lead">Students you have approved with scheduled lesson slots.</p>
+  <p class="admin-lead">All students with an active lesson schedule.</p>
 
   <section class="admin-card">
     <h2 class="admin-card-title">Create account</h2>
@@ -46,39 +46,137 @@
   } @else if (students().length === 0) {
     <p class="admin-muted">No active students yet. Approve pending applications with lesson slots first.</p>
   } @else {
+    <div class="students-toolbar">
+      <div class="admin-field students-toolbar__search">
+        <label for="student-search">Search students</label>
+        <input
+          id="student-search"
+          type="search"
+          name="studentSearch"
+          [ngModel]="searchQuery()"
+          (ngModelChange)="searchQuery.set($event)"
+          placeholder="Name, email, or phone"
+          autocomplete="off"
+        />
+      </div>
+      <div class="admin-field students-toolbar__filter">
+        <label for="payment-filter">Payment filter</label>
+        <select
+          id="payment-filter"
+          name="paymentFilter"
+          [ngModel]="paymentFilter()"
+          (ngModelChange)="paymentFilter.set($event)"
+        >
+          <option value="all">All students</option>
+          <option value="unpaid">Unpaid only</option>
+        </select>
+      </div>
+    </div>
+
+    @if (filteredStudents().length === 0) {
+      <p class="admin-muted">No students match your search or filter.</p>
+    } @else {
     <div class="admin-table-wrap">
-      <table class="admin-table">
+      <table class="admin-table admin-table--students">
         <thead>
           <tr>
             <th>Name</th>
-            <th>Email</th>
-            <th>Level</th>
-            <th>Scheduled lessons</th>
-            <th>Subjects</th>
+            <th>Payment status</th>
+            <th>Next payment due</th>
+            <th>Next lesson</th>
+            <th class="admin-table__expand-col" aria-label="Expand row"></th>
           </tr>
         </thead>
         <tbody>
-          @for (s of students(); track s.userId) {
-            <tr>
+          @for (s of filteredStudents(); track s.userId) {
+            <tr class="student-row" [class.student-row--expanded]="isExpanded(s.userId)">
               <td>{{ s.firstName }} {{ s.lastName }}</td>
-              <td>{{ s.email }}</td>
-              <td>{{ s.currentLevel }}</td>
-              <td class="lessons-cell">
-                @if (s.scheduledLessons.length === 0) {
-                  <span class="admin-muted">None</span>
+              <td>
+                <span
+                  class="payment-badge"
+                  [class.payment-badge--yes]="s.hasMadePayment"
+                  [class.payment-badge--no]="!s.hasMadePayment"
+                >
+                  {{ s.hasMadePayment ? 'Paid' : 'Unpaid' }}
+                </span>
+              </td>
+              <td class="students-table__date">
+                @if (s.hasMadePayment && s.nextPaymentDueUtc) {
+                  {{ s.nextPaymentDueUtc | date: 'mediumDate' }}
                 } @else {
-                  <ul class="lesson-list">
-                    @for (lesson of s.scheduledLessons; track lesson.slotId) {
-                      <li>{{ formatLesson(lesson.startsAtUtc, lesson.endsAtUtc) }}</li>
-                    }
-                  </ul>
+                  <span class="admin-muted">—</span>
                 }
               </td>
-              <td>{{ formatSubjects(s.subjectCodes) }}</td>
+              <td class="students-table__date">{{ formatNextLesson(s) }}</td>
+              <td class="admin-table__expand-cell">
+                <button
+                  type="button"
+                  class="row-expand"
+                  [class.row-expand--open]="isExpanded(s.userId)"
+                  [attr.aria-expanded]="isExpanded(s.userId)"
+                  [attr.aria-controls]="'student-details-' + s.userId"
+                  (click)="toggleDetails(s.userId)"
+                >
+                  <span class="row-expand__chevron" aria-hidden="true"></span>
+                  <span class="visually-hidden">
+                    {{ isExpanded(s.userId) ? 'Hide' : 'Show' }} details for {{ s.firstName }}
+                    {{ s.lastName }}
+                  </span>
+                </button>
+              </td>
             </tr>
+            @if (isExpanded(s.userId)) {
+              <tr class="student-details-row" [id]="'student-details-' + s.userId">
+                <td colspan="5">
+                  <dl class="student-details">
+                    <div>
+                      <dt>Level</dt>
+                      <dd>{{ formatLevel(s.currentLevel) }}</dd>
+                    </div>
+                    <div>
+                      <dt>Location</dt>
+                      <dd>{{ formatLocation(s) }}</dd>
+                    </div>
+                    <div>
+                      <dt>Subjects</dt>
+                      <dd>{{ formatSubjects(s.subjectCodes) }}</dd>
+                    </div>
+                    <div class="student-details__wide">
+                      <dt>Scheduled lessons</dt>
+                      <dd>
+                        @if (formatSchedule(s.scheduledLessons).length === 0) {
+                          <span class="admin-muted">None</span>
+                        } @else {
+                          <ul class="lesson-list">
+                            @for (slot of formatSchedule(s.scheduledLessons); track slot) {
+                              <li>{{ slot }}</li>
+                            }
+                          </ul>
+                        }
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Email</dt>
+                      <dd><a [href]="'mailto:' + s.email">{{ s.email }}</a></dd>
+                    </div>
+                    <div>
+                      <dt>Phone</dt>
+                      <dd>
+                        @if (s.phoneNumber) {
+                          <a [href]="'tel:' + s.phoneNumber">{{ s.phoneNumber }}</a>
+                        } @else {
+                          <span class="admin-muted">Not provided</span>
+                        }
+                      </dd>
+                    </div>
+                  </dl>
+                </td>
+              </tr>
+            }
           }
         </tbody>
       </table>
     </div>
+    }
   }
 </div>

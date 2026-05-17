@@ -1,0 +1,328 @@
+.week-sched {
+  margin-top: 1.5rem;
+  border: 1px solid rgba(28, 27, 24, 0.12);
+  border-radius: 8px;
+  background: #fff;
+  padding: 1rem 1.1rem 1.15rem;
+}
+
+.week-sched__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.week-sched__title {
+  margin: 0;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #7a7368;
+}
+
+.week-sched__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.week-sched__nav {
+  border: 1px solid rgba(45, 42, 38, 0.15);
+  background: #fcfbf7;
+  border-radius: 6px;
+  width: 2rem;
+  height: 2rem;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: #3a3834;
+
+  &:hover {
+    background: #f4f1ea;
+  }
+}
+
+.week-sched__range {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  min-width: 9rem;
+  text-align: center;
+}
+
+.week-sched__muted {
+  margin: 0;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.9rem;
+  color: #6f6a62;
+}
+
+.week-sched__layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+
+  @media (min-width: 720px) {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+    align-items: start;
+  }
+}
+
+.week-sched__days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.week-sched__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.45rem 0.25rem;
+  border: 1px solid rgba(45, 42, 38, 0.12);
+  border-radius: 8px;
+  background: #fcfbf7;
+  cursor: pointer;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+
+  &--selected {
+    border-color: #c59d5f;
+    box-shadow: 0 0 0 1px #c59d5f;
+    background: #fff;
+  }
+
+  &--today .week-sched__daynum {
+    color: #6b5420;
+  }
+
+  &--has-lessons {
+    background: rgba(197, 157, 95, 0.1);
+  }
+}
+
+.week-sched__weekday {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #7a7368;
+}
+
+.week-sched__daynum {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.week-sched__count {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #6b5420;
+}
+
+.week-sched__detail {
+  border-top: 1px solid rgba(28, 27, 24, 0.1);
+  padding-top: 1rem;
+
+  @media (min-width: 720px) {
+    border-top: none;
+    border-left: 1px solid rgba(28, 27, 24, 0.1);
+    padding-top: 0;
+    padding-left: 1rem;
+  }
+}
+
+.week-sched__detail-title {
+  margin: 0 0 0.75rem;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.week-sched__lessons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.week-sched__lesson {
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(28, 27, 24, 0.1);
+  background: #fcfbf7;
+  overflow: hidden;
+
+  &--past {
+    opacity: 0.85;
+  }
+
+  &--selected {
+    border-color: rgba(107, 84, 32, 0.45);
+    box-shadow: 0 0 0 1px rgba(197, 157, 95, 0.25);
+  }
+}
+
+.week-sched__lesson-select {
+  display: block;
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+
+  &:hover {
+    background: rgba(244, 241, 234, 0.6);
+  }
+}
+
+.week-sched__lesson-time {
+  margin: 0 0 0.4rem;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.week-sched__note-dot {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #c59d5f;
+  flex-shrink: 0;
+}
+
+.week-sched__note {
+  padding: 0 0.75rem 0.65rem;
+  border-top: 1px solid rgba(28, 27, 24, 0.08);
+}
+
+.week-sched__note-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0;
+  border: none;
+  background: none;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.85rem;
+  color: #6a6760;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    color: #3a3834;
+  }
+}
+
+.week-sched__note-label {
+  font-weight: 600;
+}
+
+.week-sched__note-chevron {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.week-sched__note-toggle--open .week-sched__note-chevron {
+  transform: rotate(45deg);
+}
+
+.week-sched__note-dot--inline {
+  margin-left: 0.15rem;
+}
+
+.week-sched__note-panel {
+  margin: 0.35rem 0 0 1.1rem;
+
+  label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #6a6760;
+  }
+
+  textarea {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 0.9rem;
+    padding: 0.5rem;
+    border: 1px solid rgba(28, 27, 24, 0.2);
+    border-radius: 6px;
+    resize: vertical;
+  }
+}
+
+.week-sched__save-note {
+  margin-top: 0.5rem;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.4rem 0.75rem;
+  border: none;
+  border-radius: 6px;
+  background: #2f5a3f;
+  color: #fff;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+}
+
+.week-sched__lesson-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.week-sched__status {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #2f5a3f;
+
+  &--no {
+    color: #8b2c2c;
+  }
+}
+
+.week-sched__toggle {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid rgba(28, 27, 24, 0.2);
+  background: #fff;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}

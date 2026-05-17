@@ -20,6 +20,13 @@ export class StudentApiService {
     return this.http.get<StudentPortalResponse>(`${this.apiBaseUrl}/api/student/portal`, { params });
   }
 
+  updateLessonNote(slotId: string, note: string): Observable<StudentLessonRow> {
+    return this.http.patch<StudentLessonRow>(
+      `${this.apiBaseUrl}/api/student/lessons/${slotId}/note`,
+      { note },
+    );
+  }
+
   updateAttendance(slotId: string, attendanceStatus: LessonAttendanceStatus): Observable<StudentLessonRow> {
     return this.http.patch<StudentLessonRow>(
       `${this.apiBaseUrl}/api/student/lessons/${slotId}/attendance`,
@@ -37,6 +44,16 @@ export class StudentApiService {
   deleteAccount(): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.apiBaseUrl}/api/student/delete-account`, {
       confirmation: 'DELETE',
+    });
+  }
+
+  createCheckoutSession(): Observable<{ url: string }> {
+    return this.http.post<{ url: string }>(`${this.apiBaseUrl}/api/student/checkout-session`, {});
+  }
+
+  confirmPayment(sessionId: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiBaseUrl}/api/student/confirm-payment`, {
+      sessionId,
     });
   }
 }

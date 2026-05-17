@@ -7,11 +7,14 @@ public sealed class ScheduleChangeRequest
     public AppUser Student { get; set; } = null!;
     public string Note { get; set; } = string.Empty;
     public string Status { get; set; } = ScheduleChangeRequestCodes.Pending;
+    public string? AdminResponseMessage { get; set; }
     public DateTime CreatedAtUtc { get; set; }
+    public DateTime? ResolvedAtUtc { get; set; }
 }
 
 public static class ScheduleChangeRequestCodes
 {
     public const string Pending = "PENDING";
     public const string Resolved = "RESOLVED";
+    public const string Declined = "DECLINED";
 }

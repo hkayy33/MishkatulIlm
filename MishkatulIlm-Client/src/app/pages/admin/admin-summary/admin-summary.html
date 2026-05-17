@@ -1,0 +1,21 @@
+<div class="admin-page">
+  <h1 class="admin-title">Summary</h1>
+  <p class="admin-lead">Booked lessons for the week. Select a day to see who is scheduled.</p>
+
+  @if (loadError()) {
+    <p class="admin-error">{{ loadError() }}</p>
+  }
+
+  <p class="admin-summary-stat">
+    <span class="admin-summary-stat__value">{{ weekLessonTotal() }}</span>
+  lesson{{ weekLessonTotal() === 1 ? '' : 's' }} this week
+  </p>
+
+  <app-admin-week-schedule
+    [lessons]="weekLessons()"
+    [loading]="loading()"
+    [timeZoneId]="timeZoneId()"
+    [weekStart]="weekStart()"
+    (weekChanged)="onWeekChanged($event)"
+  />
+</div>

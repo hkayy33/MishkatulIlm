@@ -226,6 +226,21 @@
     }
   }
 
+  &--booked-student {
+    background: #e0ddd6;
+    border: 1px dashed rgba(107, 84, 32, 0.45);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: rgba(197, 157, 95, 0.18);
+    }
+
+    .slot-row__status {
+      color: #6b5420;
+      font-weight: 600;
+    }
+  }
+
   &--outside {
     background: repeating-linear-gradient(
       -45deg,
@@ -252,10 +267,20 @@
 
   &--confirmed {
     background: rgba(197, 157, 95, 0.2);
-    cursor: default;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: rgba(197, 157, 95, 0.32);
+    }
+
+    .slot-row__status {
+      color: #5c4820;
+    }
   }
 
-  &:disabled:not(.slot-row--selected-start):not(.slot-row--selected-range) {
+  &:disabled:not(.slot-row--selected-start):not(.slot-row--selected-range):not(.slot-row--confirmed):not(
+      .slot-row--booked-student
+    ) {
     opacity: 0.55;
     cursor: not-allowed;
   }

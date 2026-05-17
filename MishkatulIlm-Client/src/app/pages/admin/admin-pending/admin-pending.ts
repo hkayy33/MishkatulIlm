@@ -20,6 +20,7 @@ import {
   requiredWeekOneSlotCount,
   selectionHint,
 } from '../../../core/utils/schedule-slot-count';
+import { AdminNavBadgeService } from '../../../core/services/admin-nav-badge.service';
 import { SchedulingSettingsService } from '../../../core/services/scheduling-settings.service';
 import { locationLabel, resolveTimeZoneId } from '../../../core/utils/timezone.util';
 import { AdminLessonCalendar } from '../../../shared/admin-lesson-calendar/admin-lesson-calendar';
@@ -34,6 +35,7 @@ import { AdminLessonCalendar } from '../../../shared/admin-lesson-calendar/admin
 export class AdminPending {
   private readonly adminApi = inject(AdminApiService);
   private readonly schedulingSettings = inject(SchedulingSettingsService);
+  private readonly navBadges = inject(AdminNavBadgeService);
 
   protected readonly rows = signal<AdminApplicationRow[]>([]);
   protected readonly loadError = signal<string | null>(null);
@@ -110,6 +112,7 @@ export class AdminPending {
       next: (list) => {
         this.rows.set(list);
         this.loading.set(false);
+        this.navBadges.refresh();
       },
       error: () => {
         this.loadError.set('Could not load pending applications.');
@@ -212,6 +215,7 @@ export class AdminPending {
         this.actionUserId.set(null);
         this.closeApprove();
         this.reload();
+        this.navBadges.refresh();
       },
       error: (err: { error?: { message?: string } }) => {
         this.loadError.set(err?.error?.message ?? 'Could not approve application.');
@@ -224,7 +228,10 @@ export class AdminPending {
     if (!row.onboardingCompleted) return;
     this.actionUserId.set(row.userId);
     this.adminApi.setApplicationStatus(row.userId, 'inactive').subscribe({
-      next: () => this.rows.update((list) => list.filter((r) => r.userId !== row.userId)),
+      next: () => {
+        this.rows.update((list) => list.filter((r) => r.userId !== row.userId));
+        this.navBadges.refresh();
+      },
       error: () => this.loadError.set('Could not update status.'),
       complete: () => this.actionUserId.set(null),
     });

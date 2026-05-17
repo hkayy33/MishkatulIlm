@@ -44,30 +44,76 @@
       } @else {
         <ul class="stu-cal__lessons">
           @for (lesson of selectedDayLessons(); track lesson.slotId) {
-            <li class="stu-cal__lesson" [class.stu-cal__lesson--past]="isPast(lesson)">
-              <p class="stu-cal__lesson-time">{{ formatLesson(lesson) }}</p>
-              <div class="stu-cal__attendance">
-                <span
-                  class="stu-cal__status"
-                  [class.stu-cal__status--no]="lesson.attendanceStatus === 'not_attending'"
-                >
-                  {{ attendanceLabel(lesson) }}
-                </span>
+            <li
+              class="stu-cal__lesson"
+              [class.stu-cal__lesson--past]="isPast(lesson)"
+              [class.stu-cal__lesson--selected]="isLessonSelected(lesson)"
+            >
+              <button type="button" class="stu-cal__lesson-select" (click)="selectLesson(lesson)">
+                <p class="stu-cal__lesson-time">
+                  {{ formatLesson(lesson) }}
+                  @if (hasNote(lesson)) {
+                    <span class="stu-cal__note-dot" title="Has a note for your teacher"></span>
+                  }
+                </p>
+                <div class="stu-cal__attendance">
+                  <span
+                    class="stu-cal__status"
+                    [class.stu-cal__status--no]="lesson.attendanceStatus === 'not_attending'"
+                  >
+                    {{ attendanceLabel(lesson) }}
+                  </span>
+                  <button
+                    type="button"
+                    class="stu-cal__toggle"
+                    [disabled]="updatingSlotId() === lesson.slotId"
+                    (click)="toggleAttendance(lesson, $event)"
+                  >
+                    {{ toggleAttendanceLabel(lesson) }}
+                  </button>
+                </div>
+              </button>
+              <div class="stu-cal__note">
                 <button
                   type="button"
-                  class="stu-cal__toggle"
-                  [disabled]="updatingSlotId() === lesson.slotId"
-                  (click)="toggleAttendance(lesson)"
+                  class="stu-cal__note-toggle"
+                  [class.stu-cal__note-toggle--open]="isNoteExpanded(lesson.slotId)"
+                  [attr.aria-expanded]="isNoteExpanded(lesson.slotId)"
+                  (click)="toggleNote(lesson, $event)"
                 >
-                  {{ toggleAttendanceLabel(lesson) }}
+                  <span class="stu-cal__note-chevron" aria-hidden="true"></span>
+                  <span class="stu-cal__note-label">Note for your teacher</span>
+                  @if (hasNote(lesson)) {
+                    <span class="stu-cal__note-dot stu-cal__note-dot--inline" title="Note saved"></span>
+                  }
                 </button>
+                @if (isNoteExpanded(lesson.slotId)) {
+                  <div class="stu-cal__note-panel" role="region" aria-label="Note for your teacher">
+                    <textarea
+                      [id]="'cal-lesson-note-' + lesson.slotId"
+                      rows="3"
+                      maxlength="2000"
+                      [ngModel]="noteDraft()"
+                      (ngModelChange)="noteDraft.set($event)"
+                      placeholder="Optional — e.g. running late, question about homework…"
+                    ></textarea>
+                    <button
+                      type="button"
+                      class="stu-cal__save-note"
+                      [disabled]="updatingSlotId() === lesson.slotId"
+                      (click)="saveNote(lesson, $event)"
+                    >
+                      {{ updatingSlotId() === lesson.slotId ? 'Saving…' : 'Save note' }}
+                    </button>
+                  </div>
+                }
               </div>
             </li>
           }
         </ul>
       }
     } @else {
-      <p class="stu-cal__muted">Select a day to view lessons and set attendance.</p>
+      <p class="stu-cal__muted">Select a day to view lessons, set attendance, or add a note.</p>
     }
   </aside>
 </div>

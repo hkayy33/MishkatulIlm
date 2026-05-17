@@ -53,13 +53,42 @@ export interface AdminStudentRow {
   email: string;
   firstName: string;
   lastName: string;
-  ageRange: string;
-  gender: string;
-  currentLevel: string;
-  lessonFrequency: string;
+  hasMadePayment: boolean;
+  nextPaymentDueUtc?: string | null;
+  nextLesson?: ScheduledLessonRow | null;
+  phoneNumber?: string | null;
+  location?: string | null;
+  country?: string | null;
+  city?: string | null;
+  ageRange?: string | null;
+  gender?: string | null;
+  currentLevel?: string | null;
+  lessonFrequency?: string | null;
   subjectCodes: string[];
   preferredAvailability: string[];
   scheduledLessons: ScheduledLessonRow[];
+}
+
+export interface AdminBadgeCounts {
+  pendingApplications: number;
+  pendingScheduleChanges: number;
+}
+
+export interface AdminScheduleChangeRequestRow {
+  id: string;
+  studentUserId: string;
+  studentName: string;
+  email: string;
+  note: string;
+  createdAtUtc: string;
+  ageRange?: string | null;
+  gender?: string | null;
+  country?: string | null;
+  city?: string | null;
+  currentLevel?: string | null;
+  lessonFrequency?: string | null;
+  subjectCodes: string[];
+  preferredAvailability: string[];
 }
 
 export interface AdminCreateUserBody {
@@ -85,6 +114,36 @@ export class AdminApiService {
 
   listPendingApplications(): Observable<AdminApplicationRow[]> {
     return this.http.get<AdminApplicationRow[]>(this.base('/applications/pending'));
+  }
+
+  getBadgeCounts(): Observable<AdminBadgeCounts> {
+    return this.http.get<AdminBadgeCounts>(this.base('/dashboard/badge-counts'));
+  }
+
+  listPendingScheduleChangeRequests(): Observable<AdminScheduleChangeRequestRow[]> {
+    return this.http.get<AdminScheduleChangeRequestRow[]>(
+      this.base('/schedule-change-requests/pending'),
+    );
+  }
+
+  resolveScheduleChangeRequest(
+    requestId: string,
+    weekOneLessons: WeekOneLessonPick[],
+  ): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      this.base(`/schedule-change-requests/${requestId}/resolve`),
+      { weekOneLessons },
+    );
+  }
+
+  declineScheduleChangeRequest(
+    requestId: string,
+    message: string,
+  ): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      this.base(`/schedule-change-requests/${requestId}/decline`),
+      { message },
+    );
   }
 
   getAvailability(

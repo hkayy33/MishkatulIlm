@@ -36,6 +36,47 @@ interface SubjectOption {
   selected: boolean;
 }
 
+type OnboardingFieldKey =
+  | 'firstName'
+  | 'lastName'
+  | 'phone'
+  | 'age'
+  | 'gender'
+  | 'country'
+  | 'city'
+  | 'subjects'
+  | 'currentLevel'
+  | 'lessonFrequency'
+  | 'availability';
+
+const ONBOARDING_FIELD_FOCUS_ORDER: OnboardingFieldKey[] = [
+  'firstName',
+  'lastName',
+  'phone',
+  'age',
+  'gender',
+  'country',
+  'city',
+  'subjects',
+  'currentLevel',
+  'lessonFrequency',
+  'availability',
+];
+
+const ONBOARDING_FIELD_ELEMENT_IDS: Record<OnboardingFieldKey, string> = {
+  firstName: 'fname',
+  lastName: 'lname',
+  phone: 'phone',
+  age: 'age',
+  gender: 'gender',
+  country: 'country',
+  city: 'city',
+  subjects: 'subjects-heading',
+  currentLevel: 'current-level',
+  lessonFrequency: 'lesson-frequency',
+  availability: 'availability-heading',
+};
+
 @Component({
   selector: 'app-onboarding',
   imports: [Auth, FormsModule, SearchableSelect],
@@ -49,6 +90,7 @@ export class Onboarding {
   private readonly router = inject(Router);
 
   submitError: string | null = null;
+  protected readonly invalidFields = signal<ReadonlySet<OnboardingFieldKey>>(new Set());
   submitting = signal(false);
   loadingCountries = signal(false);
   loadingCities = signal(false);
@@ -61,6 +103,7 @@ export class Onboarding {
 
   firstName = '';
   lastName = '';
+  phoneNumber = '';
 
   constructor() {
     // Login only reads `isAdmin` from the API. If /me failed earlier or the row was fixed in the DB
@@ -104,7 +147,19 @@ export class Onboarding {
       });
   }
 
+  protected isInvalid(field: OnboardingFieldKey): boolean {
+    return this.invalidFields().has(field);
+  }
+
+  protected clearInvalid(field: OnboardingFieldKey): void {
+    if (!this.invalidFields().has(field)) return;
+    const next = new Set(this.invalidFields());
+    next.delete(field);
+    this.invalidFields.set(next);
+  }
+
   onCountrySelected(countryId: string): void {
+    this.clearInvalid('country');
     this.selectedCountryId = countryId;
     this.selectedCityName = '';
     this.allCities = [];
@@ -214,6 +269,7 @@ export class Onboarding {
     const key = availabilitySlotKey(day, slot);
     if (input.checked) this.availabilitySelected.add(key);
     else this.availabilitySelected.delete(key);
+    if (this.availabilitySelected.size > 0) this.clearInvalid('availability');
   }
 
   private collectPreferredAvailability(): string[] {
@@ -227,6 +283,7 @@ export class Onboarding {
       return;
     }
     opt.selected = input.checked;
+    if (this.selectedSubjectCount > 0) this.clearInvalid('subjects');
     this.enforceLessonFrequencyForSubjects();
   }
 
@@ -250,35 +307,36 @@ export class Onboarding {
     const country =
       this.allCountries.find((o) => o.value === this.selectedCountryId)?.label?.trim() ?? '';
     const city = this.selectedCityName.trim();
+    const phone = this.phoneNumber.trim();
     const currentLevel =
       (form.elements.namedItem('current-level') as HTMLSelectElement)?.value ?? '';
     const lessonFrequency = this.selectedLessonFrequency.trim();
     const subjectCodes = this.subjectOptions.filter((o) => o.selected).map((o) => o.value);
-
-    if (!firstName || !lastName) {
-      this.submitError = 'Please enter your first and last name.';
-      return;
-    }
-    if (!ageRange || !gender || !country || !city || !currentLevel || !lessonFrequency) {
-      this.submitError = 'Please complete all fields including country and city.';
-      return;
-    }
-    if (subjectCodes.length === 0) {
-      this.submitError = 'Select at least one subject.';
-      return;
-    }
-    if (!isLessonFrequencyAllowed(lessonFrequency, subjectCodes.length)) {
-      this.submitError =
-        lessonFrequencyConstraintHint(subjectCodes.length) ??
-        'Choose a lesson frequency that matches your subject selection.';
-      return;
-    }
-
     const preferredAvailability = this.collectPreferredAvailability();
-    if (preferredAvailability.length === 0) {
-      this.submitError = 'Select at least one preferred lesson time.';
+
+    const invalid = this.collectInvalidFields({
+      firstName,
+      lastName,
+      ageRange,
+      gender,
+      country,
+      city,
+      phone,
+      currentLevel,
+      lessonFrequency,
+      subjectCount: subjectCodes.length,
+      availabilityCount: preferredAvailability.length,
+    });
+
+    if (invalid.size > 0) {
+      this.invalidFields.set(invalid);
+      this.submitError = this.validationSummary(invalid, phone);
+      this.scrollToFirstInvalid(invalid);
       return;
     }
+
+    this.invalidFields.set(new Set());
+    this.submitError = null;
 
     const body: SaveOnboardingRequest = {
       firstName,
@@ -287,13 +345,13 @@ export class Onboarding {
       gender,
       country,
       city,
+      phoneNumber: phone,
       currentLevel,
       lessonFrequency,
       subjectCodes,
       preferredAvailability,
     };
 
-    this.submitError = null;
     this.submitting.set(true);
     this.auth
       .getBearerToken$()
@@ -330,5 +388,87 @@ export class Onboarding {
           this.submitError = msg || 'Could not submit your application. Try again.';
         },
       });
+  }
+
+  private collectInvalidFields(values: {
+    firstName: string;
+    lastName: string;
+    ageRange: string;
+    gender: string;
+    country: string;
+    city: string;
+    phone: string;
+    currentLevel: string;
+    lessonFrequency: string;
+    subjectCount: number;
+    availabilityCount: number;
+  }): Set<OnboardingFieldKey> {
+    const invalid = new Set<OnboardingFieldKey>();
+    if (!values.firstName) invalid.add('firstName');
+    if (!values.lastName) invalid.add('lastName');
+    if (!values.phone || values.phone.length < 7) invalid.add('phone');
+    if (!values.ageRange) invalid.add('age');
+    if (!values.gender) invalid.add('gender');
+    if (!values.country || !this.selectedCountryId) invalid.add('country');
+    if (!values.city) invalid.add('city');
+    if (!values.currentLevel) invalid.add('currentLevel');
+    if (
+      !values.lessonFrequency ||
+      !isLessonFrequencyAllowed(values.lessonFrequency, values.subjectCount)
+    ) {
+      invalid.add('lessonFrequency');
+    }
+    if (values.subjectCount === 0) invalid.add('subjects');
+    if (values.availabilityCount === 0) invalid.add('availability');
+    return invalid;
+  }
+
+  private validationSummary(invalid: ReadonlySet<OnboardingFieldKey>, phone: string): string {
+    if (invalid.size === 1) {
+      const field = [...invalid][0];
+      switch (field) {
+        case 'firstName':
+          return 'Please enter your first name.';
+        case 'lastName':
+          return 'Please enter your last name.';
+        case 'phone':
+          return phone.length > 0
+            ? 'Enter a valid phone number (at least 7 characters).'
+            : 'Please enter your phone number.';
+        case 'age':
+          return 'Please select your age range.';
+        case 'gender':
+          return 'Please select your gender.';
+        case 'country':
+          return 'Please select your country.';
+        case 'city':
+          return 'Please select your city.';
+        case 'subjects':
+          return 'Select at least one subject.';
+        case 'currentLevel':
+          return 'Please select your current level.';
+        case 'lessonFrequency':
+          return (
+            lessonFrequencyConstraintHint(this.selectedSubjectCount) ??
+            'Please select a lesson frequency that matches your subjects.'
+          );
+        case 'availability':
+          return 'Select at least one preferred lesson time.';
+      }
+    }
+    return 'Please complete the highlighted fields below.';
+  }
+
+  private scrollToFirstInvalid(invalid: ReadonlySet<OnboardingFieldKey>): void {
+    const first = ONBOARDING_FIELD_FOCUS_ORDER.find((key) => invalid.has(key));
+    if (!first) return;
+    const elementId = ONBOARDING_FIELD_ELEMENT_IDS[first];
+    requestAnimationFrame(() => {
+      const el = document.getElementById(elementId);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) {
+        el.focus();
+      }
+    });
   }
 }

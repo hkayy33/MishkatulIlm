@@ -22,5 +22,9 @@ public sealed class AppUser
     public DateTime? LastPaymentAtUtc { get; set; }
     public DateTime? DeletionRequestedAtUtc { get; set; }
 
+    /// <summary>Optional note from the student for their tutor (admin dashboard).</summary>
+    public string? MessageToTutor { get; set; }
+    public DateTime? MessageToTutorUpdatedAtUtc { get; set; }
+
     public StudentOnboardingProfile? Onboarding { get; set; }
 }

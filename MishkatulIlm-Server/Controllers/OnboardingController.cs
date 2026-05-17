@@ -107,8 +107,6 @@ public sealed class OnboardingController(
         proposal.Status = ScheduleProposalCodes.Accepted;
         proposal.UpdatedAtUtc = DateTime.UtcNow;
         user.ApplicationStatus = ApplicationStatusCodes.Active;
-        if (user.NextPaymentDueUtc is null)
-            user.NextPaymentDueUtc = DateTime.UtcNow.Date.AddMonths(1);
         await db.SaveChangesAsync(cancellationToken);
 
         return Ok(
@@ -181,6 +179,10 @@ public sealed class OnboardingController(
         if (!LessonFrequencyRules.TryValidate(request.LessonFrequency, distinct.Count, out var frequencyError))
             return BadRequest(new { message = frequencyError });
 
+        var phoneNumber = request.PhoneNumber.Trim();
+        if (phoneNumber.Length is < 7 or > 32)
+            return BadRequest(new { message = "Enter a valid phone number (7–32 characters)." });
+
         var email =
             User.FindFirstValue(ClaimTypes.Email)
             ?? User.FindFirstValue(JwtRegisteredClaimNames.Email)
@@ -232,6 +234,7 @@ public sealed class OnboardingController(
                 Gender = request.Gender.Trim(),
                 Country = request.Country.Trim(),
                 City = request.City.Trim(),
+                PhoneNumber = phoneNumber,
                 CurrentLevel = request.CurrentLevel.Trim(),
                 LessonFrequency = request.LessonFrequency.Trim(),
                 SubjectCodes = distinct,
@@ -245,6 +248,7 @@ public sealed class OnboardingController(
             profile.Gender = request.Gender.Trim();
             profile.Country = request.Country.Trim();
             profile.City = request.City.Trim();
+            profile.PhoneNumber = phoneNumber;
             profile.CurrentLevel = request.CurrentLevel.Trim();
             profile.LessonFrequency = request.LessonFrequency.Trim();
             profile.SubjectCodes = distinct;

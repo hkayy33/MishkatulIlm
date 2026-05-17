@@ -40,6 +40,11 @@ public sealed class AvailabilitySlotDto
     public Guid? SlotId { get; init; }
     public Guid? StudentUserId { get; init; }
     public string? StudentName { get; init; }
+    public string? StudentCountry { get; init; }
+    public string? StudentCity { get; init; }
+    /// <summary>attending | not_attending — set when the slot is booked.</summary>
+    public string? AttendanceStatus { get; init; }
+    public string? StudentLessonNote { get; init; }
 }
 
 public sealed class ApproveApplicationRequest

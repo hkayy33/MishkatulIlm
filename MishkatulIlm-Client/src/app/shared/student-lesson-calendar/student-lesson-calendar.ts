@@ -1,12 +1,15 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, computed, effect, input, output, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import type { StudentLessonRow } from '../../core/models/student-portal.models';
+import { calendarDayKeyInZone } from '../../core/utils/schedule-grid';
+import { calendarDayKeyFromDate } from '../../core/utils/week-schedule.util';
 import { formatSlotRangeInZone } from '../../core/utils/timezone.util';
 
 @Component({
   selector: 'app-student-lesson-calendar',
   standalone: true,
-  imports: [DatePipe],
+  imports: [DatePipe, FormsModule],
   templateUrl: './student-lesson-calendar.html',
   styleUrl: './student-lesson-calendar.scss',
 })
@@ -18,9 +21,13 @@ export class StudentLessonCalendar {
 
   readonly monthChanged = output<Date>();
   readonly attendanceChange = output<{ slotId: string; status: 'attending' | 'not_attending' }>();
+  readonly lessonNoteChange = output<{ slotId: string; note: string }>();
 
   protected readonly viewMonth = signal(this.startOfMonth(new Date()));
   protected readonly selectedDay = signal<Date | null>(null);
+  protected readonly selectedLessonId = signal<string | null>(null);
+  protected readonly expandedNoteLessonIds = signal<ReadonlySet<string>>(new Set());
+  protected readonly noteDraft = signal('');
 
   protected readonly monthLabel = computed(() =>
     this.viewMonth().toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
@@ -42,9 +49,10 @@ export class StudentLessonCalendar {
   });
 
   protected readonly lessonsByDay = computed(() => {
+    const tz = this.timeZoneId();
     const map = new Map<string, StudentLessonRow[]>();
     for (const lesson of this.lessons()) {
-      const key = this.dayKey(new Date(lesson.startsAtUtc));
+      const key = calendarDayKeyInZone(lesson.startsAtUtc, tz);
       const list = map.get(key) ?? [];
       list.push(lesson);
       map.set(key, list);
@@ -55,13 +63,29 @@ export class StudentLessonCalendar {
   protected readonly selectedDayLessons = computed(() => {
     const day = this.selectedDay();
     if (!day) return [];
-    return [...(this.lessonsByDay().get(this.dayKey(day)) ?? [])].sort((a, b) =>
+    const cellKey = calendarDayKeyFromDate(day);
+    return [...(this.lessonsByDay().get(cellKey) ?? [])].sort((a, b) =>
       a.startsAtUtc.localeCompare(b.startsAtUtc),
     );
   });
 
+  constructor() {
+    effect(() => {
+      const lessons = this.selectedDayLessons();
+      const selectedId = this.selectedLessonId();
+      if (selectedId && lessons.some((l) => l.slotId === selectedId)) return;
+      this.selectedLessonId.set(lessons[0]?.slotId ?? null);
+    });
+
+    effect(() => {
+      const id = this.selectedLessonId();
+      const lesson = this.lessons().find((l) => l.slotId === id);
+      this.noteDraft.set(lesson?.studentNote ?? '');
+    });
+  }
+
   protected lessonCount(date: Date): number {
-    return this.lessonsByDay().get(this.dayKey(date))?.length ?? 0;
+    return this.lessonsByDay().get(calendarDayKeyFromDate(date))?.length ?? 0;
   }
 
   protected prevMonth(): void {
@@ -69,6 +93,8 @@ export class StudentLessonCalendar {
     const next = new Date(d.getFullYear(), d.getMonth() - 1, 1);
     this.viewMonth.set(next);
     this.selectedDay.set(null);
+    this.selectedLessonId.set(null);
+    this.expandedNoteLessonIds.set(new Set());
     this.monthChanged.emit(next);
   }
 
@@ -77,24 +103,65 @@ export class StudentLessonCalendar {
     const next = new Date(d.getFullYear(), d.getMonth() + 1, 1);
     this.viewMonth.set(next);
     this.selectedDay.set(null);
+    this.selectedLessonId.set(null);
+    this.expandedNoteLessonIds.set(new Set());
     this.monthChanged.emit(next);
   }
 
   protected selectDay(date: Date): void {
     this.selectedDay.set(date);
+    this.selectedLessonId.set(null);
+    this.expandedNoteLessonIds.set(new Set());
+  }
+
+  protected selectLesson(lesson: StudentLessonRow): void {
+    this.selectedLessonId.set(lesson.slotId);
+    this.noteDraft.set(lesson.studentNote ?? '');
+  }
+
+  protected isLessonSelected(lesson: StudentLessonRow): boolean {
+    return this.selectedLessonId() === lesson.slotId;
+  }
+
+  protected hasNote(lesson: StudentLessonRow): boolean {
+    return Boolean(lesson.studentNote?.trim());
+  }
+
+  protected isNoteExpanded(slotId: string): boolean {
+    return this.expandedNoteLessonIds().has(slotId);
+  }
+
+  protected toggleNote(lesson: StudentLessonRow, event: Event): void {
+    event.stopPropagation();
+    event.preventDefault();
+    const id = lesson.slotId;
+    if (this.expandedNoteLessonIds().has(id)) {
+      this.expandedNoteLessonIds.set(new Set());
+      return;
+    }
+    this.expandedNoteLessonIds.set(new Set([id]));
+    this.selectedLessonId.set(id);
+    this.noteDraft.set(lesson.studentNote ?? '');
+  }
+
+  protected saveNote(lesson: StudentLessonRow, event: Event): void {
+    event.stopPropagation();
+    this.lessonNoteChange.emit({ slotId: lesson.slotId, note: this.noteDraft() });
   }
 
   protected formatLesson(lesson: StudentLessonRow): string {
     return formatSlotRangeInZone(lesson.startsAtUtc, lesson.endsAtUtc, this.timeZoneId());
   }
 
-  protected setAttendance(lesson: StudentLessonRow, attending: boolean): void {
+  protected setAttendance(lesson: StudentLessonRow, attending: boolean, event?: Event): void {
+    event?.stopPropagation();
     const status = attending ? 'attending' : 'not_attending';
     if (lesson.attendanceStatus === status) return;
     this.attendanceChange.emit({ slotId: lesson.slotId, status });
   }
 
-  protected toggleAttendance(lesson: StudentLessonRow): void {
+  protected toggleAttendance(lesson: StudentLessonRow, event: Event): void {
+    event.stopPropagation();
     this.setAttendance(lesson, lesson.attendanceStatus !== 'attending');
   }
 
@@ -112,10 +179,6 @@ export class StudentLessonCalendar {
 
   protected isPast(lesson: StudentLessonRow): boolean {
     return new Date(lesson.endsAtUtc).getTime() < Date.now();
-  }
-
-  private dayKey(date: Date): string {
-    return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
   }
 
   private startOfMonth(date: Date): Date {

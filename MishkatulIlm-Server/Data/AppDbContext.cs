@@ -25,6 +25,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.ApplicationStatus).HasMaxLength(16).IsRequired();
             entity.Property(e => e.LastPaymentCurrency).HasMaxLength(8).IsRequired();
             entity.Property(e => e.LastPaymentAmount).HasPrecision(12, 2);
+            entity.Property(e => e.MessageToTutor).HasMaxLength(2000);
             entity.HasOne(e => e.Onboarding)
                 .WithOne(e => e.User)
                 .HasForeignKey<StudentOnboardingProfile>(e => e.UserId);
@@ -38,6 +39,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.Gender).HasMaxLength(64).IsRequired();
             entity.Property(e => e.Country).HasMaxLength(120).IsRequired();
             entity.Property(e => e.City).HasMaxLength(120).IsRequired();
+            entity.Property(e => e.PhoneNumber).HasMaxLength(32).IsRequired();
             entity.Property(e => e.CurrentLevel).HasMaxLength(64).IsRequired();
             entity.Property(e => e.LessonFrequency).HasMaxLength(64).IsRequired();
             entity.Property(e => e.SubjectCodes).HasColumnType("jsonb").IsRequired();
@@ -55,6 +57,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasForeignKey(e => e.StudentUserId)
                 .OnDelete(DeleteBehavior.SetNull);
             entity.Property(e => e.AttendanceStatus).HasMaxLength(16).IsRequired();
+            entity.Property(e => e.StudentNote).HasMaxLength(2000);
         });
 
         modelBuilder.Entity<ScheduleChangeRequest>(entity =>
@@ -64,6 +67,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasIndex(e => e.StudentUserId);
             entity.Property(e => e.Note).HasMaxLength(4000).IsRequired();
             entity.Property(e => e.Status).HasMaxLength(16).IsRequired();
+            entity.Property(e => e.AdminResponseMessage).HasMaxLength(2000);
             entity.HasOne(e => e.Student)
                 .WithMany()
                 .HasForeignKey(e => e.StudentUserId)

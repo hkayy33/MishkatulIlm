@@ -26,6 +26,7 @@ export class SearchableSelect {
   readonly loading = input(false);
   readonly maxResults = input(50);
   readonly autocomplete = input<string | null>(null);
+  readonly invalid = input(false);
 
   readonly value = model<string>('');
 

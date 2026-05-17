@@ -145,3 +145,7 @@
 /Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/RBush.dll
 /Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/SixLabors.Fonts.dll
 /Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/System.IO.Packaging.dll
+/Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/Newtonsoft.Json.dll
+/Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/Stripe.net.dll
+/Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/System.Configuration.ConfigurationManager.dll
+/Users/hassan/Desktop/ClientApps/MishkatulIlm/MishkatulIlm-Server/bin/Debug/net9.0/System.Security.Cryptography.ProtectedData.dll

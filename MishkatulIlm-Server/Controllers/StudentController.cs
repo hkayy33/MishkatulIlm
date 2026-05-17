@@ -4,13 +4,16 @@ using Microsoft.EntityFrameworkCore;
 using MishkatulIlm_Server.Authentication;
 using MishkatulIlm_Server.Data;
 using MishkatulIlm_Server.Dtos;
+using MishkatulIlm_Server.Services;
 
 namespace MishkatulIlm_Server.Controllers;
 
 [ApiController]
 [Authorize]
 [Route("api/student")]
-public sealed class StudentController(AppDbContext db) : ControllerBase
+public sealed class StudentController(
+    AppDbContext db,
+    StudentAccountDeletionService accountDeletion) : ControllerBase
 {
     [HttpGet("portal")]
     public async Task<IActionResult> GetPortal(
@@ -52,6 +55,12 @@ public sealed class StudentController(AppDbContext db) : ControllerBase
                 r => r.StudentUserId == userId && r.Status == ScheduleChangeRequestCodes.Pending,
                 cancellationToken);
 
+        var latestChangeRequest = await db.ScheduleChangeRequests
+            .AsNoTracking()
+            .Where(r => r.StudentUserId == userId)
+            .OrderByDescending(r => r.CreatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
         var nextLessonSlot = await db.LessonSlots
             .AsNoTracking()
             .Where(s => s.StudentUserId == userId && s.EndsAtUtc > now)
@@ -67,10 +76,11 @@ public sealed class StudentController(AppDbContext db) : ControllerBase
                     NextLesson = nextLessonSlot is null ? null : ToLessonDto(nextLessonSlot),
                     Payment = new StudentPaymentSummaryDto
                     {
-                        NextPaymentDueUtc = user.NextPaymentDueUtc,
+                        NextPaymentDueUtc = user.LastPaymentAtUtc is not null ? user.NextPaymentDueUtc : null,
                         LastPaymentAmount = user.LastPaymentAmount,
                         LastPaymentCurrency = user.LastPaymentCurrency,
                         LastPaymentAtUtc = user.LastPaymentAtUtc,
+                        RequiresInitialPayment = user.LastPaymentAtUtc is null,
                     },
                     MonthSummary = new StudentLessonMonthSummaryDto
                     {
@@ -80,6 +90,9 @@ public sealed class StudentController(AppDbContext db) : ControllerBase
                         NotAttendingCount = lessons.Count(l => l.AttendanceStatus == AttendanceStatusCodes.NotAttending),
                     },
                     HasPendingScheduleChangeRequest = hasPendingChange,
+                    ScheduleChangeUpdate = latestChangeRequest is null
+                        ? null
+                        : ToScheduleChangeUpdateDto(latestChangeRequest),
                     DeletionRequested = user.DeletionRequestedAtUtc is not null,
                 },
                 Lessons = lessons
@@ -109,6 +122,31 @@ public sealed class StudentController(AppDbContext db) : ControllerBase
             return NotFound(new { message = "Lesson not found." });
 
         slot.AttendanceStatus = status;
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Ok(ToLessonDto(slot));
+    }
+
+    [HttpPatch("lessons/{slotId:guid}/note")]
+    public async Task<IActionResult> UpdateLessonNote(
+        Guid slotId,
+        [FromBody] UpdateLessonNoteRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetSupabaseUserId(out var userId))
+            return Unauthorized();
+
+        var note = (request.Note ?? string.Empty).Trim();
+        if (note.Length > 2000)
+            return BadRequest(new { message = "Your note must be 2000 characters or fewer." });
+
+        var slot = await db.LessonSlots
+            .FirstOrDefaultAsync(s => s.Id == slotId && s.StudentUserId == userId, cancellationToken);
+
+        if (slot is null)
+            return NotFound(new { message = "Lesson not found." });
+
+        slot.StudentNote = note.Length == 0 ? null : note;
         await db.SaveChangesAsync(cancellationToken);
 
         return Ok(ToLessonDto(slot));
@@ -147,10 +185,10 @@ public sealed class StudentController(AppDbContext db) : ControllerBase
                 StudentUserId = userId,
                 Note = note,
                 Status = ScheduleChangeRequestCodes.Pending,
+                AdminResponseMessage = null,
                 CreatedAtUtc = DateTime.UtcNow,
             });
 
-        user.ApplicationStatus = ApplicationStatusCodes.Pending;
         await db.SaveChangesAsync(cancellationToken);
 
         return Ok(new { message = "Your schedule change request has been sent to your teacher." });
@@ -167,16 +205,36 @@ public sealed class StudentController(AppDbContext db) : ControllerBase
         if (!string.Equals(request.Confirmation.Trim(), "DELETE", StringComparison.Ordinal))
             return BadRequest(new { message = "Type DELETE to confirm account removal." });
 
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId && !u.IsAdmin, cancellationToken);
-        if (user is null)
-            return NotFound(new { message = "Account not found." });
-
-        user.ApplicationStatus = ApplicationStatusCodes.Inactive;
-        user.DeletionRequestedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
-
-        return Ok(new { message = "Your account deletion request has been recorded. Contact us if this was a mistake." });
+        var result = await accountDeletion.DeleteStudentAccountAsync(userId, cancellationToken);
+        return result switch
+        {
+            DeleteStudentAccountStatus.NotFound => NotFound(new { message = "Account not found." }),
+            DeleteStudentAccountStatus.Deleted => Ok(
+                new { message = "Your account has been permanently deleted." }),
+            DeleteStudentAccountStatus.DataDeletedAuthDeleteFailed => Ok(
+                new
+                {
+                    message =
+                        "Your lesson data has been removed. If you still receive sign-in emails, contact support to finish closing your login.",
+                }),
+            _ => Problem("Could not delete your account."),
+        };
     }
+
+    private static StudentScheduleChangeUpdateDto ToScheduleChangeUpdateDto(ScheduleChangeRequest row) =>
+        new()
+        {
+            Status = row.Status switch
+            {
+                ScheduleChangeRequestCodes.Resolved => "resolved",
+                ScheduleChangeRequestCodes.Declined => "declined",
+                _ => "pending",
+            },
+            RequestNote = row.Note,
+            AdminMessage = row.AdminResponseMessage,
+            CreatedAtUtc = row.CreatedAtUtc,
+            ResolvedAtUtc = row.ResolvedAtUtc,
+        };
 
     private static StudentLessonDto ToLessonDto(LessonSlot slot) =>
         new()
@@ -186,6 +244,7 @@ public sealed class StudentController(AppDbContext db) : ControllerBase
             EndsAtUtc = slot.EndsAtUtc,
             DurationMinutes = (int)(slot.EndsAtUtc - slot.StartsAtUtc).TotalMinutes,
             AttendanceStatus = AttendanceStatusCodes.ToApiValue(slot.AttendanceStatus),
+            StudentNote = string.IsNullOrWhiteSpace(slot.StudentNote) ? null : slot.StudentNote.Trim(),
         };
 }
 

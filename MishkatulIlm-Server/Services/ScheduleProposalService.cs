@@ -70,7 +70,7 @@ public sealed class ScheduleProposalService(AppDbContext db)
         CancellationToken cancellationToken = default)
     {
         if (planned.Count == 0)
-            return "Could not plan lessons for this frequency and time.";
+            return null;
 
         var rangeEnd = planned.Max(l => l.EndsAtUtc).AddHours(1);
         var rangeStart = planned.Min(l => l.StartsAtUtc);
@@ -124,7 +124,10 @@ public sealed class ScheduleProposalService(AppDbContext db)
             if (conflict is not null)
             {
                 conflict.StudentUserId = studentUserId;
+                conflict.StartsAtUtc = start;
                 conflict.EndsAtUtc = end;
+                conflict.AttendanceStatus = AttendanceStatusCodes.Attending;
+                conflict.StudentNote = null;
                 booked.Add(conflict);
                 continue;
             }
@@ -142,7 +145,65 @@ public sealed class ScheduleProposalService(AppDbContext db)
             booked.Add(slot);
         }
 
+        await db.SaveChangesAsync(cancellationToken);
         return booked;
+    }
+
+    public async Task SupersedeOpenProposalsForStudentAsync(
+        Guid studentUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var open = await db.ScheduleProposals
+            .Where(p =>
+                p.StudentUserId == studentUserId
+                && (p.Status == ScheduleProposalCodes.AwaitingStudent
+                    || p.Status == ScheduleProposalCodes.StudentAmended
+                    || p.Status == ScheduleProposalCodes.Accepted))
+            .ToListAsync(cancellationToken);
+
+        foreach (var proposal in open)
+        {
+            proposal.Status = ScheduleProposalCodes.Superseded;
+            proposal.UpdatedAtUtc = now;
+        }
+
+        if (open.Count > 0)
+            await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>Releases all of a student's bookings, then books a new recurring plan.</summary>
+    public async Task RescheduleStudentLessonsAsync(
+        Guid studentUserId,
+        IReadOnlyList<PlannedLessonSlotDto> planned,
+        CancellationToken cancellationToken = default)
+    {
+        var existingBookings = await db.LessonSlots
+            .Where(s => s.StudentUserId == studentUserId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var slot in existingBookings)
+        {
+            slot.StudentUserId = null;
+            slot.StudentNote = null;
+            slot.AttendanceStatus = AttendanceStatusCodes.Attending;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        if (planned.Count == 0)
+            return;
+
+        var proposed = planned
+            .Select(l => new ProposedLessonSlot
+            {
+                StartsAtUtc = DateTime.SpecifyKind(l.StartsAtUtc, DateTimeKind.Utc),
+                EndsAtUtc = DateTime.SpecifyKind(l.EndsAtUtc, DateTimeKind.Utc),
+                DurationMinutes = l.DurationMinutes,
+            })
+            .ToList();
+
+        await BookPlannedLessonsAsync(studentUserId, proposed, cancellationToken);
     }
 
     public static ScheduleProposalDto ToDto(ScheduleProposal proposal) =>

@@ -18,7 +18,7 @@
         <h3 id="student-info-heading" class="onboarding-section__title">Your details</h3>
         <div class="student-info">
           <div class="student-info__column">
-            <div class="form-field">
+            <div class="form-field" [class.form-field--invalid]="isInvalid('firstName')">
               <label for="fname">First name</label>
               <input
                 type="text"
@@ -26,10 +26,12 @@
                 name="fname"
                 autocomplete="given-name"
                 [(ngModel)]="firstName"
+                [attr.aria-invalid]="isInvalid('firstName')"
+                (ngModelChange)="clearInvalid('firstName')"
                 required
               />
             </div>
-            <div class="form-field">
+            <div class="form-field" [class.form-field--invalid]="isInvalid('lastName')">
               <label for="lname">Last name</label>
               <input
                 type="text"
@@ -37,22 +39,48 @@
                 name="lname"
                 autocomplete="family-name"
                 [(ngModel)]="lastName"
+                [attr.aria-invalid]="isInvalid('lastName')"
+                (ngModelChange)="clearInvalid('lastName')"
+                required
+              />
+            </div>
+            <div class="form-field" [class.form-field--invalid]="isInvalid('phone')">
+              <label for="phone">Phone number</label>
+              <input
+                type="tel"
+                id="phone"
+                name="phone"
+                autocomplete="tel"
+                [(ngModel)]="phoneNumber"
+                [attr.aria-invalid]="isInvalid('phone')"
+                (ngModelChange)="clearInvalid('phone')"
                 required
               />
             </div>
           </div>
           <div class="student-info__column">
-            <div class="form-field">
+            <div class="form-field" [class.form-field--invalid]="isInvalid('age')">
               <label for="age">Age</label>
-              <select id="age" name="age">
+              <select
+                id="age"
+                name="age"
+                [attr.aria-invalid]="isInvalid('age')"
+                (change)="clearInvalid('age')"
+              >
                 @for (opt of ageRanges; track opt.value + opt.label) {
                   <option [value]="opt.value">{{ opt.label }}</option>
                 }
               </select>
             </div>
-            <div class="form-field">
+            <div class="form-field" [class.form-field--invalid]="isInvalid('gender')">
               <label for="gender">Gender</label>
-              <select id="gender" name="gender" autocomplete="sex">
+              <select
+                id="gender"
+                name="gender"
+                autocomplete="sex"
+                [attr.aria-invalid]="isInvalid('gender')"
+                (change)="clearInvalid('gender')"
+              >
                 @for (opt of genders; track opt.value + opt.label) {
                   <option [value]="opt.value">{{ opt.label }}</option>
                 }
@@ -63,15 +91,16 @@
         <div class="student-info student-info--location">
           <app-searchable-select
             inputId="country"
-              label="Country"
-              autocomplete="country-name"
-              placeholder="Type to search countries…"
-              [(value)]="selectedCountryId"
-              [options]="allCountries"
-              [disabled]="loadingCountries()"
-              [loading]="loadingCountries()"
-              (valueChange)="onCountrySelected($event)"
-            />
+            label="Country"
+            autocomplete="country-name"
+            placeholder="Type to search countries…"
+            [(value)]="selectedCountryId"
+            [options]="allCountries"
+            [disabled]="loadingCountries()"
+            [loading]="loadingCountries()"
+            [invalid]="isInvalid('country')"
+            (valueChange)="onCountrySelected($event)"
+          />
           <app-searchable-select
             inputId="city"
             label="City"
@@ -81,6 +110,8 @@
             [options]="allCities"
             [disabled]="!selectedCountryId || loadingCities()"
             [loading]="loadingCities()"
+            [invalid]="isInvalid('city')"
+            (valueChange)="clearInvalid('city')"
           />
         </div>
         @if (locationLoadError) {
@@ -93,7 +124,7 @@
         <p class="onboarding-section__hint">
           You may select up to {{ maxSubjects }} subjects ({{ selectedSubjectCount }} selected).
         </p>
-        <fieldset class="subject-fieldset">
+        <fieldset class="subject-fieldset" [class.subject-fieldset--invalid]="isInvalid('subjects')">
           <legend class="visually-hidden">Subjects</legend>
           <div class="subjects">
             @for (opt of subjectOptions; track opt.value) {
@@ -119,20 +150,27 @@
       <section class="onboarding-section" aria-labelledby="lesson-heading">
         <h3 id="lesson-heading" class="onboarding-section__title">Level and schedule</h3>
         <div class="lesson-freq">
-          <div class="form-field">
+          <div class="form-field" [class.form-field--invalid]="isInvalid('currentLevel')">
             <label for="current-level">Current level</label>
-            <select id="current-level" name="current-level">
+            <select
+              id="current-level"
+              name="current-level"
+              [attr.aria-invalid]="isInvalid('currentLevel')"
+              (change)="clearInvalid('currentLevel')"
+            >
               @for (opt of currentLevels; track opt.value + opt.label) {
                 <option [value]="opt.value">{{ opt.label }}</option>
               }
             </select>
           </div>
-          <div class="form-field">
+          <div class="form-field" [class.form-field--invalid]="isInvalid('lessonFrequency')">
             <label for="lesson-frequency">Desired lesson frequency</label>
             <select
               id="lesson-frequency"
               name="lesson-frequency"
               [(ngModel)]="selectedLessonFrequency"
+              [attr.aria-invalid]="isInvalid('lessonFrequency')"
+              (ngModelChange)="clearInvalid('lessonFrequency')"
               required
             >
               @for (opt of availableLessonFrequencies; track opt.value + opt.label) {
@@ -153,7 +191,10 @@
         <p class="onboarding-section__hint">
           Tick when you are usually available ({{ selectedAvailabilityCount }} selected).
         </p>
-        <div class="availability-table-wrap">
+        <div
+          class="availability-table-wrap"
+          [class.availability-table-wrap--invalid]="isInvalid('availability')"
+        >
           <table class="availability-table">
             <caption class="visually-hidden">
               Preferred availability by day and time of day

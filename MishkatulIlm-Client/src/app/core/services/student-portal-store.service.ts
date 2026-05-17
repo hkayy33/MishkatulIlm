@@ -1,8 +1,10 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { finalize } from 'rxjs';
+import { finalize, forkJoin } from 'rxjs';
+import { monthsTouchingWeek, startOfWeekMonday } from '../utils/week-schedule.util';
 import type {
   StudentLessonRow,
   StudentPortalResponse,
+  StudentScheduleChangeUpdate,
 } from '../models/student-portal.models';
 import { StudentApiService } from './student-api.service';
 import { formatHttpError } from '../utils/http-error.util';
@@ -51,6 +53,73 @@ export class StudentPortalStore {
     this.reloadPortal(month);
   }
 
+  reloadPortalForWeek(weekAnchor: Date = new Date()): void {
+    const weekStart = startOfWeekMonday(weekAnchor);
+    const months = monthsTouchingWeek(weekStart);
+
+    this.loading.set(true);
+    this.loadError.set(null);
+
+    forkJoin(months.map((m) => this.studentApi.getPortal(m.year, m.monthIndex)))
+      .pipe(finalize(() => this.loading.set(false)))
+      .subscribe({
+        next: (responses) => {
+          if (responses.length === 0) return;
+          const base = normalizePortalResponse(responses[0]);
+          const lessonsById = new Map<string, StudentLessonRow>();
+          for (const response of responses) {
+            for (const lesson of normalizePortalResponse(response).lessons) {
+              lessonsById.set(lesson.slotId, lesson);
+            }
+          }
+          const lessons = [...lessonsById.values()].sort((a, b) =>
+            a.startsAtUtc.localeCompare(b.startsAtUtc),
+          );
+          this.portalData.set({ ...base, lessons });
+        },
+        error: (err: unknown) => {
+          this.loadError.set(formatHttpError(err, 'Could not load your lessons.'));
+        },
+      });
+  }
+
+  saveLessonNote(slotId: string, note: string, onComplete?: () => void): void {
+    this.updatingSlotId.set(slotId);
+    this.actionError.set(null);
+    this.studentApi
+      .updateLessonNote(slotId, note)
+      .pipe(finalize(() => {
+        this.updatingSlotId.set(null);
+        onComplete?.();
+      }))
+      .subscribe({
+        next: (updated) => {
+          const data = this.portalData();
+          if (!data) return;
+          const normalized = normalizeLessonRow(updated);
+          if (!normalized) return;
+          const lessons = data.lessons.map((l) =>
+            l.slotId === normalized.slotId ? normalized : l,
+          );
+          const nextLesson = (() => {
+            const current = data.portal.nextLesson;
+            if (current?.slotId === normalized.slotId) return normalized;
+            if (current) return current;
+            return earliestUpcomingLesson(lessons);
+          })();
+          this.portalData.set({
+            ...data,
+            lessons,
+            portal: { ...data.portal, nextLesson },
+          });
+          this.actionMessage.set('Your note for this lesson was saved.');
+        },
+        error: (err: unknown) => {
+          this.actionError.set(formatHttpError(err, 'Could not save your note.'));
+        },
+      });
+  }
+
   updateAttendance(slotId: string, status: 'attending' | 'not_attending'): void {
     this.updatingSlotId.set(slotId);
     this.actionError.set(null);
@@ -61,10 +130,14 @@ export class StudentPortalStore {
         next: (updated) => {
           const data = this.portalData();
           if (!data) return;
-          const lessons = data.lessons.map((l) => (l.slotId === updated.slotId ? updated : l));
+          const normalized = normalizeLessonRow(updated);
+          if (!normalized) return;
+          const lessons = data.lessons.map((l) =>
+            l.slotId === normalized.slotId ? normalized : l,
+          );
           const nextLesson = (() => {
             const current = data.portal.nextLesson;
-            if (current?.slotId === updated.slotId) return updated;
+            if (current?.slotId === normalized.slotId) return normalized;
             if (current) return current;
             return earliestUpcomingLesson(lessons);
           })();
@@ -96,26 +169,39 @@ function normalizePortalResponse(raw: StudentPortalResponse): StudentPortalRespo
   const portalRaw = raw.portal ?? r.Portal ?? ({} as StudentPortalResponse['portal'] & {
     NextLesson?: StudentLessonRow;
   });
-  const lessons = (raw.lessons ?? r.Lessons ?? []).map((l) => {
-    const row = l as StudentLessonRow & {
-      SlotId?: string;
-      StartsAtUtc?: string;
-      EndsAtUtc?: string;
-      AttendanceStatus?: string;
-    };
-    const status = String(l.attendanceStatus ?? row.AttendanceStatus ?? 'attending').toLowerCase();
-    return {
-      slotId: String(l.slotId ?? row.SlotId ?? ''),
-      startsAtUtc: String(l.startsAtUtc ?? row.StartsAtUtc ?? ''),
-      endsAtUtc: String(l.endsAtUtc ?? row.EndsAtUtc ?? ''),
-      durationMinutes: l.durationMinutes ?? 60,
-      attendanceStatus: status === 'not_attending' ? 'not_attending' : 'attending',
-    } as StudentLessonRow;
-  });
+  const lessons = (raw.lessons ?? r.Lessons ?? [])
+    .map((l) => normalizeLessonRow(l))
+    .filter((l): l is StudentLessonRow => l !== null);
+
+  const paymentRaw = portalRaw.payment ?? (portalRaw as { Payment?: StudentPortalResponse['portal']['payment'] }).Payment;
+  const payment = paymentRaw
+    ? {
+        ...paymentRaw,
+        requiresInitialPayment:
+          paymentRaw.requiresInitialPayment ??
+          (paymentRaw as { RequiresInitialPayment?: boolean }).RequiresInitialPayment ??
+          paymentRaw.lastPaymentAtUtc == null,
+      }
+    : {
+        nextPaymentDueUtc: null,
+        lastPaymentAmount: null,
+        lastPaymentCurrency: 'GBP',
+        lastPaymentAtUtc: null,
+        requiresInitialPayment: true,
+      };
 
   const portal = {
     ...portalRaw,
+    payment,
     nextLesson: resolveNextLesson(raw, portalRaw, lessons),
+    hasPendingScheduleChangeRequest:
+      portalRaw.hasPendingScheduleChangeRequest ??
+      (portalRaw as { HasPendingScheduleChangeRequest?: boolean }).HasPendingScheduleChangeRequest ??
+      false,
+    scheduleChangeUpdate: normalizeScheduleChangeUpdate(
+      portalRaw.scheduleChangeUpdate ??
+        (portalRaw as { ScheduleChangeUpdate?: StudentScheduleChangeUpdate | null }).ScheduleChangeUpdate,
+    ),
   };
 
   return {
@@ -123,6 +209,29 @@ function normalizePortalResponse(raw: StudentPortalResponse): StudentPortalRespo
     lessons,
     country: raw.country ?? r.Country ?? null,
     city: raw.city ?? r.City ?? null,
+  };
+}
+
+function normalizeScheduleChangeUpdate(
+  raw: StudentScheduleChangeUpdate | null | undefined,
+): StudentScheduleChangeUpdate | null {
+  if (!raw) return null;
+  const row = raw as StudentScheduleChangeUpdate & {
+    Status?: string;
+    RequestNote?: string;
+    AdminMessage?: string | null;
+    CreatedAtUtc?: string;
+    ResolvedAtUtc?: string | null;
+  };
+  const statusRaw = String(raw.status ?? row.Status ?? 'pending').toLowerCase();
+  const status =
+    statusRaw === 'resolved' || statusRaw === 'declined' ? statusRaw : ('pending' as const);
+  return {
+    status,
+    requestNote: raw.requestNote ?? row.RequestNote ?? '',
+    adminMessage: raw.adminMessage ?? row.AdminMessage ?? null,
+    createdAtUtc: raw.createdAtUtc ?? row.CreatedAtUtc ?? '',
+    resolvedAtUtc: raw.resolvedAtUtc ?? row.ResolvedAtUtc ?? null,
   };
 }
 
@@ -164,17 +273,21 @@ function normalizeLessonRow(
     StartsAtUtc?: string;
     EndsAtUtc?: string;
     AttendanceStatus?: string;
+    StudentNote?: string | null;
   };
   const startsAtUtc = String(lesson.startsAtUtc ?? row.StartsAtUtc ?? '').trim();
   const endsAtUtc = String(lesson.endsAtUtc ?? row.EndsAtUtc ?? '').trim();
   if (!startsAtUtc || !endsAtUtc) return null;
 
   const status = String(lesson.attendanceStatus ?? row.AttendanceStatus ?? 'attending').toLowerCase();
+  const noteRaw = lesson.studentNote ?? row.StudentNote ?? null;
+  const note = noteRaw?.trim() ? noteRaw.trim() : null;
   return {
     slotId: String(lesson.slotId ?? row.SlotId ?? ''),
     startsAtUtc,
     endsAtUtc,
     durationMinutes: lesson.durationMinutes ?? 60,
     attendanceStatus: status === 'not_attending' ? 'not_attending' : 'attending',
+    studentNote: note,
   };
 }

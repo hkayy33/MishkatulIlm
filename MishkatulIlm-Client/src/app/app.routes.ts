@@ -27,11 +27,23 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pages/admin/admin-layout/admin-layout').then((m) => m.AdminLayout),
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'pending' },
+      { path: '', pathMatch: 'full', redirectTo: 'summary' },
+      {
+        path: 'summary',
+        loadComponent: () =>
+          import('./pages/admin/admin-summary/admin-summary').then((m) => m.AdminSummary),
+      },
       {
         path: 'pending',
         loadComponent: () =>
           import('./pages/admin/admin-pending/admin-pending').then((m) => m.AdminPending),
+      },
+      {
+        path: 'schedule-changes',
+        loadComponent: () =>
+          import('./pages/admin/admin-schedule-changes/admin-schedule-changes').then(
+            (m) => m.AdminScheduleChanges,
+          ),
       },
       {
         path: 'students',

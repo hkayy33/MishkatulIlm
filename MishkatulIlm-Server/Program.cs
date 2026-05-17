@@ -10,6 +10,7 @@ using Npgsql;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.SectionName));
+builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
@@ -46,6 +47,9 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<SupabaseAdminAuthClient>();
 builder.Services.AddScoped<SchedulingSettingsService>();
 builder.Services.AddScoped<ScheduleProposalService>();
+builder.Services.AddScoped<StripePaymentRecorder>();
+builder.Services.AddScoped<StudentAccountDeletionService>();
+builder.Services.AddScoped<StripeCheckoutPriceResolver>();
 builder.Services.AddSingleton<LocationCatalogService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

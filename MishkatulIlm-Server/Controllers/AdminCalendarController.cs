@@ -43,7 +43,8 @@ public sealed class AdminCalendarController(AppDbContext db) : ControllerBase
         }
 
         var booked = await db.LessonSlots.AsNoTracking()
-            .Include(s => s.Student)
+            .Include(s => s.Student!)
+            .ThenInclude(u => u.Onboarding)
             .Where(s => s.StartsAtUtc < to && s.EndsAtUtc > from)
             .ToListAsync(cancellationToken);
 
@@ -74,7 +75,8 @@ public sealed class AdminCalendarController(AppDbContext db) : ControllerBase
         var end = DateTime.SpecifyKind(request.EndsAtUtc, DateTimeKind.Utc);
 
         var booked = await db.LessonSlots.AsNoTracking()
-            .Include(s => s.Student)
+            .Include(s => s.Student!)
+            .ThenInclude(u => u.Onboarding)
             .Where(s => s.StartsAtUtc < end && s.EndsAtUtc > start)
             .ToListAsync(cancellationToken);
 
@@ -163,7 +165,8 @@ public sealed class AdminCalendarController(AppDbContext db) : ControllerBase
         if (!LessonScheduleService.TryValidateWeekOneLessons(
                 request.WeekOneLessons,
                 profile.LessonFrequency,
-                out var weekOneError))
+                out var weekOneError,
+                requireExactWeekOneCount: false))
             return BadRequest(new { message = weekOneError });
 
         var planned = LessonScheduleService.PlanFromWeekOneLessons(

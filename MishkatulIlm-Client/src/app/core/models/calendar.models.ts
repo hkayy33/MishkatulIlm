@@ -8,6 +8,10 @@ export interface AvailabilitySlotRow {
   slotId?: string | null;
   studentUserId?: string | null;
   studentName?: string | null;
+  studentCountry?: string | null;
+  studentCity?: string | null;
+  studentLessonNote?: string | null;
+  attendanceStatus?: 'attending' | 'not_attending' | null;
 }
 
 export interface WeekOneLessonPick {

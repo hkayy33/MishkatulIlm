@@ -6,6 +6,7 @@ export interface StudentLessonRow {
   endsAtUtc: string;
   durationMinutes: number;
   attendanceStatus: LessonAttendanceStatus;
+  studentNote?: string | null;
 }
 
 export interface StudentPaymentSummary {
@@ -13,6 +14,7 @@ export interface StudentPaymentSummary {
   lastPaymentAmount: number | null;
   lastPaymentCurrency: string;
   lastPaymentAtUtc: string | null;
+  requiresInitialPayment: boolean;
 }
 
 export interface StudentLessonMonthSummary {
@@ -22,12 +24,23 @@ export interface StudentLessonMonthSummary {
   notAttendingCount: number;
 }
 
+export type ScheduleChangeUpdateStatus = 'pending' | 'resolved' | 'declined';
+
+export interface StudentScheduleChangeUpdate {
+  status: ScheduleChangeUpdateStatus;
+  requestNote: string;
+  adminMessage?: string | null;
+  createdAtUtc: string;
+  resolvedAtUtc?: string | null;
+}
+
 export interface StudentPortalInfo {
   status: string;
   payment: StudentPaymentSummary;
   monthSummary: StudentLessonMonthSummary;
   nextLesson?: StudentLessonRow | null;
   hasPendingScheduleChangeRequest: boolean;
+  scheduleChangeUpdate?: StudentScheduleChangeUpdate | null;
   deletionRequested: boolean;
 }
 

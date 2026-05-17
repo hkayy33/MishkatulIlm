@@ -71,6 +71,7 @@ export interface SaveOnboardingRequest {
   gender: string;
   country: string;
   city: string;
+  phoneNumber: string;
   currentLevel: string;
   lessonFrequency: string;
   subjectCodes: string[];

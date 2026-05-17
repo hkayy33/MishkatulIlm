@@ -70,6 +70,13 @@ namespace MishkatulIlm_Server.Data.Migrations
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)");
 
+                    b.Property<string>("MessageToTutor")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime?>("MessageToTutorUpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("NextPaymentDueUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -104,6 +111,10 @@ namespace MishkatulIlm_Server.Data.Migrations
                     b.Property<DateTime>("StartsAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("StudentNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<Guid?>("StudentUserId")
                         .HasColumnType("uuid");
 
@@ -122,6 +133,10 @@ namespace MishkatulIlm_Server.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AdminResponseMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -129,6 +144,9 @@ namespace MishkatulIlm_Server.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTime?>("ResolvedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -250,6 +268,11 @@ namespace MishkatulIlm_Server.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.PrimitiveCollection<List<string>>("PreferredAvailability")
                         .IsRequired()

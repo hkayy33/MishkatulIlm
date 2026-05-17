@@ -1,8 +1,7 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, input, model, output, signal } from '@angular/core';
+import { Component, computed, effect, input, model, output, signal } from '@angular/core';
 import type { AvailabilitySlotRow, WeekOneLessonPick } from '../../core/models/calendar.models';
 import { lessonsOverlap } from '../../core/utils/lesson-duration';
-import { calendarWeekStartUtc } from '../../core/utils/schedule-slot-count';
 import { addMinutesToIso, formatSlotRange } from '../../core/utils/datetime-local';
 import {
   durationLabel,
@@ -12,14 +11,20 @@ import {
   normalizeSlotStartIso,
   SCHEDULE_DURATION_OPTIONS,
   SCHEDULE_GRID_STEP_MINUTES,
+  calendarDayKeyInZone,
   utcCivilDayKeyFromCalendarDate,
-  utcCivilDayKeyFromIso,
 } from '../../core/utils/schedule-grid';
+import { parseLessonAttendanceStatus } from '../../core/utils/attendance.util';
 import { formatSlotRangeInZone, timeZoneOffsetLabel } from '../../core/utils/timezone.util';
+import {
+  calendarWeekStartKeyInZone,
+  dayKeyForLocalCalendarDate,
+} from '../../core/utils/week-schedule.util';
 
 export type SlotVisualState =
   | 'open'
   | 'booked'
+  | 'booked-student'
   | 'outside-preference'
   | 'selected-start'
   | 'selected-range'
@@ -32,6 +37,8 @@ export interface DaySlotView {
   studentTimeLabel: string | null;
   state: SlotVisualState;
   studentName?: string | null;
+  attendanceStatus?: 'attending' | 'not_attending' | null;
+  releaseKey?: string | null;
 }
 
 export interface DayMonthSummary {
@@ -52,6 +59,8 @@ export class AdminLessonCalendar {
   readonly loading = input(false);
   readonly pickMode = input(false);
   readonly requiredSelections = input(1);
+  /** When set, caps how many start-week lessons can be added (resolve flow uses a high limit). */
+  readonly selectionLimit = input<number | null>(null);
   readonly selectedLessons = model<WeekOneLessonPick[]>([]);
   readonly selectionError = output<string | null>();
   readonly monthChanged = output<Date>();
@@ -63,8 +72,11 @@ export class AdminLessonCalendar {
   readonly studentTimeZoneId = input<string | null>(null);
   readonly studentDisplayName = input<string | null>(null);
   readonly studentLocationLabel = input<string | null>(null);
+  /** When rescheduling, pass the student id so their bookings can be released for new picks. */
+  readonly releaseableStudentUserId = input<string | null>(null);
 
   protected readonly durationOptions = SCHEDULE_DURATION_OPTIONS;
+  protected readonly releasedBookingKeys = signal<ReadonlySet<string>>(new Set());
   protected readonly durationLabel = durationLabel;
 
   protected readonly viewMonth = signal(
@@ -79,10 +91,23 @@ export class AdminLessonCalendar {
     return d.toLocaleString(undefined, { month: 'long', year: 'numeric' });
   });
 
-  protected readonly weekOneAnchorMs = computed(() => {
+  protected readonly enforceStartWeekAnchor = computed(
+    () => this.pickMode() && !this.releaseableStudentUserId(),
+  );
+
+  protected readonly weekOneAnchorKey = computed(() => {
     const first = this.selectedLessons()[0];
-    return first ? calendarWeekStartUtc(first.startsAtUtc) : null;
+    if (!first) return null;
+    return calendarWeekStartKeyInZone(first.startsAtUtc, this.tutorTimeZoneId());
   });
+
+  constructor() {
+    effect(() => {
+      this.releaseableStudentUserId();
+      this.availability();
+      this.releasedBookingKeys.set(new Set());
+    });
+  }
 
   protected readonly grid = computed(() => {
     const start = this.viewMonth();
@@ -105,9 +130,10 @@ export class AdminLessonCalendar {
   );
 
   protected readonly slotsByDayKey = computed(() => {
+    const tz = this.tutorTimeZoneId();
     const map = new Map<string, AvailabilitySlotRow[]>();
     for (const slot of this.normalizedAvailability()) {
-      const key = utcCivilDayKeyFromIso(slot.startsAtUtc);
+      const key = calendarDayKeyInZone(slot.startsAtUtc, tz);
       const list = map.get(key) ?? [];
       list.push(slot);
       map.set(key, list);
@@ -118,12 +144,56 @@ export class AdminLessonCalendar {
   protected readonly selectedDaySlots = computed(() => {
     const day = this.selectedDay();
     if (!day) return [];
+    const cellKey = dayKeyForLocalCalendarDate(day, this.tutorTimeZoneId());
+    const matching = (this.slotsByDayKey().get(cellKey) ?? []).slice().sort((a, b) =>
+      a.startsAtUtc.localeCompare(b.startsAtUtc),
+    );
+    if (matching.length > 0) {
+      return matching;
+    }
     return mergeDayAvailability(
       day.getFullYear(),
       day.getMonth(),
       day.getDate(),
-      this.slotsByDayKey().get(utcCivilDayKeyFromCalendarDate(day)) ?? [],
+      [],
     );
+  });
+
+  protected readonly effectiveDaySlots = computed((): AvailabilitySlotRow[] => {
+    const raw = this.selectedDaySlots();
+    const studentId = this.releaseableStudentUserId();
+    const released = this.releasedBookingKeys();
+    if (!studentId || released.size === 0) {
+      return raw;
+    }
+
+    const pass1 = raw.map((slot) => {
+      if (!this.isReleasableStudentBooking(slot) || !released.has(this.bookingReleaseKey(slot))) {
+        return slot;
+      }
+      return {
+        ...slot,
+        isAvailable: true,
+        studentUserId: null,
+        studentName: null,
+        slotId: null,
+        attendanceStatus: null,
+        studentLessonNote: null,
+        availableDurationMinutes: [...SCHEDULE_DURATION_OPTIONS],
+      };
+    });
+
+    return pass1.map((slot) => {
+      if (!slot.isAvailable) {
+        return slot;
+      }
+      const durations = durationsFromStart(slot.startsAtUtc, pass1);
+      return {
+        ...slot,
+        availableDurationMinutes:
+          durations.length > 0 ? durations : (slot.availableDurationMinutes ?? []),
+      };
+    });
   });
 
   protected readonly daySlotViews = computed((): DaySlotView[] => {
@@ -133,23 +203,36 @@ export class AdminLessonCalendar {
 
     const tutorTz = this.tutorTimeZoneId();
     const studentTz = this.studentTimeZoneId();
+    const effectiveByStart = new Map(
+      this.effectiveDaySlots().map((s) => [normalizeSlotStartIso(s.startsAtUtc), s]),
+    );
 
-    return this.selectedDaySlots().map((slot) => ({
-      startsAtUtc: slot.startsAtUtc,
-      endsAtUtc: slot.endsAtUtc,
-      tutorTimeLabel: formatSlotRangeInZone(slot.startsAtUtc, slot.endsAtUtc, tutorTz),
-      studentTimeLabel: studentTz
-        ? formatSlotRangeInZone(slot.startsAtUtc, slot.endsAtUtc, studentTz)
-        : null,
-      state: this.slotVisualState(slot, draftStart, draftSteps),
-      studentName: slot.studentName,
-    }));
+    return this.selectedDaySlots().map((rawSlot) => {
+      const effective =
+        effectiveByStart.get(normalizeSlotStartIso(rawSlot.startsAtUtc)) ?? rawSlot;
+      return {
+        startsAtUtc: rawSlot.startsAtUtc,
+        endsAtUtc: rawSlot.endsAtUtc,
+        tutorTimeLabel: formatSlotRangeInZone(rawSlot.startsAtUtc, rawSlot.endsAtUtc, tutorTz),
+        studentTimeLabel: studentTz
+          ? formatSlotRangeInZone(rawSlot.startsAtUtc, rawSlot.endsAtUtc, studentTz)
+          : null,
+        state: this.slotVisualState(rawSlot, effective, draftStart, draftSteps),
+        studentName: rawSlot.studentName,
+        attendanceStatus: rawSlot.studentUserId
+          ? parseLessonAttendanceStatus(rawSlot.attendanceStatus)
+          : null,
+        releaseKey: this.isReleasableStudentBooking(rawSlot)
+          ? this.bookingReleaseKey(rawSlot)
+          : null,
+      };
+    });
   });
 
   protected readonly draftDurationChoices = computed(() => {
     const start = this.draftStartUtc();
     if (!start) return [];
-    return durationsFromStart(start, this.selectedDaySlots());
+    return durationsFromStart(start, this.effectiveDaySlots());
   });
 
   protected readonly canConfirmDraft = computed(() => {
@@ -173,8 +256,15 @@ export class AdminLessonCalendar {
     return `${tutor} · student ${student} (${durationLabel(duration)})`;
   });
 
+  protected readonly maxSelectableLessons = computed(() => {
+    if (this.releaseableStudentUserId()) {
+      return this.selectionLimit() ?? 16;
+    }
+    return this.selectionLimit() ?? this.requiredSelections();
+  });
+
   protected readonly picksRemaining = computed(
-    () => this.requiredSelections() - this.selectedLessons().length,
+    () => this.maxSelectableLessons() - this.selectedLessons().length,
   );
 
   protected readonly timezoneBanner = computed(() => {
@@ -193,16 +283,23 @@ export class AdminLessonCalendar {
     return `8am – 10pm · ${tutor}'s time · 30-minute slots`;
   });
 
+  protected bookedSlotLabel(slot: DaySlotView): string {
+    const name = slot.studentName?.trim() || 'Booked';
+    if (slot.attendanceStatus === 'not_attending') {
+      return `${name} · Not attending`;
+    }
+    return name;
+  }
+
   protected daySummary(date: Date): DayMonthSummary {
-    const slots = mergeDayAvailability(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-      this.slotsByDayKey().get(utcCivilDayKeyFromCalendarDate(date)) ?? [],
-    );
+    const cellKey = dayKeyForLocalCalendarDate(date, this.tutorTimeZoneId());
+    const slots = this.slotsByDayKey().get(cellKey) ?? [];
     const hasPicks = this.selectedLessons().some((lesson) => {
       const end = addMinutesToIso(lesson.startsAtUtc, lesson.durationMinutes);
-      return this.overlapsLocalDay(lesson.startsAtUtc, end, date);
+      return (
+        calendarDayKeyInZone(lesson.startsAtUtc, this.tutorTimeZoneId()) === cellKey ||
+        this.overlapsLocalDay(lesson.startsAtUtc, end, date)
+      );
     });
     const isActuallyBooked = (s: AvailabilitySlotRow) =>
       !s.isAvailable && Boolean(s.studentUserId ?? s.studentName);
@@ -256,15 +353,30 @@ export class AdminLessonCalendar {
 
   protected isSlotClickable(slot: DaySlotView): boolean {
     if (!this.pickMode()) return false;
-    if (slot.state === 'booked' || slot.state === 'confirmed') {
+    if (slot.state === 'booked') {
       return false;
     }
-    if (this.picksRemaining() <= 0 && slot.state !== 'selected-start' && slot.state !== 'selected-range') {
+    if (slot.state === 'booked-student') {
+      return true;
+    }
+    if (slot.state === 'confirmed') {
+      return true;
+    }
+    if (
+      this.picksRemaining() <= 0 &&
+      slot.state !== 'selected-start' &&
+      slot.state !== 'selected-range'
+    ) {
       return false;
     }
-    const anchor = this.weekOneAnchorMs();
-    if (anchor !== null && calendarWeekStartUtc(slot.startsAtUtc) !== anchor) {
-      return false;
+    if (this.enforceStartWeekAnchor()) {
+      const anchorKey = this.weekOneAnchorKey();
+      if (
+        anchorKey &&
+        calendarWeekStartKeyInZone(slot.startsAtUtc, this.tutorTimeZoneId()) !== anchorKey
+      ) {
+        return false;
+      }
     }
     return (
       slot.state === 'open' ||
@@ -275,6 +387,19 @@ export class AdminLessonCalendar {
   }
 
   protected onSlotClick(slot: DaySlotView): void {
+    if (slot.state === 'booked-student' && slot.releaseKey) {
+      this.toggleBookingRelease(slot.releaseKey);
+      return;
+    }
+
+    if (slot.state === 'confirmed') {
+      const lesson = this.findLessonCoveringSlot(slot.startsAtUtc);
+      if (lesson) {
+        this.removeLesson(lesson);
+      }
+      return;
+    }
+
     if (!this.isSlotClickable(slot) && slot.state !== 'selected-start' && slot.state !== 'selected-range') {
       return;
     }
@@ -285,7 +410,7 @@ export class AdminLessonCalendar {
     }
 
     this.draftStartUtc.set(slot.startsAtUtc);
-    const choices = durationsFromStart(slot.startsAtUtc, this.selectedDaySlots());
+    const choices = durationsFromStart(slot.startsAtUtc, this.effectiveDaySlots());
     this.draftDurationMinutes.set(choices[0] ?? 30);
     this.selectionError.emit(null);
   }
@@ -314,10 +439,15 @@ export class AdminLessonCalendar {
     }
 
     const pick: WeekOneLessonPick = { startsAtUtc, durationMinutes };
-    const anchor = this.weekOneAnchorMs();
-    if (anchor !== null && calendarWeekStartUtc(startsAtUtc) !== anchor) {
-      this.selectionError.emit('All lessons must be in the same calendar week.');
-      return;
+    if (this.enforceStartWeekAnchor()) {
+      const anchorKey = this.weekOneAnchorKey();
+      if (
+        anchorKey &&
+        calendarWeekStartKeyInZone(startsAtUtc, this.tutorTimeZoneId()) !== anchorKey
+      ) {
+        this.selectionError.emit('All lessons must be in the same calendar week.');
+        return;
+      }
     }
 
     const current = [...this.selectedLessons()];
@@ -346,36 +476,71 @@ export class AdminLessonCalendar {
   }
 
   private slotVisualState(
-    slot: AvailabilitySlotRow,
+    rawSlot: AvailabilitySlotRow,
+    effectiveSlot: AvailabilitySlotRow,
     draftStart: string | null,
     draftSteps: number,
   ): SlotVisualState {
-    if (!slot.isAvailable) return 'booked';
-    if (slot.matchesStudentPreference === false) return 'outside-preference';
+    if (this.isReleasableStudentBooking(rawSlot) && !this.isBookingReleased(rawSlot)) {
+      return 'booked-student';
+    }
+    if (!effectiveSlot.isAvailable) return 'booked';
+    if (effectiveSlot.matchesStudentPreference === false) return 'outside-preference';
 
-    const startMs = new Date(slot.startsAtUtc).getTime();
+    const startMs = new Date(effectiveSlot.startsAtUtc).getTime();
     if (draftStart) {
       const draftStartMs = new Date(draftStart).getTime();
       const draftEndMs = draftStartMs + draftSteps * SCHEDULE_GRID_STEP_MINUTES * 60 * 1000;
       if (startMs >= draftStartMs && startMs < draftEndMs) {
-        return normalizeSlotStartIso(slot.startsAtUtc) === normalizeSlotStartIso(draftStart)
+        return normalizeSlotStartIso(effectiveSlot.startsAtUtc) === normalizeSlotStartIso(draftStart)
           ? 'selected-start'
           : 'selected-range';
       }
     }
 
-    if (this.isCoveredByConfirmedLesson(slot.startsAtUtc)) return 'confirmed';
+    if (this.isCoveredByConfirmedLesson(effectiveSlot.startsAtUtc)) return 'confirmed';
     return 'open';
   }
 
+  private isReleasableStudentBooking(slot: AvailabilitySlotRow): boolean {
+    const studentId = this.releaseableStudentUserId();
+    if (!studentId || !slot.studentUserId) return false;
+    return !slot.isAvailable && String(slot.studentUserId) === String(studentId);
+  }
+
+  private isBookingReleased(slot: AvailabilitySlotRow): boolean {
+    return this.releasedBookingKeys().has(this.bookingReleaseKey(slot));
+  }
+
+  private bookingReleaseKey(slot: AvailabilitySlotRow): string {
+    if (slot.slotId) return String(slot.slotId);
+    return `${slot.studentUserId}|${slot.startsAtUtc}|${slot.endsAtUtc}`;
+  }
+
+  private toggleBookingRelease(releaseKey: string): void {
+    const next = new Set(this.releasedBookingKeys());
+    if (next.has(releaseKey)) {
+      next.delete(releaseKey);
+    } else {
+      next.add(releaseKey);
+    }
+    this.releasedBookingKeys.set(next);
+    this.clearDraft();
+    this.selectionError.emit(null);
+  }
+
   private isCoveredByConfirmedLesson(slotStartUtc: string): boolean {
+    return this.findLessonCoveringSlot(slotStartUtc) !== null;
+  }
+
+  private findLessonCoveringSlot(slotStartUtc: string): WeekOneLessonPick | null {
     const t = new Date(slotStartUtc).getTime();
     for (const lesson of this.selectedLessons()) {
       const start = new Date(lesson.startsAtUtc).getTime();
       const end = new Date(addMinutesToIso(lesson.startsAtUtc, lesson.durationMinutes)).getTime();
-      if (t >= start && t < end) return true;
+      if (t >= start && t < end) return lesson;
     }
-    return false;
+    return null;
   }
 
   private overlapsLocalDay(startIso: string, endIso: string, day: Date): boolean {

@@ -1,0 +1,214 @@
+<div class="admin-page">
+  <h1 class="admin-title">Schedule change requests</h1>
+  <p class="admin-lead">
+    Students submit these from their dashboard when they need a different lesson schedule. Open
+    <strong>Resolve</strong> to reschedule lessons on the calendar, or decline with a message to the
+    student.
+  </p>
+
+  @if (actionMessage()) {
+    <p class="admin-success admin-tight-bottom">{{ actionMessage() }}</p>
+  }
+
+  @if (loading()) {
+    <p class="admin-muted">Loading…</p>
+  } @else if (loadError() && !resolveTarget() && !declineTarget()) {
+    <p class="admin-error">{{ loadError() }}</p>
+  } @else if (rows().length === 0) {
+    <p class="admin-muted">No pending schedule change requests.</p>
+  } @else {
+    <div class="admin-table-wrap">
+      <table class="admin-table admin-table--schedule-changes">
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th>Submitted</th>
+            <th>Request</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of rows(); track r.id) {
+            <tr>
+              <td>
+                <strong>{{ r.studentName }}</strong>
+                <div class="cell-sub">{{ r.email }}</div>
+              </td>
+              <td>{{ r.createdAtUtc | date: 'medium' }}</td>
+              <td class="schedule-change-note">{{ r.note }}</td>
+              <td class="actions-cell">
+                <button
+                  type="button"
+                  class="admin-btn admin-btn--small"
+                  [disabled]="actionUserId() === r.id"
+                  (click)="openResolve(r)"
+                >
+                  Resolve
+                </button>
+                <button
+                  type="button"
+                  class="admin-btn admin-btn--ghost admin-btn--small"
+                  [disabled]="actionUserId() === r.id"
+                  (click)="openDecline(r)"
+                >
+                  Decline
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  @if (resolveTarget(); as target) {
+    <div class="approve-overlay" role="dialog" aria-modal="true" aria-labelledby="resolve-title">
+      <div class="approve-dialog approve-dialog--schedule">
+        <h2 id="resolve-title">Resolve schedule change — {{ target.studentName }}</h2>
+
+        <section class="approve-details">
+          <h3>Student details</h3>
+          <dl class="approve-details__grid">
+            <div><dt>Email</dt><dd>{{ target.email }}</dd></div>
+            <div><dt>Age</dt><dd>{{ labelAgeRangeCode(target.ageRange ?? '') }}</dd></div>
+            <div><dt>Gender</dt><dd>{{ labelGenderCode(target.gender ?? '') }}</dd></div>
+            <div><dt>Country</dt><dd>{{ target.country }}</dd></div>
+            <div><dt>City</dt><dd>{{ target.city }}</dd></div>
+            <div><dt>Level</dt><dd>{{ labelLevelCode(target.currentLevel ?? '') }}</dd></div>
+            <div class="approve-details__span">
+              <dt>Lesson frequency</dt>
+              <dd>{{ labelFrequencyCode(target.lessonFrequency ?? '') }}</dd>
+            </div>
+            <div class="approve-details__span">
+              <dt>Subjects</dt>
+              <dd>{{ formatSubjects(target.subjectCodes) }}</dd>
+            </div>
+            <div class="approve-details__span">
+              <dt>Preferred times</dt>
+              <dd>{{ formatAvailability(target.preferredAvailability) }}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <div class="approve-amend-note">
+          <h3>Student request</h3>
+          <p>{{ target.note }}</p>
+        </div>
+
+        @if (loadError()) {
+          <p class="admin-error">{{ loadError() }}</p>
+        }
+        @if (scheduleSelectionError()) {
+          <p class="admin-error">{{ scheduleSelectionError() }}</p>
+        }
+
+        <section class="approve-schedule">
+          <h3>Reschedule lessons</h3>
+          <p class="approve-hint">
+            Optionally pick new start-week lessons (any number). Each repeats weekly for
+            {{ bookingWeeks }} weeks. Leave empty to clear this student's schedule. Click their
+            current lessons to free those times first. Grey = other students; striped = outside
+            preferences.
+          </p>
+          <p class="approve-hint approve-hint--count">
+            Selected {{ selectedWeekOneLessons().length }} start-week lesson(s)
+            @if (requiredSlotCount() > 1) {
+              (usual plan: {{ requiredSlotCount() }} per week)
+            }
+          </p>
+
+          <app-admin-lesson-calendar
+            [availability]="availability()"
+            [loading]="slotsLoading()"
+            [pickMode]="true"
+            [selectionLimit]="16"
+            [selectedLessons]="selectedWeekOneLessons()"
+            [tutorTimeZoneId]="tutorSettings()?.tutorTimeZoneId ?? 'UTC'"
+            [tutorDisplayName]="tutorSettings()?.tutorDisplayName ?? 'Tutor'"
+            [studentTimeZoneId]="scheduleStudentTimeZoneId()"
+            [studentDisplayName]="scheduleStudentDisplayName()"
+            [studentLocationLabel]="scheduleStudentLocationLabel()"
+            [releaseableStudentUserId]="target.studentUserId"
+            (selectedLessonsChange)="onWeekOneLessonsChange($event)"
+            (selectionError)="onScheduleSelectionError($event)"
+            (monthChanged)="onScheduleMonthChanged($event)"
+          />
+
+          @if (previewLoading()) {
+            <p class="admin-muted">Calculating schedule…</p>
+          } @else if (preview(); as p) {
+            <div class="approve-preview">
+              <p>
+                <strong>{{ p.lessonCount }}</strong> lessons over {{ bookingPeriodLabel(p.plannedLessons) }}:
+              </p>
+              <ul class="approve-preview__list">
+                @for (lesson of p.plannedLessons; track lesson.startsAtUtc + lesson.durationMinutes) {
+                  <li>{{ formatPreviewLesson(lesson.startsAtUtc, lesson.endsAtUtc) }}</li>
+                }
+              </ul>
+            </div>
+          }
+        </section>
+
+        <div class="approve-actions">
+          <button type="button" class="admin-btn admin-btn--ghost" (click)="closeModals()">Cancel</button>
+          <button
+            type="button"
+            class="admin-btn admin-btn--ghost"
+            (click)="openDecline(target)"
+          >
+            Decline instead…
+          </button>
+          <button
+            type="button"
+            class="admin-btn"
+            [disabled]="actionUserId() === target.id"
+            (click)="confirmResolve()"
+          >
+            {{ actionUserId() === target.id ? 'Saving…' : 'Resolve & apply schedule' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (declineTarget(); as target) {
+    <div class="approve-overlay" role="dialog" aria-modal="true" aria-labelledby="decline-title">
+      <div class="approve-dialog approve-dialog--wide">
+        <h2 id="decline-title">Decline request — {{ target.studentName }}</h2>
+
+        <div class="approve-amend-note">
+          <h3>Student request</h3>
+          <p>{{ target.note }}</p>
+        </div>
+
+        @if (loadError()) {
+          <p class="admin-error">{{ loadError() }}</p>
+        }
+
+        <div class="decline-form">
+          <label for="decline-message">Message to student</label>
+          <textarea
+            id="decline-message"
+            rows="4"
+            [ngModel]="declineMessage()"
+            (ngModelChange)="declineMessage.set($event)"
+            placeholder="Explain why the request cannot be accommodated and what the student can do next."
+          ></textarea>
+        </div>
+
+        <div class="approve-actions">
+          <button type="button" class="admin-btn admin-btn--ghost" (click)="closeModals()">Cancel</button>
+          <button
+            type="button"
+            class="admin-btn admin-btn--danger"
+            [disabled]="actionUserId() === target.id"
+            (click)="confirmDecline()"
+          >
+            {{ actionUserId() === target.id ? 'Sending…' : 'Decline request' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

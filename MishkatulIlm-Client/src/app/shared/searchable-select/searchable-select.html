@@ -2,6 +2,7 @@
   class="searchable-select"
   [class.searchable-select--open]="open()"
   [class.searchable-select--disabled]="disabled() || loading()"
+  [class.searchable-select--invalid]="invalid()"
 >
   <label [for]="inputId()">{{ label() }}</label>
   <div class="searchable-select__control">

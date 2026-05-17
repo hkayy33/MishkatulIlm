@@ -23,6 +23,18 @@
   &--disabled {
     opacity: 0.65;
   }
+
+  &--invalid {
+    label {
+      color: #8b2c2c;
+    }
+
+    .searchable-select__control input {
+      border-color: #c44;
+      background: rgba(139, 44, 44, 0.04);
+      box-shadow: 0 0 0 3px rgba(139, 44, 44, 0.12);
+    }
+  }
 }
 
 .searchable-select__control {

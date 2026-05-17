@@ -1,0 +1,13 @@
+@use '../admin-page.shared';
+
+.admin-summary-stat {
+  margin: 0 0 1rem;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.95rem;
+  color: #5c584f;
+}
+
+.admin-summary-stat__value {
+  font-weight: 700;
+  color: #1c1b18;
+}

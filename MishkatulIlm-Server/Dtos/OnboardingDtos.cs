@@ -22,6 +22,9 @@ public sealed class SaveOnboardingRequest
     [Required, MaxLength(120)]
     public string City { get; set; } = string.Empty;
 
+    [Required, MaxLength(32)]
+    public string PhoneNumber { get; set; } = string.Empty;
+
     [Required, MaxLength(64)]
     public string CurrentLevel { get; set; } = string.Empty;
 

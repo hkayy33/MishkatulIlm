@@ -94,7 +94,8 @@ public static class LessonScheduleService
     public static bool TryValidateWeekOneLessons(
         IReadOnlyList<WeekOneLessonSlotDto> weekOneLessons,
         string lessonFrequency,
-        out string? error)
+        out string? error,
+        bool requireExactWeekOneCount = true)
     {
         error = null;
         var required = RequiredWeekOneSlotCount(lessonFrequency);
@@ -107,7 +108,10 @@ public static class LessonScheduleService
             .OrderBy(l => l.StartsAtUtc)
             .ToList();
 
-        if (lessons.Count != required)
+        if (lessons.Count == 0)
+            return !requireExactWeekOneCount;
+
+        if (requireExactWeekOneCount && lessons.Count != required)
         {
             error = required switch
             {
@@ -145,11 +149,14 @@ public static class LessonScheduleService
             }
         }
 
-        var weekStart = CalendarWeekStartUtc(lessons[0].StartsAtUtc);
-        if (lessons.Any(l => CalendarWeekStartUtc(l.StartsAtUtc) != weekStart))
+        if (requireExactWeekOneCount)
         {
-            error = "All selected slots must be in the same calendar week.";
-            return false;
+            var weekStart = CalendarWeekStartUtc(lessons[0].StartsAtUtc);
+            if (lessons.Any(l => CalendarWeekStartUtc(l.StartsAtUtc) != weekStart))
+            {
+                error = "All selected slots must be in the same calendar week.";
+                return false;
+            }
         }
 
         for (var i = 0; i < lessons.Count; i++)
@@ -310,6 +317,10 @@ public static class LessonScheduleService
                         StudentName = blocking.Student is null
                             ? null
                             : $"{blocking.Student.FirstName} {blocking.Student.LastName}".Trim(),
+                        StudentCountry = blocking.Student?.Onboarding?.Country,
+                        StudentCity = blocking.Student?.Onboarding?.City,
+                        StudentLessonNote = TrimOrNullNote(blocking.StudentNote),
+                        AttendanceStatus = AttendanceStatusCodes.ToApiValue(blocking.AttendanceStatus),
                     });
                 continue;
             }
@@ -360,6 +371,14 @@ public static class LessonScheduleService
                     StudentName = conflict?.Student is null
                         ? null
                         : $"{conflict.Student.FirstName} {conflict.Student.LastName}".Trim(),
+                    StudentCountry = conflict?.Student?.Onboarding?.Country,
+                    StudentCity = conflict?.Student?.Onboarding?.City,
+                    StudentLessonNote = conflict?.StudentUserId is not null && conflict is not null
+                        ? TrimOrNullNote(conflict.StudentNote)
+                        : null,
+                    AttendanceStatus = conflict?.StudentUserId is not null && conflict is not null
+                        ? AttendanceStatusCodes.ToApiValue(conflict.AttendanceStatus)
+                        : null,
                 });
         }
 
@@ -447,5 +466,11 @@ public static class LessonScheduleService
     {
         dow = value;
         return ok;
+    }
+
+    private static string? TrimOrNullNote(string? value)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed;
     }
 }

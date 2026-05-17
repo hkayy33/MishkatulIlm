@@ -50,6 +50,25 @@
   }
 }
 
+.admin-nav__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.admin-nav__badge {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  background: #2f7a4f;
+  color: #fff;
+  letter-spacing: 0.02em;
+}
+
 .admin-side-footer {
   display: flex;
   flex-direction: column;

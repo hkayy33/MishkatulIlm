@@ -52,8 +52,9 @@
 
       @if (pickMode()) {
         <p class="cal-side-hint">
-          Click a start time, choose duration (30-minute steps), then add the lesson. Times show your
-          zone and the student's local time. Grey = booked; striped = outside preferences.
+          Click a start time, choose duration (30-minute steps), then add the lesson. Click this
+          student's existing lessons to free those times for booking. Click an added lesson again to
+          remove it. Grey = other students; striped = outside preferences.
         </p>
       }
 
@@ -65,6 +66,7 @@
               class="slot-row"
               [class.slot-row--open]="slot.state === 'open'"
               [class.slot-row--booked]="slot.state === 'booked'"
+              [class.slot-row--booked-student]="slot.state === 'booked-student'"
               [class.slot-row--outside]="slot.state === 'outside-preference'"
               [class.slot-row--selected-start]="slot.state === 'selected-start'"
               [class.slot-row--selected-range]="slot.state === 'selected-range'"
@@ -81,7 +83,10 @@
               <span class="slot-row__status">
                 @switch (slot.state) {
                   @case ('booked') {
-                    {{ slot.studentName || 'Booked' }}
+                    {{ bookedSlotLabel(slot) }}
+                  }
+                  @case ('booked-student') {
+                    {{ bookedSlotLabel(slot) }} · click to free
                   }
                   @case ('outside-preference') {
                     Outside preference

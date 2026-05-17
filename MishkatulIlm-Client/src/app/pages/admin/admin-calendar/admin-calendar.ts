@@ -1,5 +1,7 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AdminApiService } from '../../../core/services/admin-api.service';
+import { AdminScheduleRefreshService } from '../../../core/services/admin-schedule-refresh.service';
 import type { AvailabilitySlotRow } from '../../../core/models/calendar.models';
 import { SchedulingSettingsService } from '../../../core/services/scheduling-settings.service';
 import { monthUtcRange } from '../../../core/utils/datetime-local';
@@ -15,6 +17,8 @@ import { AdminLessonCalendar } from '../../../shared/admin-lesson-calendar/admin
 export class AdminCalendar {
   private readonly adminApi = inject(AdminApiService);
   private readonly schedulingSettings = inject(SchedulingSettingsService);
+  private readonly scheduleRefresh = inject(AdminScheduleRefreshService);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly tutorSettings = computed(() => this.schedulingSettings.settings());
 
@@ -26,6 +30,9 @@ export class AdminCalendar {
   private viewMonth = new Date();
 
   constructor() {
+    this.scheduleRefresh.scheduleChanged$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.reloadMonth(this.viewMonth));
     void this.schedulingSettings.ensureLoaded();
     this.reloadMonth(new Date());
   }

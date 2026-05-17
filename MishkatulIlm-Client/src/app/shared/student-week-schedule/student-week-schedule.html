@@ -1,0 +1,118 @@
+<section class="week-sched" aria-labelledby="week-sched-heading">
+  <div class="week-sched__header">
+    <h2 id="week-sched-heading" class="week-sched__title">This week</h2>
+    <div class="week-sched__toolbar">
+      <button type="button" class="week-sched__nav" (click)="prevWeek()" aria-label="Previous week">‹</button>
+      <span class="week-sched__range">{{ weekRangeLabel() }}</span>
+      <button type="button" class="week-sched__nav" (click)="nextWeek()" aria-label="Next week">›</button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <p class="week-sched__muted">Loading schedule…</p>
+  } @else {
+    <div class="week-sched__layout">
+      <div class="week-sched__days" role="tablist" aria-label="Days this week">
+        @for (day of weekDays(); track day.dayKey) {
+          <button
+            type="button"
+            role="tab"
+            class="week-sched__day"
+            [class.week-sched__day--selected]="isSelected(day.date)"
+            [class.week-sched__day--today]="day.isToday"
+            [class.week-sched__day--has-lessons]="day.lessonCount > 0"
+            [attr.aria-selected]="isSelected(day.date)"
+            (click)="selectDay(day.date)"
+          >
+            <span class="week-sched__weekday">{{ day.weekdayLabel }}</span>
+            <span class="week-sched__daynum">{{ day.dayNum }}</span>
+            @if (day.lessonCount > 0) {
+              <span class="week-sched__count">{{ day.lessonCount }}</span>
+            }
+          </button>
+        }
+      </div>
+
+      <aside class="week-sched__detail" role="tabpanel">
+        @if (selectedDay()) {
+          <h3 class="week-sched__detail-title">{{ selectedDayLabel() }}</h3>
+          @if (selectedDayLessons().length === 0) {
+            <p class="week-sched__muted">No lessons scheduled this day.</p>
+          } @else {
+            <ul class="week-sched__lessons">
+              @for (lesson of selectedDayLessons(); track lesson.slotId) {
+                <li
+                  class="week-sched__lesson"
+                  [class.week-sched__lesson--past]="isPast(lesson)"
+                  [class.week-sched__lesson--selected]="isLessonSelected(lesson)"
+                >
+                  <button type="button" class="week-sched__lesson-select" (click)="selectLesson(lesson, $event)">
+                    <p class="week-sched__lesson-time">
+                      {{ formatLessonTime(lesson) }}
+                      @if (hasNote(lesson)) {
+                        <span class="week-sched__note-dot" title="Has a note for your teacher"></span>
+                      }
+                    </p>
+                    <div class="week-sched__lesson-meta">
+                      <span
+                        class="week-sched__status"
+                        [class.week-sched__status--no]="lesson.attendanceStatus === 'not_attending'"
+                      >
+                        {{ attendanceLabel(lesson) }}
+                      </span>
+                      <button
+                        type="button"
+                        class="week-sched__toggle"
+                        [disabled]="updatingSlotId() === lesson.slotId"
+                        (click)="toggleAttendance(lesson, $event)"
+                      >
+                        {{ toggleAttendanceLabel(lesson) }}
+                      </button>
+                    </div>
+                  </button>
+                  <div class="week-sched__note">
+                    <button
+                      type="button"
+                      class="week-sched__note-toggle"
+                      [class.week-sched__note-toggle--open]="isNoteExpanded(lesson.slotId)"
+                      [attr.aria-expanded]="isNoteExpanded(lesson.slotId)"
+                      (click)="toggleNote(lesson, $event)"
+                    >
+                      <span class="week-sched__note-chevron" aria-hidden="true"></span>
+                      <span class="week-sched__note-label">Note for your teacher</span>
+                      @if (hasNote(lesson)) {
+                        <span class="week-sched__note-dot week-sched__note-dot--inline" title="Note saved"></span>
+                      }
+                    </button>
+                    @if (isNoteExpanded(lesson.slotId)) {
+                      <div class="week-sched__note-panel" role="region" aria-label="Note for your teacher">
+                        <textarea
+                          [id]="'lesson-note-' + lesson.slotId"
+                          rows="3"
+                          maxlength="2000"
+                          [ngModel]="noteDraft()"
+                          (ngModelChange)="noteDraft.set($event)"
+                          placeholder="Optional — e.g. running late, question about homework…"
+                        ></textarea>
+                        <button
+                          type="button"
+                          class="week-sched__save-note"
+                          [disabled]="updatingSlotId() === lesson.slotId"
+                          (click)="saveNote(lesson, $event)"
+                        >
+                          {{ updatingSlotId() === lesson.slotId ? 'Saving…' : 'Save note' }}
+                        </button>
+                      </div>
+                    }
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+        } @else {
+          <p class="week-sched__muted">Select a day to see your lessons.</p>
+        }
+      </aside>
+    </div>
+  }
+</section>

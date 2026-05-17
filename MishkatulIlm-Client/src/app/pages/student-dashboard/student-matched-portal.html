@@ -66,6 +66,36 @@
               {{ paymentBusy() ? 'Opening checkout…' : 'Make payment' }}
             </button>
           </div>
+        } @else if (paymentOverdue() || subscriptionPastDue()) {
+          <div class="matched-payment-cta" role="region" aria-labelledby="payment-overdue-heading">
+            <div>
+              <h2 id="payment-overdue-heading">Payment overdue</h2>
+              <p>
+                @if (subscriptionPastDue()) {
+                  Your monthly payment could not be collected. Update your payment to keep your lessons.
+                } @else {
+                  Your monthly payment is due. Pay now to stay up to date.
+                }
+              </p>
+            </div>
+            @if (canMakePayment()) {
+              <button
+                type="button"
+                class="matched-btn"
+                [disabled]="paymentBusy()"
+                (click)="makePayment()"
+              >
+                {{ paymentBusy() ? 'Opening checkout…' : 'Pay now' }}
+              </button>
+            }
+          </div>
+        } @else if (subscriptionCancelAtPeriodEnd() && subscriptionPeriodEnd(); as end) {
+          <div class="matched-payment-cta matched-payment-cta--info" role="status">
+            <div>
+              <h2>Subscription ending</h2>
+              <p>Monthly payments stop after {{ end | date: 'fullDate' }}. You can use lessons until then.</p>
+            </div>
+          </div>
         }
 
         <div class="matched-cards matched-cards--summary">
@@ -100,6 +130,30 @@
                 (click)="makePayment()"
               >
                 {{ paymentBusy() ? 'Opening checkout…' : 'Make payment' }}
+              </button>
+            } @else if (paymentOverdue() || subscriptionPastDue()) {
+              <p class="matched-card__value matched-card__value--warn">Payment overdue</p>
+              @if (canMakePayment()) {
+                <button
+                  type="button"
+                  class="matched-btn matched-btn--compact"
+                  [disabled]="paymentBusy()"
+                  (click)="makePayment()"
+                >
+                  {{ paymentBusy() ? 'Opening checkout…' : 'Pay now' }}
+                </button>
+              }
+            } @else if (hasActiveSubscription() && subscriptionPeriodEnd(); as end) {
+              <p class="matched-card__value">{{ end | date: 'fullDate' }}</p>
+              <p class="matched-card__sub">
+                @if (subscriptionCancelAtPeriodEnd()) {
+                  Monthly payments end on this date
+                } @else {
+                  Next monthly charge
+                }
+              </p>
+              <button type="button" class="matched-summary-link" (click)="setTab('payments')">
+                View payments
               </button>
             } @else if (nextPaymentDue(); as due) {
               <p class="matched-card__value">{{ due | date: 'fullDate' }}</p>
@@ -284,6 +338,29 @@
               {{ paymentBusy() ? 'Opening checkout…' : 'Make payment' }}
             </button>
           </div>
+        } @else if (paymentOverdue() || subscriptionPastDue()) {
+          <div class="matched-payment-cta matched-payment-cta--page" role="region" aria-labelledby="payments-overdue-page-heading">
+            <div>
+              <h2 id="payments-overdue-page-heading">Payment overdue</h2>
+              <p>
+                @if (subscriptionPastDue()) {
+                  We could not collect your monthly payment. Pay now or update your card in checkout.
+                } @else {
+                  Your monthly payment is due. Pay now to stay up to date.
+                }
+              </p>
+            </div>
+            @if (canMakePayment()) {
+              <button
+                type="button"
+                class="matched-btn"
+                [disabled]="paymentBusy()"
+                (click)="makePayment()"
+              >
+                {{ paymentBusy() ? 'Opening checkout…' : 'Pay now' }}
+              </button>
+            }
+          </div>
         }
 
         <div class="matched-cards">
@@ -291,6 +368,20 @@
             <h2>Next payment due</h2>
             @if (requiresInitialPayment()) {
               <p class="matched-card__value matched-card__value--muted">Due before your first lesson</p>
+            } @else if (paymentOverdue() || subscriptionPastDue()) {
+              <p class="matched-card__value matched-card__value--warn">Overdue</p>
+              @if (payment.nextPaymentDueUtc) {
+                <p class="matched-card__sub">Was due {{ payment.nextPaymentDueUtc | date: 'mediumDate' }}</p>
+              }
+            } @else if (hasActiveSubscription() && payment.subscriptionCurrentPeriodEndUtc) {
+              <p class="matched-card__value">{{ payment.subscriptionCurrentPeriodEndUtc | date: 'mediumDate' }}</p>
+              <p class="matched-card__sub">
+                @if (payment.subscriptionCancelAtPeriodEnd) {
+                  Subscription ends — no further charges
+                } @else {
+                  Next monthly charge (active subscription)
+                }
+              </p>
             } @else if (payment.nextPaymentDueUtc) {
               <p class="matched-card__value">{{ payment.nextPaymentDueUtc | date: 'mediumDate' }}</p>
             } @else {
@@ -309,6 +400,58 @@
             }
           </article>
         </div>
+
+        @if (showSubscriptionManage()) {
+          <section class="matched-card matched-subscription-manage">
+            <h2>Monthly subscription</h2>
+            @if (subscriptionCancelAtPeriodEnd() && subscriptionPeriodEnd(); as end) {
+              <p class="matched-card__sub">
+                Your subscription is scheduled to end on {{ end | date: 'fullDate' }}. No further monthly charges will be
+                made after that date.
+              </p>
+            } @else {
+              <p class="matched-card__sub">
+                Your lessons are billed monthly. Cancelling stops future charges at the end of your current billing
+                period; you can keep using the portal until then.
+              </p>
+              @if (canCancelSubscription()) {
+              @if (!showCancelSubscriptionConfirm()) {
+                <button
+                  type="button"
+                  class="matched-btn matched-btn--ghost"
+                  [disabled]="paymentBusy()"
+                  (click)="showCancelSubscriptionConfirm.set(true)"
+                >
+                  Cancel monthly payments
+                </button>
+              } @else {
+              <div class="matched-subscription-manage__confirm" role="region" aria-labelledby="cancel-sub-heading">
+                <h3 id="cancel-sub-heading">Cancel monthly payments?</h3>
+                <p>You will not be charged again after your current billing period ends.</p>
+                <div class="matched-subscription-manage__actions">
+                  <button
+                    type="button"
+                    class="matched-btn matched-btn--danger"
+                    [disabled]="paymentBusy()"
+                    (click)="cancelSubscription()"
+                  >
+                    {{ paymentBusy() ? 'Cancelling…' : 'Yes, cancel payments' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="matched-btn matched-btn--ghost"
+                    [disabled]="paymentBusy()"
+                    (click)="showCancelSubscriptionConfirm.set(false)"
+                  >
+                    Keep subscription
+                  </button>
+                </div>
+              </div>
+                }
+              }
+            }
+          </section>
+        }
 
         <section class="matched-card matched-card--summary">
           <h2>Lesson summary this month</h2>
@@ -340,6 +483,53 @@
         <p class="matched-page-lead">
           Request a new lesson schedule or delete your account if you no longer need lessons.
         </p>
+
+        @if (showSubscriptionManage()) {
+          <section class="matched-account-block matched-subscription-manage">
+            <h2>Monthly subscription</h2>
+            @if (subscriptionCancelAtPeriodEnd() && subscriptionPeriodEnd(); as end) {
+              <p class="matched-muted">
+                Payments stop after {{ end | date: 'fullDate' }}. You can keep using lessons until then.
+              </p>
+            } @else if (canCancelSubscription()) {
+              <p class="matched-muted">
+                Cancel recurring billing anytime. You keep access until the end of the current period.
+              </p>
+              @if (!showCancelSubscriptionConfirm()) {
+                <button
+                  type="button"
+                  class="matched-btn matched-btn--ghost"
+                  [disabled]="paymentBusy()"
+                  (click)="showCancelSubscriptionConfirm.set(true)"
+                >
+                  Cancel monthly payments
+                </button>
+              } @else {
+                <div class="matched-subscription-manage__confirm">
+                  <p class="matched-muted">You will not be charged again after this billing period.</p>
+                  <div class="matched-subscription-manage__actions">
+                    <button
+                      type="button"
+                      class="matched-btn matched-btn--danger"
+                      [disabled]="paymentBusy()"
+                      (click)="cancelSubscription()"
+                    >
+                      {{ paymentBusy() ? 'Cancelling…' : 'Yes, cancel' }}
+                    </button>
+                    <button
+                      type="button"
+                      class="matched-btn matched-btn--ghost"
+                      [disabled]="paymentBusy()"
+                      (click)="showCancelSubscriptionConfirm.set(false)"
+                    >
+                      Keep subscription
+                    </button>
+                  </div>
+                </div>
+              }
+            }
+          </section>
+        }
 
         <section class="matched-account-block">
           <h2>Schedule change</h2>

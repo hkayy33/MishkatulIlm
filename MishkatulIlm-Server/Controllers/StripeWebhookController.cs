@@ -39,11 +39,25 @@ public sealed class StripeWebhookController(
             return BadRequest();
         }
 
-        if (stripeEvent.Type == EventTypes.CheckoutSessionCompleted)
+        StripeConfiguration.ApiKey = options.SecretKey;
+
+        switch (stripeEvent.Type)
         {
-            var session = stripeEvent.Data.Object as Session;
-            if (session is not null)
-                await paymentRecorder.TryRecordCheckoutSessionAsync(session, cancellationToken);
+            case EventTypes.CheckoutSessionCompleted:
+                if (stripeEvent.Data.Object is Session checkoutSession)
+                    await paymentRecorder.TryRecordCheckoutSessionAsync(checkoutSession, cancellationToken);
+                break;
+
+            case EventTypes.InvoicePaid:
+                if (stripeEvent.Data.Object is Invoice invoice)
+                    await paymentRecorder.TryRecordInvoicePaidAsync(invoice, cancellationToken);
+                break;
+
+            case EventTypes.CustomerSubscriptionUpdated:
+            case EventTypes.CustomerSubscriptionDeleted:
+                if (stripeEvent.Data.Object is Subscription subscription)
+                    await paymentRecorder.TrySyncSubscriptionAsync(subscription, cancellationToken);
+                break;
         }
 
         return Ok();

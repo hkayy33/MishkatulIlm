@@ -13,7 +13,8 @@ namespace MishkatulIlm_Server.Controllers;
 [Route("api/student")]
 public sealed class StudentController(
     AppDbContext db,
-    StudentAccountDeletionService accountDeletion) : ControllerBase
+    StudentAccountDeletionService accountDeletion,
+    StripeSubscriptionSyncService subscriptionSync) : ControllerBase
 {
     [HttpGet("portal")]
     public async Task<IActionResult> GetPortal(
@@ -25,7 +26,6 @@ public sealed class StudentController(
             return Unauthorized();
 
         var user = await db.Users
-            .AsNoTracking()
             .Include(u => u.Onboarding)
             .FirstOrDefaultAsync(u => u.Id == userId && !u.IsAdmin, cancellationToken);
 
@@ -34,6 +34,9 @@ public sealed class StudentController(
 
         if (user.ApplicationStatus != ApplicationStatusCodes.Active)
             return BadRequest(new { message = "Your student portal is available after you accept your lesson schedule." });
+
+        await subscriptionSync.TrySyncUserFromStripeAsync(user, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
 
         var now = DateTime.UtcNow;
         var viewYear = year ?? now.Year;
@@ -74,14 +77,7 @@ public sealed class StudentController(
                 {
                     Status = "active",
                     NextLesson = nextLessonSlot is null ? null : ToLessonDto(nextLessonSlot),
-                    Payment = new StudentPaymentSummaryDto
-                    {
-                        NextPaymentDueUtc = user.LastPaymentAtUtc is not null ? user.NextPaymentDueUtc : null,
-                        LastPaymentAmount = user.LastPaymentAmount,
-                        LastPaymentCurrency = user.LastPaymentCurrency,
-                        LastPaymentAtUtc = user.LastPaymentAtUtc,
-                        RequiresInitialPayment = user.LastPaymentAtUtc is null,
-                    },
+                    Payment = StudentPaymentSummaryBuilder.Build(user),
                     MonthSummary = new StudentLessonMonthSummaryDto
                     {
                         PastLessonsCount = past.Count,
@@ -211,11 +207,19 @@ public sealed class StudentController(
             DeleteStudentAccountStatus.NotFound => NotFound(new { message = "Account not found." }),
             DeleteStudentAccountStatus.Deleted => Ok(
                 new { message = "Your account has been permanently deleted." }),
-            DeleteStudentAccountStatus.DataDeletedAuthDeleteFailed => Ok(
+            DeleteStudentAccountStatus.AuthNotConfigured => StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
                 new
                 {
                     message =
-                        "Your lesson data has been removed. If you still receive sign-in emails, contact support to finish closing your login.",
+                        "Account deletion is not fully configured on the server. Your profile was not removed. Please contact support.",
+                }),
+            DeleteStudentAccountStatus.AuthDeleteFailed => StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    message =
+                        "Could not remove your login from authentication. Your profile was not deleted. Please try again or contact support.",
                 }),
             _ => Problem("Could not delete your account."),
         };

@@ -50,6 +50,8 @@ builder.Services.AddSingleton<SupabaseAdminAuthClient>();
 builder.Services.AddScoped<SchedulingSettingsService>();
 builder.Services.AddScoped<ScheduleProposalService>();
 builder.Services.AddScoped<StripePaymentRecorder>();
+builder.Services.AddScoped<StripeSubscriptionService>();
+builder.Services.AddScoped<StripeSubscriptionSyncService>();
 builder.Services.AddScoped<StudentAccountDeletionService>();
 builder.Services.AddScoped<StripeCheckoutPriceResolver>();
 builder.Services.AddSingleton<LocationCatalogService>();

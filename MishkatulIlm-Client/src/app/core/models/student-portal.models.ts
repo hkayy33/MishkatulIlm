@@ -15,6 +15,13 @@ export interface StudentPaymentSummary {
   lastPaymentCurrency: string;
   lastPaymentAtUtc: string | null;
   requiresInitialPayment: boolean;
+  paymentOverdue: boolean;
+  hasActiveSubscription: boolean;
+  subscriptionCancelAtPeriodEnd: boolean;
+  subscriptionCurrentPeriodEndUtc: string | null;
+  subscriptionPastDue: boolean;
+  canMakePayment: boolean;
+  canCancelSubscription: boolean;
 }
 
 export interface StudentLessonMonthSummary {

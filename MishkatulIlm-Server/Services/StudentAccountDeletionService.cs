@@ -7,7 +7,8 @@ public enum DeleteStudentAccountStatus
 {
     NotFound,
     Deleted,
-    DataDeletedAuthDeleteFailed,
+    AuthNotConfigured,
+    AuthDeleteFailed,
 }
 
 public sealed class StudentAccountDeletionService(
@@ -19,11 +20,38 @@ public sealed class StudentAccountDeletionService(
         Guid userId,
         CancellationToken cancellationToken)
     {
+        var userExists = await db.Users.AnyAsync(u => u.Id == userId && !u.IsAdmin, cancellationToken);
+        if (!userExists)
+            return DeleteStudentAccountStatus.NotFound;
+
+        if (!supabaseAdmin.IsConfigured)
+        {
+            logger.LogError(
+                "Account deletion aborted for {UserId}: Supabase:ServiceRoleKey (and Url) are not configured.",
+                userId);
+            return DeleteStudentAccountStatus.AuthNotConfigured;
+        }
+
+        var authDeleted = await supabaseAdmin.DeleteUserAsync(userId, cancellationToken);
+        if (!authDeleted)
+        {
+            logger.LogError(
+                "Account deletion aborted for {UserId}: Supabase auth user could not be removed.",
+                userId);
+            return DeleteStudentAccountStatus.AuthDeleteFailed;
+        }
+
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId && !u.IsAdmin, cancellationToken);
         if (user is null)
-            return DeleteStudentAccountStatus.NotFound;
+        {
+            await transaction.CommitAsync(cancellationToken);
+            logger.LogWarning(
+                "Supabase auth user {UserId} was deleted but application profile row was already missing.",
+                userId);
+            return DeleteStudentAccountStatus.Deleted;
+        }
 
         var bookedSlots = await db.LessonSlots
             .Where(s => s.StudentUserId == userId)
@@ -57,24 +85,7 @@ public sealed class StudentAccountDeletionService(
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        if (!supabaseAdmin.IsConfigured)
-        {
-            logger.LogWarning(
-                "Deleted application data for user {UserId} but Supabase admin is not configured; auth user may remain.",
-                userId);
-            return DeleteStudentAccountStatus.DataDeletedAuthDeleteFailed;
-        }
-
-        var authDeleted = await supabaseAdmin.DeleteUserAsync(userId, cancellationToken);
-        if (!authDeleted)
-        {
-            logger.LogError(
-                "Deleted application data for user {UserId} but failed to remove Supabase auth user.",
-                userId);
-            return DeleteStudentAccountStatus.DataDeletedAuthDeleteFailed;
-        }
-
-        logger.LogInformation("Fully deleted student account {UserId}.", userId);
+        logger.LogInformation("Fully deleted student account {UserId} (auth + application data).", userId);
         return DeleteStudentAccountStatus.Deleted;
     }
 }

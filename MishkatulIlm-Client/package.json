@@ -6,6 +6,8 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:deploy": "node scripts/write-deploy-env.cjs && ng build --configuration production-static",
+    "vercel-build": "node scripts/write-deploy-env.cjs && ng build --configuration production-static",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "serve:ssr:MishkatulIlm-Client": "node dist/MishkatulIlm-Client/server/server.mjs"

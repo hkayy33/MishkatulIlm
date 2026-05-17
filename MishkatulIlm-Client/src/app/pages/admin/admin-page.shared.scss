@@ -1,0 +1,133 @@
+.admin-page {
+  max-width: 1100px;
+}
+
+.admin-title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.75rem;
+  margin: 0 0 0.35rem;
+}
+
+.admin-lead {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  margin: 0 0 1.25rem;
+  color: #5c584f;
+}
+
+.admin-muted {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  color: #6f6a62;
+}
+
+.admin-error {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  color: #8a2b2b;
+}
+
+.admin-table-wrap {
+  overflow: auto;
+  border: 1px solid rgba(28, 27, 24, 0.12);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.95rem;
+
+  th,
+  td {
+    text-align: left;
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid rgba(28, 27, 24, 0.08);
+  }
+
+  th {
+    font-weight: 600;
+    background: #faf8f4;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+}
+
+.admin-card {
+  border: 1px solid rgba(28, 27, 24, 0.12);
+  border-radius: 8px;
+  background: #fff;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin-card-title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.1rem;
+  margin: 0 0 0.75rem;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.65rem 0.85rem;
+  align-items: end;
+}
+
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+
+  label {
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 0.82rem;
+    color: #5c584f;
+  }
+
+  input {
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 0.95rem;
+    padding: 0.45rem 0.55rem;
+    border-radius: 6px;
+    border: 1px solid rgba(28, 27, 24, 0.2);
+    background: #fff;
+  }
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.admin-btn {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.95rem;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid rgba(28, 27, 24, 0.25);
+  background: #1c1b18;
+  color: #fcfbf7;
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+}
+
+.admin-check {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}

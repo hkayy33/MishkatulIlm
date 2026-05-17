@@ -1,0 +1,170 @@
+<div class="cal-layout">
+  <div class="cal-main">
+    <div class="cal-toolbar">
+      <button type="button" class="cal-nav" (click)="prevMonth()" aria-label="Previous month">‹</button>
+      <div class="cal-label">{{ monthLabel() }}</div>
+      <button type="button" class="cal-nav" (click)="nextMonth()" aria-label="Next month">›</button>
+    </div>
+
+    @if (loading()) {
+      <p class="admin-muted">Loading calendar…</p>
+    } @else {
+      <div class="cal-grid" role="grid" aria-label="Month calendar">
+        @for (label of ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; track label) {
+          <div class="cal-head" role="columnheader">{{ label }}</div>
+        }
+        @for (cell of grid(); track $index) {
+          @if (cell.date) {
+            @let summary = daySummary(cell.date);
+            <button
+              type="button"
+              class="cal-cell cal-cell--day"
+              [class.cal-cell--selected]="selectedDay()?.toDateString() === cell.date.toDateString()"
+              [class.cal-cell--has-picks]="summary.hasPicks"
+              role="gridcell"
+              (click)="selectDay(cell.date)"
+            >
+              <span class="cal-daynum">{{ cell.date.getDate() }}</span>
+              @if (summary.hasPicks) {
+                <span class="cal-slot-count cal-slot-count--picked">Scheduled</span>
+              } @else if (summary.available > 0) {
+                <span class="cal-slot-count cal-slot-count--avail">{{ summary.available }} avail</span>
+              } @else if (summary.available === 0 && summary.booked > 0) {
+                <span class="cal-slot-count cal-slot-count--full">Full</span>
+              }
+            </button>
+          } @else {
+            <div class="cal-cell cal-cell--empty" role="gridcell"></div>
+          }
+        }
+      </div>
+    }
+  </div>
+
+  <aside class="cal-side" aria-label="Day schedule">
+    @if (selectedDay(); as day) {
+      <h2 class="cal-side-title">{{ day | date: 'fullDate' }}</h2>
+      <p class="cal-side-range-label">{{ sideRangeLabel() }}</p>
+
+      @if (timezoneBanner(); as banner) {
+        <p class="cal-side-offset">{{ banner }}</p>
+      }
+
+      @if (pickMode()) {
+        <p class="cal-side-hint">
+          Click a start time, choose duration (30-minute steps), then add the lesson. Click this
+          student's existing lessons to free those times for booking. Click an added lesson again to
+          remove it. Grey = other students; striped = outside preferences.
+        </p>
+      }
+
+      <ul class="slot-timeline" role="list">
+        @for (slot of daySlotViews(); track slot.startsAtUtc) {
+          <li role="listitem">
+            <button
+              type="button"
+              class="slot-row"
+              [class.slot-row--open]="slot.state === 'open'"
+              [class.slot-row--booked]="slot.state === 'booked'"
+              [class.slot-row--booked-student]="slot.state === 'booked-student'"
+              [class.slot-row--outside]="slot.state === 'outside-preference'"
+              [class.slot-row--selected-start]="slot.state === 'selected-start'"
+              [class.slot-row--selected-range]="slot.state === 'selected-range'"
+              [class.slot-row--confirmed]="slot.state === 'confirmed'"
+              [disabled]="!pickMode() || !isSlotClickable(slot)"
+              (click)="onSlotClick(slot)"
+            >
+              <span class="slot-row__times">
+                <span class="slot-row__time">{{ slot.tutorTimeLabel }}</span>
+                @if (slot.studentTimeLabel) {
+                  <span class="slot-row__student-time">Student: {{ slot.studentTimeLabel }}</span>
+                }
+              </span>
+              <span class="slot-row__status">
+                @switch (slot.state) {
+                  @case ('booked') {
+                    {{ bookedSlotLabel(slot) }}
+                  }
+                  @case ('booked-student') {
+                    {{ bookedSlotLabel(slot) }} · click to free
+                  }
+                  @case ('outside-preference') {
+                    Outside preference
+                  }
+                  @case ('selected-start') {
+                    Start
+                  }
+                  @case ('selected-range') {
+                    Selected
+                  }
+                  @case ('confirmed') {
+                    In schedule
+                  }
+                  @default {
+                    Available
+                  }
+                }
+              </span>
+            </button>
+          </li>
+        }
+      </ul>
+
+      @if (pickMode() && draftStartUtc()) {
+        <div class="slot-draft-panel">
+          <p class="slot-draft-panel__summary">
+            <strong>{{ draftSummaryLabel() }}</strong>
+          </p>
+          <div class="slot-duration-picker" role="group" aria-label="Lesson duration">
+            @for (mins of durationOptions; track mins) {
+              <button
+                type="button"
+                class="slot-duration-btn"
+                [class.slot-duration-btn--active]="draftDurationMinutes() === mins"
+                [disabled]="!draftDurationChoices().includes(mins)"
+                (click)="onDurationPick(mins)"
+              >
+                {{ durationLabel(mins) }}
+              </button>
+            }
+          </div>
+          <div class="slot-draft-panel__actions">
+            <button type="button" class="admin-btn admin-btn--ghost admin-btn--small" (click)="clearDraft()">
+              Clear
+            </button>
+            <button
+              type="button"
+              class="admin-btn admin-btn--small"
+              [disabled]="!canConfirmDraft()"
+              (click)="confirmDraftLesson()"
+            >
+              Add lesson
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (pickMode() && selectedLessons().length > 0) {
+        <div class="day-confirmed-picks">
+          <h3 class="day-confirmed-picks__title">Start-week lessons</h3>
+          <ul>
+            @for (lesson of selectedLessons(); track lesson.startsAtUtc) {
+              <li>
+                <span>{{ formatLesson(lesson) }}</span>
+                <button
+                  type="button"
+                  class="day-confirmed-picks__remove"
+                  (click)="removeLesson(lesson)"
+                >
+                  Remove
+                </button>
+              </li>
+            }
+          </ul>
+        </div>
+      }
+    } @else {
+      <p class="admin-muted">Select a day to see 30-minute slots from 8am to 10pm in your time zone.</p>
+    }
+  </aside>
+</div>

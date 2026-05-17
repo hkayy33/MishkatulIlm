@@ -1,0 +1,111 @@
+.admin-shell {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #fcfbf7;
+  color: #1c1b18;
+}
+
+.admin-side {
+  width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1rem;
+  border-right: 1px solid rgba(28, 27, 24, 0.12);
+  background: #f4f1ea;
+}
+
+.admin-brand {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+}
+
+.admin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+
+  a {
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 0.95rem;
+    text-decoration: none;
+    color: #3a3834;
+    padding: 0.55rem 0.65rem;
+    border-radius: 6px;
+    border: 1px solid transparent;
+
+    &:hover {
+      background: rgba(28, 27, 24, 0.06);
+    }
+
+    &.is-active {
+      background: #fff;
+      border-color: rgba(28, 27, 24, 0.12);
+      font-weight: 600;
+    }
+  }
+}
+
+.admin-nav__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.admin-nav__badge {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  background: #2f7a4f;
+  color: #fff;
+  letter-spacing: 0.02em;
+}
+
+.admin-side-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(28, 27, 24, 0.1);
+}
+
+.admin-link-quiet {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.9rem;
+  color: #5c584f;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.admin-signout {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border: 1px solid rgba(28, 27, 24, 0.2);
+  background: #fff;
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+
+  &:hover {
+    background: #faf8f4;
+  }
+}
+
+.admin-content {
+  flex: 1;
+  min-width: 0;
+  padding: 1.75rem 2rem 2.5rem;
+}

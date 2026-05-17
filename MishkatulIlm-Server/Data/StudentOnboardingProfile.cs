@@ -1,0 +1,21 @@
+namespace MishkatulIlm_Server.Data;
+
+public sealed class StudentOnboardingProfile
+{
+    public Guid UserId { get; set; }
+    public AppUser User { get; set; } = null!;
+
+    public string AgeRange { get; set; } = string.Empty;
+    public string Gender { get; set; } = string.Empty;
+    public string Country { get; set; } = string.Empty;
+    public string City { get; set; } = string.Empty;
+    public string PhoneNumber { get; set; } = string.Empty;
+    public string CurrentLevel { get; set; } = string.Empty;
+    public string LessonFrequency { get; set; } = string.Empty;
+
+    /// <summary>Stored as JSON array in PostgreSQL (jsonb).</summary>
+    public List<string> SubjectCodes { get; set; } = new();
+
+    /// <summary>Preferred lesson slots as DAY-SLOT codes (e.g. MON-MORNING) in jsonb.</summary>
+    public List<string> PreferredAvailability { get; set; } = new();
+}

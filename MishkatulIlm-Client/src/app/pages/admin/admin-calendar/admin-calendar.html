@@ -1,0 +1,33 @@
+<div class="admin-page admin-calendar-page">
+  <h1 class="admin-title">Lesson calendar</h1>
+  <p class="admin-lead">
+    Select a day to see 30-minute slots from 8am–10pm UTC. Grey rows are booked.
+  </p>
+
+  <div class="cal-toolbar-actions">
+    <button
+      type="button"
+      class="admin-btn admin-btn--ghost admin-btn--small"
+      [disabled]="clearing()"
+      (click)="clearAllSlots()"
+    >
+      {{ clearing() ? 'Clearing…' : 'Clear all slots' }}
+    </button>
+  </div>
+
+  @if (loadError()) {
+    <p class="admin-error admin-tight">{{ loadError() }}</p>
+  }
+  @if (clearMessage()) {
+    <p class="admin-success admin-tight">{{ clearMessage() }}</p>
+  }
+
+  <app-admin-lesson-calendar
+    [availability]="availability()"
+    [loading]="loading()"
+    [pickMode]="false"
+    [tutorTimeZoneId]="tutorSettings()?.tutorTimeZoneId ?? 'UTC'"
+    [tutorDisplayName]="tutorSettings()?.tutorDisplayName ?? 'Tutor'"
+    (monthChanged)="onMonthChanged($event)"
+  />
+</div>

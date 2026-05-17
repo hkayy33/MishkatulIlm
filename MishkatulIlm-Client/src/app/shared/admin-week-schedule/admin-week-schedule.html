@@ -1,0 +1,125 @@
+<section class="admin-week" aria-labelledby="admin-week-heading">
+  <div class="admin-week__header">
+    <h2 id="admin-week-heading" class="admin-week__title">This week</h2>
+    <div class="admin-week__toolbar">
+      <button type="button" class="admin-week__nav" (click)="prevWeek()" aria-label="Previous week">‹</button>
+      <span class="admin-week__range">{{ weekRangeLabel() }}</span>
+      <button type="button" class="admin-week__nav" (click)="nextWeek()" aria-label="Next week">›</button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <p class="admin-week__muted">Loading lessons…</p>
+  } @else {
+    <div class="admin-week__layout">
+      <div class="admin-week__days" role="tablist" aria-label="Days this week">
+        @for (day of weekDays(); track day.dayKey) {
+          <button
+            type="button"
+            role="tab"
+            class="admin-week__day"
+            [class.admin-week__day--selected]="isSelected(day.date)"
+            [class.admin-week__day--today]="day.isToday"
+            [class.admin-week__day--has-lessons]="day.lessonCount > 0"
+            [attr.aria-selected]="isSelected(day.date)"
+            (click)="selectDay(day.date)"
+          >
+            <span class="admin-week__weekday">{{ day.weekdayLabel }}</span>
+            <span class="admin-week__daynum">{{ day.dayNum }}</span>
+            @if (day.lessonCount > 0) {
+              <span class="admin-week__count">{{ day.lessonCount }}</span>
+            }
+          </button>
+        }
+      </div>
+
+      <aside class="admin-week__detail" role="tabpanel">
+        @if (selectedDay()) {
+          <h3 class="admin-week__detail-title">{{ selectedDayLabel() }}</h3>
+          @if (selectedDayLessons().length === 0) {
+            <p class="admin-week__muted">No lessons scheduled this day.</p>
+          } @else {
+            <ul class="admin-week__lessons">
+              @for (lesson of selectedDayLessons(); track lesson.id + '|' + lesson.attendanceStatus) {
+                <li
+                  class="admin-week__lesson"
+                  [class.admin-week__lesson--past]="isPast(lesson)"
+                  [class.admin-week__lesson--selected]="isLessonSelected(lesson)"
+                >
+                  <button type="button" class="admin-week__lesson-select" (click)="selectLesson(lesson, $event)">
+                    <p class="admin-week__lesson-time">
+                      {{ formatLessonTime(lesson) }}
+                      @if (hasNote(lesson)) {
+                        <span class="admin-week__note-badge" title="Student left a note">Note</span>
+                      }
+                    </p>
+                    <p class="admin-week__student-row">
+                      <span class="admin-week__student">{{ lesson.studentName }}</span>
+                      <span
+                        class="admin-week__attendance"
+                        [class.admin-week__attendance--no]="lesson.attendanceStatus === 'not_attending'"
+                      >
+                        {{ attendanceLabel(lesson) }}
+                      </span>
+                    </p>
+                  </button>
+                  <div class="admin-week__subjects">
+                    <button
+                      type="button"
+                      class="admin-week__subjects-toggle"
+                      [class.admin-week__subjects-toggle--open]="expandedSubjectLessonIds().has(lesson.id)"
+                      [attr.aria-expanded]="expandedSubjectLessonIds().has(lesson.id)"
+                      (click)="toggleSubjects(lesson.id, $event)"
+                    >
+                      <span class="admin-week__subjects-chevron" aria-hidden="true"></span>
+                      <span class="admin-week__subjects-label">Subjects</span>
+                    </button>
+                    @if (expandedSubjectLessonIds().has(lesson.id)) {
+                      <div class="admin-week__subjects-panel" role="region" aria-label="Subjects">
+                        @if (lesson.subjectLabels.length === 0) {
+                          <p class="admin-week__muted">None</p>
+                        } @else {
+                          <ul class="admin-week__subjects-list">
+                            @for (subject of lesson.subjectLabels; track subject) {
+                              <li>{{ subject }}</li>
+                            }
+                          </ul>
+                        }
+                      </div>
+                    }
+                  </div>
+                  <div class="admin-week__note">
+                    <button
+                      type="button"
+                      class="admin-week__subjects-toggle"
+                      [class.admin-week__subjects-toggle--open]="expandedNoteLessonIds().has(lesson.id)"
+                      [attr.aria-expanded]="expandedNoteLessonIds().has(lesson.id)"
+                      (click)="toggleNote(lesson, $event)"
+                    >
+                      <span class="admin-week__subjects-chevron" aria-hidden="true"></span>
+                      <span class="admin-week__subjects-label">Student note</span>
+                    </button>
+                    @if (expandedNoteLessonIds().has(lesson.id)) {
+                      <div class="admin-week__note-panel" role="region" aria-label="Student note">
+                        @if (lesson.studentLessonNote) {
+                          <div class="admin-week__note-alert" role="alert">
+                            <p class="admin-week__note-alert-title">Student note</p>
+                            <p class="admin-week__note-alert-body">{{ lesson.studentLessonNote }}</p>
+                          </div>
+                        } @else {
+                          <p class="admin-week__muted">No note from this student.</p>
+                        }
+                      </div>
+                    }
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+        } @else {
+          <p class="admin-week__muted">Select a day to see scheduled lessons.</p>
+        }
+      </aside>
+    </div>
+  }
+</section>

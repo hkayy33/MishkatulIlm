@@ -1,0 +1,73 @@
+<div class="admin-page admin-details-page">
+  <h1 class="admin-title">Admin details</h1>
+  <p class="admin-lead">
+    Set your name and location for the lesson calendar. Times are shown in your time zone, with the
+    student's local time beside each slot when scheduling.
+  </p>
+
+  @if (settingsLoading()) {
+    <p class="admin-muted">Loading settings…</p>
+  } @else {
+    @if (settingsLoadError()) {
+      <p class="admin-error">{{ settingsLoadError() }}</p>
+    }
+    @if (saveError()) {
+      <p class="admin-error">{{ saveError() }}</p>
+    }
+    @if (saveMessage()) {
+      <p class="admin-success">{{ saveMessage() }}</p>
+    }
+    @if (locationLoadError()) {
+      <p class="admin-error">{{ locationLoadError() }}</p>
+    }
+
+    <form class="details-form" (ngSubmit)="save()">
+      <label class="details-field">
+        <span>Your name (shown on calendar)</span>
+        <input
+          type="text"
+          name="tutorDisplayName"
+          [(ngModel)]="tutorDisplayName"
+          placeholder="e.g. Ustadh Ahmed"
+          autocomplete="name"
+        />
+      </label>
+
+      <app-searchable-select
+        inputId="tutor-country"
+        label="Country"
+        [options]="allCountries"
+        [loading]="loadingCountries()"
+        placeholder="Search country…"
+        autocomplete="country-name"
+        [(value)]="selectedCountryId"
+        (valueChange)="onCountrySelected($event)"
+      />
+
+      <app-searchable-select
+        inputId="tutor-city"
+        label="City"
+        [options]="allCities"
+        [loading]="loadingCities()"
+        [disabled]="!selectedCountryId()"
+        placeholder="Search city…"
+        autocomplete="address-level2"
+        [(value)]="selectedCityName"
+        (valueChange)="onCitySelected($event)"
+      />
+
+      <div class="details-preview">
+        <p>
+          <strong>Location:</strong> {{ locationPreview() || '—' }}
+        </p>
+        <p>
+          <strong>Time zone:</strong> {{ timeZonePreview() }} ({{ resolvedTimeZoneId() }})
+        </p>
+      </div>
+
+      <button type="submit" class="admin-btn" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : 'Save tutor details' }}
+      </button>
+    </form>
+  }
+</div>

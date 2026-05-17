@@ -1,0 +1,192 @@
+<div class="admin-page">
+  <h1 class="admin-title">Pending applications</h1>
+  <p class="admin-lead">
+    Review submitted applications. Approve by scheduling lessons on the calendar — pick slots in the
+    student's start week; the same times repeat each week for {{ bookingWeeks }} weeks (one month block).
+  </p>
+
+  @if (loading()) {
+    <p class="admin-muted">Loading…</p>
+  } @else if (loadError() && !approveTarget()) {
+    <p class="admin-error">{{ loadError() }}</p>
+  } @else if (rows().length === 0) {
+    <p class="admin-muted">No pending applications right now.</p>
+  } @else {
+    <div class="admin-table-wrap">
+      <table class="admin-table admin-table--pending">
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th>Location</th>
+            <th>Status</th>
+            <th>Form</th>
+            <th>Registered</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of rows(); track r.userId) {
+            <tr>
+              <td>
+                <strong>{{ r.firstName }} {{ r.lastName }}</strong>
+                <div class="cell-sub">{{ r.email }}</div>
+              </td>
+              <td>
+                @if (r.onboardingCompleted) {
+                  {{ r.city }}, {{ r.country }}
+                } @else {
+                  <span class="admin-muted">—</span>
+                }
+              </td>
+              <td>
+                @if (r.applicationStatus === 'awaiting_reply') {
+                  <span class="status-pill status-pill--awaiting">Awaiting reply</span>
+                } @else if (r.scheduleProposalStatus === 'student_amended') {
+                  <span class="status-pill status-pill--amended">Amend requested</span>
+                } @else if (r.onboardingCompleted) {
+                  <span class="status-pill status-pill--ready">Pending review</span>
+                } @else {
+                  <span class="status-pill status-pill--draft">Incomplete</span>
+                }
+              </td>
+              <td>
+                @if (r.onboardingCompleted) {
+                  <span class="status-pill status-pill--ready">Ready</span>
+                } @else {
+                  <span class="status-pill status-pill--draft">Incomplete</span>
+                }
+              </td>
+              <td>{{ r.createdAtUtc | date: 'mediumDate' }}</td>
+              <td class="actions-cell">
+                <button
+                  type="button"
+                  class="admin-btn admin-btn--small"
+                  [disabled]="!r.onboardingCompleted || actionUserId() === r.userId"
+                  (click)="openApprove(r)"
+                >
+                  {{
+                    r.scheduleProposalStatus === 'student_amended' || r.applicationStatus === 'awaiting_reply'
+                      ? 'Revise schedule'
+                      : 'Schedule lessons'
+                  }}
+                </button>
+                @if (r.onboardingCompleted) {
+                  <button
+                    type="button"
+                    class="admin-btn admin-btn--ghost admin-btn--small"
+                    [disabled]="actionUserId() === r.userId"
+                    (click)="markInactive(r)"
+                  >
+                    Decline
+                  </button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  @if (approveTarget(); as target) {
+    <div class="approve-overlay" role="dialog" aria-modal="true" aria-labelledby="approve-title">
+      <div class="approve-dialog approve-dialog--schedule">
+        <h2 id="approve-title">Schedule lessons — {{ target.firstName }} {{ target.lastName }}</h2>
+
+        <section class="approve-details">
+          <h3>Student details</h3>
+          <dl class="approve-details__grid">
+            <div><dt>Email</dt><dd>{{ target.email }}</dd></div>
+            <div><dt>Age</dt><dd>{{ labelAgeRangeCode(target.ageRange ?? '') }}</dd></div>
+            <div><dt>Gender</dt><dd>{{ labelGenderCode(target.gender ?? '') }}</dd></div>
+            <div><dt>Country</dt><dd>{{ target.country }}</dd></div>
+            <div><dt>City</dt><dd>{{ target.city }}</dd></div>
+            <div><dt>Level</dt><dd>{{ labelLevelCode(target.currentLevel ?? '') }}</dd></div>
+            <div class="approve-details__span">
+              <dt>Lesson frequency</dt>
+              <dd>{{ labelFrequencyCode(target.lessonFrequency ?? '') }}</dd>
+            </div>
+            <div class="approve-details__span">
+              <dt>Subjects</dt>
+              <dd>{{ formatSubjects(target.subjectCodes) }}</dd>
+            </div>
+            <div class="approve-details__span">
+              <dt>Preferred times</dt>
+              <dd>{{ formatAvailability(target.preferredAvailability) }}</dd>
+            </div>
+          </dl>
+        </section>
+
+        @if (target.scheduleProposalStatus === 'student_amended' && target.studentAmendNote) {
+          <div class="approve-amend-note">
+            <h3>Student availability note</h3>
+            <p>{{ target.studentAmendNote }}</p>
+          </div>
+        }
+
+        @if (loadError()) {
+          <p class="admin-error">{{ loadError() }}</p>
+        }
+        @if (scheduleSelectionError()) {
+          <p class="admin-error">{{ scheduleSelectionError() }}</p>
+        }
+
+        <section class="approve-schedule">
+          <h3>Schedule lessons</h3>
+          <p class="approve-hint">
+            {{ selectionHint(requiredSlotCount()) }}
+            Select a day, pick a start time, then choose a duration (30-minute steps). Grey =
+            booked; striped = outside student preferences.
+          </p>
+          <p class="approve-hint approve-hint--count">
+            Selected {{ selectedWeekOneLessons().length }} / {{ requiredSlotCount() }} start-week
+            lesson(s)
+          </p>
+
+          <app-admin-lesson-calendar
+            [availability]="availability()"
+            [loading]="slotsLoading()"
+            [pickMode]="true"
+            [requiredSelections]="requiredSlotCount()"
+            [selectedLessons]="selectedWeekOneLessons()"
+            [tutorTimeZoneId]="tutorSettings()?.tutorTimeZoneId ?? 'UTC'"
+            [tutorDisplayName]="tutorSettings()?.tutorDisplayName ?? 'Tutor'"
+            [studentTimeZoneId]="scheduleStudentTimeZoneId()"
+            [studentDisplayName]="scheduleStudentDisplayName()"
+            [studentLocationLabel]="scheduleStudentLocationLabel()"
+            (selectedLessonsChange)="onWeekOneLessonsChange($event)"
+            (selectionError)="onScheduleSelectionError($event)"
+            (monthChanged)="onScheduleMonthChanged($event)"
+          />
+
+          @if (previewLoading()) {
+            <p class="admin-muted">Calculating schedule…</p>
+          } @else if (preview(); as p) {
+            <div class="approve-preview">
+              <p>
+                <strong>{{ p.lessonCount }}</strong> lessons over {{ bookingPeriodLabel(p.plannedLessons) }}:
+              </p>
+              <ul class="approve-preview__list">
+                @for (lesson of p.plannedLessons; track lesson.startsAtUtc + lesson.durationMinutes) {
+                  <li>{{ formatPreviewLesson(lesson.startsAtUtc, lesson.endsAtUtc) }}</li>
+                }
+              </ul>
+            </div>
+          }
+        </section>
+
+        <div class="approve-actions">
+          <button type="button" class="admin-btn admin-btn--ghost" (click)="closeApprove()">Cancel</button>
+          <button
+            type="button"
+            class="admin-btn"
+            [disabled]="!canConfirmSchedule() || actionUserId() === target.userId"
+            (click)="confirmApprove()"
+          >
+            {{ actionUserId() === target.userId ? 'Sending…' : 'Send schedule to student' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

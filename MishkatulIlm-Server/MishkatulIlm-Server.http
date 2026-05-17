@@ -1,0 +1,6 @@
+@MishkatulIlm_Server_HostAddress = http://localhost:5198
+
+GET {{MishkatulIlm_Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,5 +1,7 @@
-import { Component, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { filter, map, merge, of } from 'rxjs';
 import { NavBar } from './shared/nav-bar/nav-bar';
 import { Footer } from './shared/footer/footer';
 
@@ -7,8 +9,23 @@ import { Footer } from './shared/footer/footer';
   selector: 'app-root',
   imports: [RouterOutlet, NavBar, Footer],
   templateUrl: './app.html',
-  styleUrl: './app.scss'
+  styleUrl: './app.scss',
 })
 export class App {
+  private readonly router = inject(Router);
+
   protected readonly title = signal('MishkatulIlm-Client');
+
+  protected readonly showMarketingShell = toSignal(
+    merge(
+      of(null),
+      this.router.events.pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd)),
+    ).pipe(map(() => !this.isStandaloneAppRoute(this.router.url))),
+    { initialValue: !this.isStandaloneAppRoute(this.router.url) },
+  );
+
+  private isStandaloneAppRoute(rawUrl: string): boolean {
+    const path = rawUrl.split('#')[0]?.split('?')[0] ?? '';
+    return path.startsWith('/admin');
+  }
 }

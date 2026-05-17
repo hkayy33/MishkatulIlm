@@ -1,0 +1,37 @@
+<div class="admin-shell">
+  <aside class="admin-side" aria-label="Admin navigation">
+    <div class="admin-brand">Admin</div>
+    <nav class="admin-nav">
+      <a routerLink="summary" routerLinkActive="is-active">Summary</a>
+      <a routerLink="pending" routerLinkActive="is-active" class="admin-nav__link">
+        <span>Pending applications</span>
+        @if (navBadges.counts().pendingApplications > 0) {
+          <span class="admin-nav__badge" [attr.aria-label]="navBadges.counts().pendingApplications + ' pending'">
+            {{ badgeLabel(navBadges.counts().pendingApplications) }}
+          </span>
+        }
+      </a>
+      <a routerLink="schedule-changes" routerLinkActive="is-active" class="admin-nav__link">
+        <span>Schedule changes</span>
+        @if (navBadges.counts().pendingScheduleChanges > 0) {
+          <span
+            class="admin-nav__badge"
+            [attr.aria-label]="navBadges.counts().pendingScheduleChanges + ' pending'"
+          >
+            {{ badgeLabel(navBadges.counts().pendingScheduleChanges) }}
+          </span>
+        }
+      </a>
+      <a routerLink="students" routerLinkActive="is-active">Active students</a>
+      <a routerLink="calendar" routerLinkActive="is-active">Calendar</a>
+      <a routerLink="details" routerLinkActive="is-active">Admin details</a>
+    </nav>
+    <div class="admin-side-footer">
+      <a class="admin-link-quiet" routerLink="/">Back to site</a>
+      <button type="button" class="admin-signout" (click)="signOut()">Sign out</button>
+    </div>
+  </aside>
+  <section class="admin-content">
+    <router-outlet />
+  </section>
+</div>

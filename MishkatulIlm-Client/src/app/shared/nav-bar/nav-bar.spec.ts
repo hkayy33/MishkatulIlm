@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
+import { createAuthServiceStub } from '../../core/testing/auth.service.stub';
+import { AuthService } from '../../core/services/auth.service';
 import { NavBar } from './nav-bar';
 
 describe('NavBar', () => {
@@ -10,7 +12,7 @@ describe('NavBar', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [NavBar],
-      providers: [provideRouter([])],
+      providers: [provideRouter([]), { provide: AuthService, useFactory: () => createAuthServiceStub() }],
     })
     .compileComponents();
 

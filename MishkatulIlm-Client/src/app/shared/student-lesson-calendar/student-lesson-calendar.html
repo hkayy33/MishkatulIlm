@@ -1,0 +1,119 @@
+<div class="stu-cal">
+  <div class="stu-cal__main">
+    <div class="stu-cal__toolbar">
+      <button type="button" class="stu-cal__nav" (click)="prevMonth()" aria-label="Previous month">‹</button>
+      <div class="stu-cal__label">{{ monthLabel() }}</div>
+      <button type="button" class="stu-cal__nav" (click)="nextMonth()" aria-label="Next month">›</button>
+    </div>
+
+    @if (loading()) {
+      <p class="stu-cal__muted">Loading lessons…</p>
+    } @else {
+      <div class="stu-cal__grid" role="grid">
+        @for (label of ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; track label) {
+          <div class="stu-cal__head">{{ label }}</div>
+        }
+        @for (cell of grid(); track $index) {
+          @if (cell.date) {
+            @let count = lessonCount(cell.date);
+            <button
+              type="button"
+              class="stu-cal__cell"
+              [class.stu-cal__cell--selected]="selectedDay()?.toDateString() === cell.date.toDateString()"
+              [class.stu-cal__cell--has-lessons]="count > 0"
+              (click)="selectDay(cell.date)"
+            >
+              <span class="stu-cal__daynum">{{ cell.date.getDate() }}</span>
+              @if (count > 0) {
+                <span class="stu-cal__count">{{ count }} lesson{{ count === 1 ? '' : 's' }}</span>
+              }
+            </button>
+          } @else {
+            <div class="stu-cal__cell stu-cal__cell--empty"></div>
+          }
+        }
+      </div>
+    }
+  </div>
+
+  <aside class="stu-cal__side">
+    @if (selectedDay(); as day) {
+      <h3 class="stu-cal__side-title">{{ day | date: 'fullDate' }}</h3>
+      @if (selectedDayLessons().length === 0) {
+        <p class="stu-cal__muted">No lessons this day.</p>
+      } @else {
+        <ul class="stu-cal__lessons">
+          @for (lesson of selectedDayLessons(); track lesson.slotId) {
+            <li
+              class="stu-cal__lesson"
+              [class.stu-cal__lesson--past]="isPast(lesson)"
+              [class.stu-cal__lesson--selected]="isLessonSelected(lesson)"
+            >
+              <button type="button" class="stu-cal__lesson-select" (click)="selectLesson(lesson)">
+                <p class="stu-cal__lesson-time">
+                  {{ formatLesson(lesson) }}
+                  @if (hasNote(lesson)) {
+                    <span class="stu-cal__note-dot" title="Has a note for your teacher"></span>
+                  }
+                </p>
+                <div class="stu-cal__attendance">
+                  <span
+                    class="stu-cal__status"
+                    [class.stu-cal__status--no]="lesson.attendanceStatus === 'not_attending'"
+                  >
+                    {{ attendanceLabel(lesson) }}
+                  </span>
+                  <button
+                    type="button"
+                    class="stu-cal__toggle"
+                    [disabled]="updatingSlotId() === lesson.slotId"
+                    (click)="toggleAttendance(lesson, $event)"
+                  >
+                    {{ toggleAttendanceLabel(lesson) }}
+                  </button>
+                </div>
+              </button>
+              <div class="stu-cal__note">
+                <button
+                  type="button"
+                  class="stu-cal__note-toggle"
+                  [class.stu-cal__note-toggle--open]="isNoteExpanded(lesson.slotId)"
+                  [attr.aria-expanded]="isNoteExpanded(lesson.slotId)"
+                  (click)="toggleNote(lesson, $event)"
+                >
+                  <span class="stu-cal__note-chevron" aria-hidden="true"></span>
+                  <span class="stu-cal__note-label">Note for your teacher</span>
+                  @if (hasNote(lesson)) {
+                    <span class="stu-cal__note-dot stu-cal__note-dot--inline" title="Note saved"></span>
+                  }
+                </button>
+                @if (isNoteExpanded(lesson.slotId)) {
+                  <div class="stu-cal__note-panel" role="region" aria-label="Note for your teacher">
+                    <textarea
+                      [id]="'cal-lesson-note-' + lesson.slotId"
+                      rows="3"
+                      maxlength="2000"
+                      [ngModel]="noteDraft()"
+                      (ngModelChange)="noteDraft.set($event)"
+                      placeholder="Optional — e.g. running late, question about homework…"
+                    ></textarea>
+                    <button
+                      type="button"
+                      class="stu-cal__save-note"
+                      [disabled]="updatingSlotId() === lesson.slotId"
+                      (click)="saveNote(lesson, $event)"
+                    >
+                      {{ updatingSlotId() === lesson.slotId ? 'Saving…' : 'Save note' }}
+                    </button>
+                  </div>
+                }
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    } @else {
+      <p class="stu-cal__muted">Select a day to view lessons, set attendance, or add a note.</p>
+    }
+  </aside>
+</div>

@@ -1,0 +1,281 @@
+.stu-cal {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+
+  @media (min-width: 900px) {
+    grid-template-columns: 1fr minmax(260px, 320px);
+  }
+}
+
+.stu-cal__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.stu-cal__nav {
+  border: 1px solid rgba(45, 42, 38, 0.15);
+  background: #fff;
+  border-radius: 8px;
+  width: 2rem;
+  height: 2rem;
+  cursor: pointer;
+}
+
+.stu-cal__label {
+  font-weight: 600;
+}
+
+.stu-cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.stu-cal__head {
+  font-size: 0.72rem;
+  text-align: center;
+  color: #7a7368;
+  padding: 0.25rem;
+}
+
+.stu-cal__cell {
+  min-height: 3.5rem;
+  border: 1px solid rgba(45, 42, 38, 0.1);
+  border-radius: 8px;
+  background: #fffef9;
+  padding: 0.25rem;
+  cursor: pointer;
+  text-align: left;
+
+  &--selected {
+    border-color: #c59d5f;
+    box-shadow: 0 0 0 1px #c59d5f;
+  }
+
+  &--has-lessons {
+    background: rgba(197, 157, 95, 0.12);
+  }
+
+  &--empty {
+    border: none;
+    background: transparent;
+    cursor: default;
+  }
+}
+
+.stu-cal__daynum {
+  display: block;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.stu-cal__count {
+  display: block;
+  font-size: 0.65rem;
+  color: #6b5420;
+}
+
+.stu-cal__side {
+  border: 1px solid rgba(45, 42, 38, 0.1);
+  border-radius: 12px;
+  padding: 1rem;
+  background: #fffef9;
+}
+
+.stu-cal__side-title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.stu-cal__muted {
+  margin: 0;
+  color: #7a7368;
+  font-size: 0.9rem;
+}
+
+.stu-cal__lessons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.stu-cal__lesson {
+  border: 1px solid rgba(45, 42, 38, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+
+  &--selected {
+    border-color: rgba(107, 84, 32, 0.45);
+    box-shadow: 0 0 0 1px rgba(197, 157, 95, 0.25);
+  }
+
+  &--past {
+    opacity: 0.75;
+  }
+}
+
+.stu-cal__lesson-select {
+  display: block;
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+
+  &:hover {
+    background: rgba(244, 241, 234, 0.6);
+  }
+}
+
+.stu-cal__lesson-time {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.stu-cal__note-dot {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #c59d5f;
+  flex-shrink: 0;
+}
+
+.stu-cal__note {
+  padding: 0 0.75rem 0.65rem;
+  border-top: 1px solid rgba(28, 27, 24, 0.08);
+}
+
+.stu-cal__note-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0;
+  border: none;
+  background: none;
+  font-size: 0.85rem;
+  color: #6a6760;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    color: #3a3834;
+  }
+}
+
+.stu-cal__note-label {
+  font-weight: 600;
+}
+
+.stu-cal__note-chevron {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.stu-cal__note-toggle--open .stu-cal__note-chevron {
+  transform: rotate(45deg);
+}
+
+.stu-cal__note-dot--inline {
+  margin-left: 0.15rem;
+}
+
+.stu-cal__note-panel {
+  margin: 0.35rem 0 0 1.1rem;
+
+  label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #6a6760;
+  }
+
+  textarea {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 0.9rem;
+    padding: 0.5rem;
+    border: 1px solid rgba(28, 27, 24, 0.2);
+    border-radius: 6px;
+    resize: vertical;
+  }
+}
+
+.stu-cal__save-note {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.4rem 0.75rem;
+  border: none;
+  border-radius: 6px;
+  background: #2f5a3f;
+  color: #fff;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+}
+
+.stu-cal__attendance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stu-cal__status {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(47, 122, 79, 0.15);
+  color: #2f5a3f;
+
+  &--no {
+    background: rgba(139, 44, 44, 0.12);
+    color: #8b2c2c;
+  }
+}
+
+.stu-cal__toggle {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.82rem;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid rgba(28, 27, 24, 0.2);
+  background: #fff;
+  color: #3a3834;
+
+  &:hover:not(:disabled) {
+    background: #faf8f4;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}

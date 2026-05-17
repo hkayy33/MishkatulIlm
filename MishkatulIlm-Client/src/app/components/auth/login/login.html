@@ -6,6 +6,10 @@
     </header>
 
     <form class="auth-form" novalidate (submit)="onSubmit($event)" autocomplete="on">
+      @if (submitError) {
+        <p class="auth-form__error" role="alert">{{ submitError }}</p>
+      }
+
       <div class="form-field">
         <label for="login-email">Email</label>
         <input

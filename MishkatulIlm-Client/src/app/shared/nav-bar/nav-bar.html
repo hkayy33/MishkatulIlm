@@ -27,14 +27,91 @@
         <li class="nav-link">
             <p><span>How It Works</span></p>
         </li>
-        <li class="nav-link">
-            <a routerLink="/login" class="nav-route-link">
-                <span>Log in</span>
-            </a>
-        </li>
-        <li class="nav-link nav-link--cta">
-            <app-get-started-btn></app-get-started-btn>
-        </li>
+        @if (auth.isAuthenticated()) {
+            <li class="nav-link nav-link--user">
+                <div #userMenu class="nav-user-menu">
+                    <button
+                        type="button"
+                        class="nav-user"
+                        [attr.aria-expanded]="menuOpen()"
+                        aria-haspopup="menu"
+                        [attr.aria-controls]="menuOpen() ? 'nav-user-dropdown' : null"
+                        (click)="toggleUserMenu($event)"
+                        (keydown)="onUserMenuKeydown($event)"
+                    >
+                        <svg
+                            class="nav-user__icon"
+                            width="22"
+                            height="22"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                            aria-hidden="true"
+                        >
+                            <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.75" />
+                            <path
+                                d="M5 20c0-3.314 3.134-6 7-6s7 2.686 7 6"
+                                stroke="currentColor"
+                                stroke-width="1.75"
+                                stroke-linecap="round"
+                            />
+                        </svg>
+                        <span class="nav-user__name">{{ userFirstName() }}</span>
+                        <svg
+                            class="nav-user__chevron"
+                            width="12"
+                            height="12"
+                            viewBox="0 0 12 12"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                            aria-hidden="true"
+                            [class.nav-user__chevron--open]="menuOpen()"
+                        >
+                            <path
+                                d="M2.5 4.5 6 8l3.5-3.5"
+                                stroke="currentColor"
+                                stroke-width="1.4"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+                        </svg>
+                    </button>
+                    @if (menuOpen()) {
+                        <ul id="nav-user-dropdown" class="nav-user-dropdown" role="menu">
+                            <li role="none">
+                                <a
+                                    class="nav-user-dropdown__item"
+                                    role="menuitem"
+                                    [routerLink]="dashboardLink()"
+                                    (click)="closeUserMenu()"
+                                >
+                                    My dashboard
+                                </a>
+                            </li>
+                            <li role="none">
+                                <button
+                                    type="button"
+                                    class="nav-user-dropdown__item nav-user-dropdown__item--button"
+                                    role="menuitem"
+                                    (click)="onLogout()"
+                                >
+                                    Log out
+                                </button>
+                            </li>
+                        </ul>
+                    }
+                </div>
+            </li>
+        } @else {
+            <li class="nav-link">
+                <a routerLink="/login" class="nav-route-link">
+                    <span>Log in</span>
+                </a>
+            </li>
+            <li class="nav-link nav-link--cta">
+                <app-get-started-btn></app-get-started-btn>
+            </li>
+        }
     </ul>
 
 </div>

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MishkatulIlm_Server.Authentication;
@@ -11,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.SectionName));
 builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
+builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection(CorsOptions.SectionName));
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
@@ -57,16 +59,31 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+if (corsOrigins.Length == 0)
+{
+    corsOrigins =
+    [
+        "http://localhost:4200",
+        "https://localhost:4200",
+    ];
+}
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins(
-                "http://localhost:4200",
-                "https://localhost:4200")
+        policy.WithOrigins(corsOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
+});
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
 });
 
 var app = builder.Build();
@@ -91,6 +108,8 @@ if (app.Environment.IsDevelopment())
 }
 
 // HTTP-only local profile (e.g. http://localhost:5198): avoid redirecting API clients to HTTPS.
+app.UseForwardedHeaders();
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
@@ -100,7 +119,17 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
+var wwwrootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+var serveSpa = File.Exists(Path.Combine(wwwrootPath, "index.html"));
+if (serveSpa)
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
+
 app.MapControllers();
+
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
 app.MapGet("/health/db", async (AppDbContext? db, CancellationToken cancellationToken) =>
 {
@@ -119,6 +148,11 @@ app.MapGet("/health/db", async (AppDbContext? db, CancellationToken cancellation
         return Results.Problem(detail: ex.Message, title: "Database connection failed");
     }
 });
+
+if (serveSpa)
+{
+    app.MapFallbackToFile("index.html");
+}
 
 if (!string.IsNullOrWhiteSpace(connectionString))
 {

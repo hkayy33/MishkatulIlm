@@ -31,6 +31,7 @@ yarn-error.log
 # Local secrets (created by npm postinstall if missing)
 /src/environments/environment.development.local.ts
 /src/environments/environment.prod.local.ts
+/src/environments/environment.deploy.ts
 
 # Miscellaneous
 /.angular/cache

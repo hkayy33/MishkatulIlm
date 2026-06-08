@@ -1,5 +1,7 @@
-# Fly.io API — deploy from this directory: fly deploy
-# https://fly.io/docs/reference/configuration/
+# fly.toml app configuration file generated for mishkatulilm-api on 2026-06-08T23:00:32+01:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
 app = 'mishkatulilm-api'
 primary_region = 'lhr'
@@ -19,8 +21,14 @@ primary_region = 'lhr'
   processes = ['app']
 
   [[http_service.checks]]
-    grace_period = '20s'
     interval = '30s'
+    timeout = '5s'
+    grace_period = '20s'
     method = 'GET'
     path = '/health'
-    timeout = '5s'
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 1024

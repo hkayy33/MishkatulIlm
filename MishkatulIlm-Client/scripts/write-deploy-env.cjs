@@ -9,6 +9,7 @@
  * Optional (defaults shown):
  *   API_BASE_URL          — e.g. https://api.yourdomain.com
  *   SUPABASE_URL          — e.g. https://xxxx.supabase.co
+ *   AUTH_REDIRECT_ORIGIN  — e.g. https://your-app.vercel.app (defaults to window.location.origin)
  */
 const fs = require('fs');
 const path = require('path');
@@ -19,6 +20,7 @@ const envDir = path.join(root, 'src/environments');
 const apiBaseUrl = (process.env.API_BASE_URL || '').trim();
 const supabaseUrl = (process.env.SUPABASE_URL || '').trim();
 const supabaseAnonKey = (process.env.SUPABASE_ANON_KEY || '').trim();
+const authRedirectOrigin = (process.env.AUTH_REDIRECT_ORIGIN || '').trim() || undefined;
 
 if (!supabaseAnonKey) {
   console.error('write-deploy-env: SUPABASE_ANON_KEY is required for production builds.');
@@ -31,6 +33,7 @@ export const environment = {
   apiBaseUrl: ${JSON.stringify(apiBaseUrl)},
   supabaseUrl: ${JSON.stringify(supabaseUrl)},
   supabaseAnonKey: ${JSON.stringify(supabaseAnonKey)},
+  authRedirectOrigin: ${authRedirectOrigin ? JSON.stringify(authRedirectOrigin) : 'undefined as string | undefined'},
 };
 `;
 

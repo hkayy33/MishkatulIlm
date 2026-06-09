@@ -1,6 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { environment } from '../../../environments/environment';
-
 /** One browser Supabase client so session storage and refresh are never split across instances. */
 let browserClient: SupabaseClient | null = null;
 

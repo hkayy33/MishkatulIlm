@@ -23,6 +23,96 @@ public sealed class DevBootstrapController(
     SupabaseAdminAuthClient supabaseAdmin,
     ILogger<DevBootstrapController> logger) : ControllerBase
 {
+    /// <summary>
+    /// Returns a direct Supabase signup confirmation URL (dev only). Use when email templates still point at production Site URL.
+    /// </summary>
+    [HttpPost("signup-confirmation-link")]
+    public async Task<IActionResult> CreateSignupConfirmationLink(
+        [FromBody] DevConfirmationLinkRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsBootstrapAllowed())
+            return NotFound();
+
+        if (!supabaseAdmin.IsConfigured)
+        {
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new { message = "Add Supabase:ServiceRoleKey to user secrets, then try again." });
+        }
+
+        var email = request.Email.Trim();
+        if (email.Length is < 3 or > 320 || !email.Contains('@', StringComparison.Ordinal))
+            return BadRequest(new { message = "Provide a valid email." });
+
+        var redirectTo = NormalizeAuthCallbackRedirect(
+            request.RedirectTo ?? configuration["Stripe:ClientAppUrl"] ?? "http://localhost:4200");
+
+        var (actionLink, resolvedRedirect) = await supabaseAdmin.GenerateSignupConfirmationLinkAsync(
+            email,
+            redirectTo,
+            cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(actionLink))
+        {
+            return Conflict(
+                new
+                {
+                    message =
+                        "Could not generate a confirmation link. Ensure this email has a pending signup in Supabase Auth.",
+                    email,
+                    redirectTo,
+                });
+        }
+
+        return Ok(new { actionLink, redirectTo = resolvedRedirect ?? redirectTo, email });
+    }
+
+    /// <summary>
+    /// Confirms a pending signup in Supabase Auth without using an email link (dev only).
+    /// </summary>
+    [HttpPost("confirm-signup")]
+    public async Task<IActionResult> ConfirmSignup(
+        [FromBody] DevConfirmSignupRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsBootstrapAllowed())
+            return NotFound();
+
+        if (!supabaseAdmin.IsConfigured)
+        {
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new { message = "Add Supabase:ServiceRoleKey to user secrets, then try again." });
+        }
+
+        var email = request.Email.Trim();
+        if (email.Length is < 3 or > 320 || !email.Contains('@', StringComparison.Ordinal))
+            return BadRequest(new { message = "Provide a valid email." });
+
+        var (success, alreadyConfirmed) = await supabaseAdmin.ConfirmSignupEmailAsync(email, cancellationToken);
+        if (!success)
+        {
+            return Conflict(
+                new
+                {
+                    message =
+                        "Could not confirm this signup. Register first, or check that the email matches the pending Supabase Auth user.",
+                    email,
+                });
+        }
+
+        return Ok(
+            new
+            {
+                message = alreadyConfirmed
+                    ? "That account was already confirmed. You can sign in."
+                    : "Email confirmed. You can sign in now.",
+                email,
+                alreadyConfirmed,
+            });
+    }
+
     [HttpPost("admin-account")]
     public async Task<IActionResult> CreateDevAdmin(
         [FromBody] DevBootstrapAdminRequest request,
@@ -116,4 +206,13 @@ public sealed class DevBootstrapController(
     private bool IsBootstrapAllowed() =>
         env.IsDevelopment()
         || string.Equals(configuration["DevBootstrap:Enabled"], "true", StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizeAuthCallbackRedirect(string value)
+    {
+        var redirectTo = value.Trim().TrimEnd('/');
+        if (redirectTo.EndsWith("/auth/callback", StringComparison.OrdinalIgnoreCase))
+            return redirectTo;
+
+        return $"{redirectTo}/auth/callback";
+    }
 }

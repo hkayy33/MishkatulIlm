@@ -1,3 +1,4 @@
+import { HttpClient } from '@angular/common/http';
 import { isPlatformBrowser } from '@angular/common';
 import { inject, Injectable, NgZone, PLATFORM_ID, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
@@ -15,6 +16,7 @@ import {
 } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import type { AuthUser, LoginRequest, RegisterRequest, RegisterResult } from '../models/auth.models';
+import { getAuthEmailRedirectUrl } from '../supabase/auth-redirect';
 import {
   getSupabaseBrowserClient,
   isSupabaseConfigured,
@@ -22,16 +24,10 @@ import {
 import { UserProfileService } from './user-profile.service';
 import { UserSyncService } from './user-sync.service';
 
-/**
- * Where Supabase redirects after the user clicks the email confirmation link.
- * Add this exact URL under Supabase → Authentication → URL Configuration → Redirect URLs
- * (include http://localhost:4200 for local dev).
- */
-const AUTH_EMAIL_CALLBACK_PATH = '/auth/callback';
-
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly router = inject(Router);
+  private readonly http = inject(HttpClient);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly zone = inject(NgZone);
   private readonly userSync = inject(UserSyncService);
@@ -140,11 +136,6 @@ export class AuthService {
     return getSupabaseBrowserClient();
   }
 
-  private getAuthEmailRedirectUrl(): string {
-    if (!isPlatformBrowser(this.platformId)) return '';
-    return `${globalThis.location.origin}${AUTH_EMAIL_CALLBACK_PATH}`;
-  }
-
   /**
    * Reads the current access token from Supabase (storage + refresh), updates in-memory state,
    * and returns the token for API calls. Prefer this over {@link getBearerToken} for HTTP requests.
@@ -212,7 +203,9 @@ export class AuthService {
   }
 
   register(body: RegisterRequest): Observable<RegisterResult> {
-    const emailRedirectTo = this.getAuthEmailRedirectUrl();
+    const emailRedirectTo = isPlatformBrowser(this.platformId)
+      ? getAuthEmailRedirectUrl()
+      : '';
     return from(
       this.getClient().auth.signUp({
         email: body.email,
@@ -242,8 +235,27 @@ export class AuthService {
     );
   }
 
+  /** Dev-only: server builds a confirmation URL that bypasses Supabase email templates. */
+  fetchDevSignupConfirmationLink(email: string): Observable<{ actionLink: string; redirectTo: string }> {
+    const redirectTo = isPlatformBrowser(this.platformId) ? getAuthEmailRedirectUrl() : '';
+    const base = environment.apiBaseUrl.replace(/\/$/, '');
+    return this.http.post<{ actionLink: string; redirectTo: string }>(
+      `${base}/api/dev/signup-confirmation-link`,
+      { email: email.trim(), redirectTo: redirectTo || undefined },
+    );
+  }
+
+  /** Dev-only: confirm signup via Supabase admin API (no email link or redirect URL). */
+  confirmDevSignup(email: string): Observable<{ message: string; alreadyConfirmed: boolean }> {
+    const base = environment.apiBaseUrl.replace(/\/$/, '');
+    return this.http.post<{ message: string; alreadyConfirmed: boolean }>(
+      `${base}/api/dev/confirm-signup`,
+      { email: email.trim() },
+    );
+  }
+
   resendSignupConfirmation(email: string): Observable<void> {
-    const redirectTo = this.getAuthEmailRedirectUrl();
+    const redirectTo = isPlatformBrowser(this.platformId) ? getAuthEmailRedirectUrl() : '';
     return from(
       this.getClient().auth.resend({
         type: 'signup',

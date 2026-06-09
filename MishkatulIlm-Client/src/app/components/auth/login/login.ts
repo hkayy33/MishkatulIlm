@@ -17,6 +17,7 @@ export class Login implements OnInit {
   private readonly platformId = inject(PLATFORM_ID);
 
   submitError: string | null = null;
+  submitInfo: string | null = null;
 
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
@@ -25,6 +26,10 @@ export class Login implements OnInit {
     if (href.includes('code=')) {
       void this.auth.handleAuthRedirectResult();
       return;
+    }
+
+    if (this.route.snapshot.queryParamMap.get('confirmed') === '1') {
+      this.submitInfo = 'Your email is confirmed. Sign in with your password to continue.';
     }
 
     const err = this.route.snapshot.queryParamMap.get('authError');

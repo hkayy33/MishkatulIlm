@@ -8,8 +8,12 @@ const files = [
   {
     rel: 'src/environments/environment.development.local.ts',
     body:
-      "// Gitignored — paste Supabase anon public key (Dashboard → Settings → API → anon public).\n" +
-      'export const localDevSecrets = {\n  supabaseAnonKey: \'\',\n};\n',
+      "// Gitignored — local dev secrets.\n" +
+      'export const localDevSecrets = {\n' +
+      '  supabaseAnonKey: \'\',\n' +
+      "  /** Mac LAN IP when testing auth emails on a phone; use http://localhost:4200 on desktop only. */\n" +
+      '  authRedirectOrigin: \'http://192.168.1.40:4200\',\n' +
+      '};\n',
   },
   {
     rel: 'src/environments/environment.prod.local.ts',

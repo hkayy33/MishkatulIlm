@@ -96,6 +96,207 @@ public sealed class SupabaseAdminAuthClient(
         }
     }
 
+    /// <summary>Marks a pending signup as email-confirmed (dev bypass; no redirect URL required).</summary>
+    public async Task<(bool Success, bool AlreadyConfirmed)> ConfirmSignupEmailAsync(
+        string email,
+        CancellationToken cancellationToken)
+    {
+        if (!IsConfigured)
+        {
+            logger.LogWarning("Supabase confirm signup skipped: ServiceRoleKey or Url not configured.");
+            return (false, false);
+        }
+
+        var normalized = email.Trim();
+        var user = await FindUserByEmailAsync(normalized, cancellationToken);
+        if (user is null)
+        {
+            logger.LogWarning("Supabase confirm signup: no auth user for {Email}", normalized);
+            return (false, false);
+        }
+
+        if (user.EmailConfirmedAt is not null)
+            return (true, true);
+
+        var baseUrl = _opts.Url.Trim().TrimEnd('/');
+        var client = httpClientFactory.CreateClient();
+        using var req = new HttpRequestMessage(
+            HttpMethod.Put,
+            $"{baseUrl}/auth/v1/admin/users/{user.Id}");
+
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _opts.ServiceRoleKey);
+        req.Headers.TryAddWithoutValidation("apikey", _opts.ServiceRoleKey);
+        req.Content = new StringContent(
+            JsonSerializer.Serialize(new { email_confirm = true }),
+            Encoding.UTF8,
+            "application/json");
+
+        HttpResponseMessage res;
+        try
+        {
+            res = await client.SendAsync(req, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Supabase confirm signup HTTP failure for {Email}", normalized);
+            return (false, false);
+        }
+
+        var body = await res.Content.ReadAsStringAsync(cancellationToken);
+        if (!res.IsSuccessStatusCode)
+        {
+            logger.LogWarning(
+                "Supabase confirm signup failed ({Status}) for {Email}: {Body}",
+                (int)res.StatusCode,
+                normalized,
+                body);
+            return (false, false);
+        }
+
+        return (true, false);
+    }
+
+    /// <summary>
+    /// Builds a signup confirmation URL with an explicit <paramref name="redirectTo"/> (bypasses email templates).
+    /// </summary>
+    public async Task<(string? ActionLink, string? RedirectTo)> GenerateSignupConfirmationLinkAsync(
+        string email,
+        string redirectTo,
+        CancellationToken cancellationToken)
+    {
+        if (!IsConfigured)
+        {
+            logger.LogWarning("Supabase generate_link skipped: ServiceRoleKey or Url not configured.");
+            return (null, null);
+        }
+
+        var baseUrl = _opts.Url.Trim().TrimEnd('/');
+        var client = httpClientFactory.CreateClient();
+        using var req = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"{baseUrl}/auth/v1/admin/generate_link");
+
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _opts.ServiceRoleKey);
+        req.Headers.TryAddWithoutValidation("apikey", _opts.ServiceRoleKey);
+
+        var payload = new
+        {
+            type = "signup",
+            email = email.Trim(),
+            options = new { redirect_to = redirectTo.Trim() },
+        };
+
+        req.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+        HttpResponseMessage res;
+        try
+        {
+            res = await client.SendAsync(req, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Supabase generate_link HTTP failure for {Email}", email);
+            return (null, null);
+        }
+
+        var body = await res.Content.ReadAsStringAsync(cancellationToken);
+        if (!res.IsSuccessStatusCode)
+        {
+            logger.LogWarning(
+                "Supabase generate_link failed ({Status}) for {Email}: {Body}",
+                (int)res.StatusCode,
+                email,
+                body);
+            return (null, null);
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<SupabaseGenerateLinkResponse>(body);
+            var actionLink = parsed?.ActionLink ?? parsed?.Properties?.ActionLink;
+            var resolvedRedirect = parsed?.RedirectTo ?? parsed?.Properties?.RedirectTo ?? redirectTo;
+            if (string.IsNullOrWhiteSpace(actionLink))
+            {
+                logger.LogWarning("Supabase generate_link: missing action_link for {Email}: {Body}", email, body);
+                return (null, null);
+            }
+
+            return (actionLink, resolvedRedirect);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Supabase generate_link: invalid JSON for {Email}: {Body}", email, body);
+            return (null, null);
+        }
+    }
+
+    private async Task<SupabaseAdminUserSummary?> FindUserByEmailAsync(
+        string email,
+        CancellationToken cancellationToken)
+    {
+        var baseUrl = _opts.Url.Trim().TrimEnd('/');
+        var client = httpClientFactory.CreateClient();
+        var target = email.Trim();
+        const int perPage = 200;
+
+        for (var page = 1; page <= 5; page++)
+        {
+            using var req = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"{baseUrl}/auth/v1/admin/users?page={page}&per_page={perPage}");
+
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _opts.ServiceRoleKey);
+            req.Headers.TryAddWithoutValidation("apikey", _opts.ServiceRoleKey);
+
+            HttpResponseMessage res;
+            try
+            {
+                res = await client.SendAsync(req, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Supabase list users HTTP failure while resolving {Email}", target);
+                return null;
+            }
+
+            var body = await res.Content.ReadAsStringAsync(cancellationToken);
+            if (!res.IsSuccessStatusCode)
+            {
+                logger.LogWarning(
+                    "Supabase list users failed ({Status}) while resolving {Email}: {Body}",
+                    (int)res.StatusCode,
+                    target,
+                    body);
+                return null;
+            }
+
+            SupabaseListUsersResponse? parsed;
+            try
+            {
+                parsed = JsonSerializer.Deserialize<SupabaseListUsersResponse>(body);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Supabase list users: invalid JSON while resolving {Email}: {Body}", target, body);
+                return null;
+            }
+
+            var users = parsed?.Users ?? [];
+            if (users.Count == 0)
+                return null;
+
+            var match = users.FirstOrDefault(
+                u => string.Equals(u.Email?.Trim(), target, StringComparison.OrdinalIgnoreCase));
+            if (match is not null)
+                return match;
+
+            if (users.Count < perPage)
+                return null;
+        }
+
+        return null;
+    }
+
     /// <summary>Permanently removes a Supabase auth user. Returns false if not configured or the API call fails.</summary>
     public async Task<bool> DeleteUserAsync(Guid userId, CancellationToken cancellationToken)
     {

@@ -99,6 +99,10 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "host": "0.0.0.0",
+            "allowedHosts": true
+          },
           "configurations": {
             "production": {
               "buildTarget": "MishkatulIlm-Client:build:production"

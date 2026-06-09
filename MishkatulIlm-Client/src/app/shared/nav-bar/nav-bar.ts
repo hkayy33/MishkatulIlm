@@ -1,13 +1,14 @@
 import {
   Component,
   computed,
+  effect,
   ElementRef,
   HostListener,
   inject,
   signal,
   viewChild,
 } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter, map, merge, of, tap } from 'rxjs';
 import { GetStartedBtn } from '../../components/get-started-btn/get-started-btn';
@@ -19,6 +20,9 @@ import { ProgramsSectionNavService } from '../../services/programs-section-nav.s
   imports: [GetStartedBtn, RouterLink],
   templateUrl: './nav-bar.html',
   styleUrl: './nav-bar.scss',
+  host: {
+    '(document:keydown.escape)': 'onEscape($event)',
+  },
 })
 export class NavBar {
   private readonly router = inject(Router);
@@ -38,6 +42,8 @@ export class NavBar {
     this.auth.user()?.isAdmin ? '/admin' : '/dashboard',
   );
 
+  readonly mobileMenuOpen = signal(false);
+
   /** White nav links on home hero; dark links on other routes (e.g. legal pages). */
   readonly isHomeRoute = toSignal(
     merge(
@@ -45,10 +51,31 @@ export class NavBar {
       this.router.events.pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd)),
     ).pipe(
       map(() => this.pathIsHome(this.router.url)),
-      tap(() => this.menuOpen.set(false)),
+      tap(() => this.closeMenus()),
     ),
     { initialValue: this.pathIsHome(this.router.url) },
   );
+
+  constructor() {
+    this.router.events
+      .pipe(
+        filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => this.closeMenus());
+
+    effect((onCleanup) => {
+      const open = this.mobileMenuOpen();
+      if (typeof document === 'undefined') {
+        return;
+      }
+
+      document.body.style.overflow = open ? 'hidden' : '';
+      onCleanup(() => {
+        document.body.style.overflow = '';
+      });
+    });
+  }
 
   private pathIsHome(url: string): boolean {
     const path = url.split('#')[0].split('?')[0];
@@ -57,16 +84,40 @@ export class NavBar {
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
-    if (!this.menuOpen()) return;
+    if (!this.menuOpen()) {
+      return;
+    }
+
     const root = this.userMenuRef()?.nativeElement;
     if (root && !root.contains(event.target as Node)) {
       this.menuOpen.set(false);
     }
   }
 
-  @HostListener('document:keydown.escape')
-  onEscape(): void {
+  toggleMobileMenu(): void {
     this.menuOpen.set(false);
+    this.mobileMenuOpen.update((open) => !open);
+  }
+
+  closeMobileMenu(): void {
+    this.mobileMenuOpen.set(false);
+  }
+
+  closeMenus(): void {
+    this.closeMobileMenu();
+    this.menuOpen.set(false);
+  }
+
+  onEscape(event: Event): void {
+    if (this.mobileMenuOpen()) {
+      event.preventDefault();
+      this.closeMobileMenu();
+      return;
+    }
+
+    if (this.menuOpen()) {
+      this.menuOpen.set(false);
+    }
   }
 
   toggleUserMenu(event: Event): void {
@@ -81,17 +132,14 @@ export class NavBar {
     }
   }
 
-  closeUserMenu(): void {
-    this.menuOpen.set(false);
-  }
-
   onLogout(): void {
-    this.closeUserMenu();
+    this.closeMenus();
     this.auth.logout();
   }
 
   onProgramsClick(): void {
     this.programsNav.scrollToProgramsSection();
+    this.closeMobileMenu();
   }
 
   onProgramsKeydown(ev: KeyboardEvent): void {

@@ -8,4 +8,6 @@ export const environment = {
   apiBaseUrl: 'http://localhost:5198',
   supabaseUrl: 'https://kpvfrbgpbmlxkqqibpjp.supabase.co',
   supabaseAnonKey: '',
+  /** Override for Supabase emailRedirectTo (e.g. LAN IP for phone testing). Falls back to window.location.origin. */
+  authRedirectOrigin: undefined as string | undefined,
 };

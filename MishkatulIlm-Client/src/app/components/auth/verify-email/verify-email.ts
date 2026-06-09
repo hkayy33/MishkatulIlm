@@ -81,7 +81,7 @@ export class VerifyEmail implements OnInit, OnDestroy {
     this.auth.resendSignupConfirmation(this.email).subscribe({
       next: () => {
         this.resendBusy = false;
-        this.submitInfo = 'Another confirmation email has been sent. Check your inbox.';
+        this.submitInfo = 'Another confirmation email has been sent. Check your inbox and spam folder.';
         this.startCooldown(RESEND_SUCCESS_COOLDOWN_SEC);
       },
       error: (err: unknown) => {

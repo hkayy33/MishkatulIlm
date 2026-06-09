@@ -7,6 +7,17 @@ $accent-gold-hover: #b08a4f;
     vertical-align: middle;
 }
 
+:host-context(.action-buttons),
+:host-context(.nav-link--cta) {
+    display: block;
+    width: 100%;
+}
+
+:host-context(.action-buttons) button,
+:host-context(.nav-link--cta) button {
+    width: 100%;
+}
+
 button {
     appearance: none;
     border-radius: 10px;

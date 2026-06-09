@@ -9,4 +9,5 @@ export const environment = {
   apiBaseUrl: '',
   supabaseUrl: '',
   supabaseAnonKey: prodSecrets.supabaseAnonKey,
+  authRedirectOrigin: undefined as string | undefined,
 };

@@ -120,9 +120,63 @@ public sealed class DevBootstrapAdminRequest
     public string LastName { get; set; } = "User";
 }
 
+/// <summary>Body for <c>POST /api/dev/signup-confirmation-link</c> (Development only).</summary>
+public sealed class DevConfirmationLinkRequest
+{
+    public string Email { get; set; } = string.Empty;
+    public string? RedirectTo { get; set; }
+}
+
+/// <summary>Body for <c>POST /api/dev/confirm-signup</c> (Development only).</summary>
+public sealed class DevConfirmSignupRequest
+{
+    public string Email { get; set; } = string.Empty;
+}
+
 /// <summary>Subset of Supabase <c>POST /auth/v1/admin/users</c> response.</summary>
 internal sealed class SupabaseCreateUserResponse
 {
     [JsonPropertyName("id")]
     public Guid Id { get; set; }
+}
+
+/// <summary>Subset of Supabase <c>POST /auth/v1/admin/generate_link</c> response.</summary>
+internal sealed class SupabaseGenerateLinkResponse
+{
+    [JsonPropertyName("action_link")]
+    public string? ActionLink { get; set; }
+
+    [JsonPropertyName("redirect_to")]
+    public string? RedirectTo { get; set; }
+
+    [JsonPropertyName("properties")]
+    public SupabaseGenerateLinkProperties? Properties { get; set; }
+}
+
+internal sealed class SupabaseGenerateLinkProperties
+{
+    [JsonPropertyName("action_link")]
+    public string? ActionLink { get; set; }
+
+    [JsonPropertyName("redirect_to")]
+    public string? RedirectTo { get; set; }
+}
+
+/// <summary>Subset of Supabase <c>GET /auth/v1/admin/users</c> response.</summary>
+internal sealed class SupabaseListUsersResponse
+{
+    [JsonPropertyName("users")]
+    public List<SupabaseAdminUserSummary>? Users { get; set; }
+}
+
+internal sealed class SupabaseAdminUserSummary
+{
+    [JsonPropertyName("id")]
+    public Guid Id { get; set; }
+
+    [JsonPropertyName("email")]
+    public string? Email { get; set; }
+
+    [JsonPropertyName("email_confirmed_at")]
+    public DateTimeOffset? EmailConfirmedAt { get; set; }
 }

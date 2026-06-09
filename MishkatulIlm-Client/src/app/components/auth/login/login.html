@@ -6,6 +6,9 @@
     </header>
 
     <form class="auth-form" novalidate (submit)="onSubmit($event)" autocomplete="on">
+      @if (submitInfo) {
+        <p class="auth-form__info" role="status">{{ submitInfo }}</p>
+      }
       @if (submitError) {
         <p class="auth-form__error" role="alert">{{ submitError }}</p>
       }

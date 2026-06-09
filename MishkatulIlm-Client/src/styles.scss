@@ -1,8 +1,28 @@
 /* You can add global styles to this file, and also import other style files */
-body{
+:root {
+    --nav-height: 12vh;
+    --nav-margin: 5px;
+
+    @media (max-width: 991px) {
+        --nav-height: 4.25rem;
+    }
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    overflow-x: clip;
+}
+
+body {
     background-color: #fcfbf7;
     margin: 0;
     padding: 0;
+    overflow-x: clip;
 }
 
 p{

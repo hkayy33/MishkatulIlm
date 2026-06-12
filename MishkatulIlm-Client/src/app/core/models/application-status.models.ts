@@ -4,6 +4,7 @@ export type StudentApplicationStatus =
   | 'awaiting_reply'
   | 'matched'
   | 'active'
+  | 'rejected'
   | 'inactive'
   | 'approved'
   | 'enrolled';
@@ -38,6 +39,7 @@ export interface StudentApplicationSummary {
 export interface StudentApplicationResponse {
   status: StudentApplicationStatus;
   onboardingCompleted: boolean;
+  rejectionMessage?: string | null;
   summary: StudentApplicationSummary | null;
   scheduleProposal?: ScheduleProposalResponse | null;
 }

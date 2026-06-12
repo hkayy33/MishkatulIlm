@@ -30,6 +30,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.StripeSubscriptionStatus).HasMaxLength(32);
             entity.Property(e => e.LastStripeInvoiceId).HasMaxLength(255);
             entity.Property(e => e.MessageToTutor).HasMaxLength(2000);
+            entity.Property(e => e.ApplicationDeclineMessage).HasMaxLength(2000);
             entity.HasOne(e => e.Onboarding)
                 .WithOne(e => e.User)
                 .HasForeignKey<StudentOnboardingProfile>(e => e.UserId);

@@ -75,7 +75,7 @@
                     type="button"
                     class="admin-btn admin-btn--ghost admin-btn--small"
                     [disabled]="actionUserId() === r.userId"
-                    (click)="markInactive(r)"
+                    (click)="openDecline(r)"
                   >
                     Decline
                   </button>
@@ -183,6 +183,45 @@
             (click)="confirmApprove()"
           >
             {{ actionUserId() === target.userId ? 'Sending…' : 'Send schedule to student' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (declineTarget(); as target) {
+    <div class="approve-overlay" role="dialog" aria-modal="true" aria-labelledby="decline-title">
+      <div class="approve-dialog approve-dialog--wide">
+        <h2 id="decline-title">Decline application — {{ target.firstName }} {{ target.lastName }}</h2>
+        <p class="approve-hint">
+          The student will see this message on their dashboard as the reason their application was
+          rejected.
+        </p>
+
+        @if (loadError()) {
+          <p class="admin-error">{{ loadError() }}</p>
+        }
+
+        <div class="decline-form">
+          <label for="decline-message">Message to student</label>
+          <textarea
+            id="decline-message"
+            rows="4"
+            [ngModel]="declineMessage()"
+            (ngModelChange)="declineMessage.set($event)"
+            placeholder="Explain why the application was not accepted and what the student can do next."
+          ></textarea>
+        </div>
+
+        <div class="approve-actions">
+          <button type="button" class="admin-btn admin-btn--ghost" (click)="closeDecline()">Cancel</button>
+          <button
+            type="button"
+            class="admin-btn admin-btn--danger"
+            [disabled]="actionUserId() === target.userId"
+            (click)="confirmDecline()"
+          >
+            {{ actionUserId() === target.userId ? 'Sending…' : 'Decline application' }}
           </button>
         </div>
       </div>

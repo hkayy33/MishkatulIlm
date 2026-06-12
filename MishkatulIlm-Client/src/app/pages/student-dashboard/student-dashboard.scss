@@ -79,6 +79,13 @@ h1 {
       0 10px 28px rgba(197, 157, 95, 0.16);
   }
 
+  &--rejected {
+    border-color: rgba(139, 58, 50, 0.35);
+    box-shadow:
+      0 1px 2px rgba(45, 42, 38, 0.04),
+      0 10px 28px rgba(139, 58, 50, 0.12);
+  }
+
   &--error {
     color: #8b2c2c;
     background: rgba(139, 44, 44, 0.06);
@@ -129,6 +136,10 @@ h1 {
   .status-card--success & {
     background: rgba(47, 122, 79, 0.12);
   }
+
+  .status-card--rejected & {
+    background: rgba(139, 58, 50, 0.12);
+  }
 }
 
 .status-badge__dot {
@@ -147,6 +158,10 @@ h1 {
 
   .status-card--success & {
     background: #2f7a4f;
+  }
+
+  .status-card--rejected & {
+    background: #8b3a32;
   }
 }
 
@@ -178,6 +193,32 @@ h1 {
   font-size: 0.95rem;
   line-height: 1.5;
   color: $text-muted;
+}
+
+.rejection-reason {
+  margin-top: 0.35rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  background: rgba(139, 58, 50, 0.08);
+  border: 1px solid rgba(139, 58, 50, 0.2);
+}
+
+.rejection-reason__title {
+  margin: 0 0 0.35rem;
+  font-family: Montserrat, 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8b3a32;
+}
+
+.rejection-reason__message {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: $text-dark;
+  white-space: pre-wrap;
 }
 
 .progress-track {

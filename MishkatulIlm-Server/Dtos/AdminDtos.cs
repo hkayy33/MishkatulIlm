@@ -102,6 +102,11 @@ public sealed class DeclineScheduleChangeRequest
     public string Message { get; set; } = string.Empty;
 }
 
+public sealed class DeclineApplicationRequest
+{
+    public string Message { get; set; } = string.Empty;
+}
+
 public sealed class AdminCreateUserRequest
 {
     public string Email { get; set; } = string.Empty;

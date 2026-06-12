@@ -61,21 +61,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-if (corsOrigins.Length == 0)
-{
-    corsOrigins =
-    [
-        "http://localhost:4200",
-        "https://localhost:4200",
-    ];
-}
+var corsOrigins = BuildCorsOrigins(builder.Configuration);
 
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins(corsOrigins)
+        policy.SetIsOriginAllowed(origin => IsAllowedCorsOrigin(origin, corsOrigins))
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
@@ -165,3 +157,45 @@ if (!string.IsNullOrWhiteSpace(connectionString))
 }
 
 app.Run();
+
+static string[] BuildCorsOrigins(IConfiguration configuration)
+{
+    var origins = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+    foreach (var origin in configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])
+    {
+        if (string.IsNullOrWhiteSpace(origin) || origin.Contains('*', StringComparison.Ordinal))
+            continue;
+
+        origins.Add(NormalizeOrigin(origin));
+    }
+
+    var clientAppUrl = configuration["Stripe:ClientAppUrl"];
+    if (!string.IsNullOrWhiteSpace(clientAppUrl))
+        origins.Add(NormalizeOrigin(clientAppUrl));
+
+    if (origins.Count == 0)
+    {
+        origins.Add("http://localhost:4200");
+        origins.Add("https://localhost:4200");
+    }
+
+    return [.. origins];
+}
+
+static bool IsAllowedCorsOrigin(string origin, string[] allowedOrigins)
+{
+    if (string.IsNullOrWhiteSpace(origin))
+        return false;
+
+    var normalized = NormalizeOrigin(origin);
+    if (allowedOrigins.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+        return true;
+
+    if (!Uri.TryCreate(normalized, UriKind.Absolute, out var uri))
+        return false;
+
+    return uri.Host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase);
+}
+
+static string NormalizeOrigin(string value) => value.Trim().TrimEnd('/');

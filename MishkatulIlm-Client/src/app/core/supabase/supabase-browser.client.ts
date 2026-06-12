@@ -18,12 +18,13 @@ export function getSupabaseBrowserClient(): SupabaseClient {
     }
 
     browserClient = createClient(environment.supabaseUrl, environment.supabaseAnonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      // Exchanged in AuthService.handleAuthRedirectResult; must be true so getSession() can parse ?code=.
-      detectSessionInUrl: true,
-      flowType: 'pkce',
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        // Exchanged in AuthService.handleAuthRedirectResult; must be true so getSession() can parse ?code=.
+        detectSessionInUrl: true,
+        flowType: 'pkce',
+      },
     });
   }
 

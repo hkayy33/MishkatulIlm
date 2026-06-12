@@ -376,7 +376,7 @@ export class AuthService {
 
     const client = this.getClient();
     const emailOtp = this.parseEmailOtpCallback(href);
-    const newSignup = emailOtp?.type === 'signup';
+    const newSignup = emailOtp?.type === 'signup' || emailOtp?.type === 'email';
 
     try {
       let session: Session | null = null;
@@ -545,10 +545,10 @@ export class AuthService {
     try {
       const url = new URL(href);
       const raw = url.searchParams.get('token_hash');
-      const tokenHash = raw ? decodeURIComponent(raw).trim() : '';
+      const tokenHash = raw?.trim() ?? '';
       if (!tokenHash) return null;
 
-      const typeParam = url.searchParams.get('type')?.trim() || 'signup';
+      const typeParam = url.searchParams.get('type')?.trim() || 'email';
       const allowed: EmailOtpType[] = [
         'signup',
         'email',
@@ -589,14 +589,14 @@ export class AuthService {
     return data.session;
   }
 
-  /** Tries signup then email type — Supabase templates vary. */
+  /** Tries email then signup — Supabase signup confirmation uses type <c>email</c> for token_hash. */
   private async verifyEmailOtpSession(
     client: ReturnType<AuthService['getClient']>,
     tokenHash: string,
     type: EmailOtpType,
   ): Promise<{ session: Session | null; confirmed: boolean }> {
     const types: EmailOtpType[] =
-      type === 'signup' ? ['signup', 'email'] : type === 'email' ? ['email', 'signup'] : [type];
+      type === 'email' ? ['email', 'signup'] : type === 'signup' ? ['email', 'signup'] : [type, 'email'];
 
     for (const otpType of types) {
       const { data, error } = await client.auth.verifyOtp({
@@ -607,7 +607,92 @@ export class AuthService {
       if (!error && data.user) return { session: null, confirmed: true };
       if (error) console.warn('[AuthService] verifyOtp:', otpType, error.message);
     }
+
+    const restSession = await this.verifyEmailOtpViaRest(tokenHash, types);
+    if (restSession) return { session: restSession, confirmed: true };
+
+    const serverSession = await this.verifyEmailOtpViaServer(tokenHash, type);
+    if (serverSession) return { session: serverSession, confirmed: true };
+
     return { session: null, confirmed: false };
+  }
+
+  private async verifyEmailOtpViaRest(
+    tokenHash: string,
+    types: EmailOtpType[],
+  ): Promise<Session | null> {
+    if (!environment.supabaseUrl || !environment.supabaseAnonKey) return null;
+
+    for (const otpType of types) {
+      try {
+        const res = await fetch(`${environment.supabaseUrl.replace(/\/$/, '')}/auth/v1/verify`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: environment.supabaseAnonKey,
+            Authorization: `Bearer ${environment.supabaseAnonKey}`,
+          },
+          body: JSON.stringify({ token_hash: tokenHash, type: otpType }),
+        });
+        const body = (await res.json()) as {
+          access_token?: string;
+          refresh_token?: string;
+          msg?: string;
+        };
+        if (!res.ok) {
+          console.warn('[AuthService] verify REST:', otpType, body.msg ?? res.status);
+          continue;
+        }
+        if (!body.access_token || !body.refresh_token) continue;
+
+        const { data, error } = await getSupabaseBrowserClient().auth.setSession({
+          access_token: body.access_token,
+          refresh_token: body.refresh_token,
+        });
+        if (error) {
+          console.warn('[AuthService] setSession after REST verify:', error.message);
+          continue;
+        }
+        return data.session;
+      } catch (ex) {
+        console.warn('[AuthService] verifyEmailOtpViaRest:', ex);
+      }
+    }
+    return null;
+  }
+
+  private async verifyEmailOtpViaServer(
+    tokenHash: string,
+    type: EmailOtpType,
+  ): Promise<Session | null> {
+    if (!this.apiConfigured()) return null;
+
+    try {
+      const base = environment.apiBaseUrl.replace(/\/$/, '');
+      const res = await firstValueFrom(
+        this.http.post<{
+          accessToken: string;
+          refreshToken: string;
+        }>(`${base}/api/auth/verify-email-callback`, {
+          tokenHash,
+          type,
+        }),
+      );
+      if (!res.accessToken || !res.refreshToken) return null;
+
+      const { data, error } = await getSupabaseBrowserClient().auth.setSession({
+        access_token: res.accessToken,
+        refresh_token: res.refreshToken,
+      });
+      if (error) {
+        console.warn('[AuthService] setSession after server verify:', error.message);
+        return null;
+      }
+      return data.session;
+    } catch (ex) {
+      console.warn('[AuthService] verifyEmailOtpViaServer:', ex);
+      return null;
+    }
   }
 
   /** After verifyOtp, Supabase may persist the session slightly after the API response. */

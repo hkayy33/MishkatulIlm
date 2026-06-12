@@ -180,3 +180,43 @@ internal sealed class SupabaseAdminUserSummary
     [JsonPropertyName("email_confirmed_at")]
     public DateTimeOffset? EmailConfirmedAt { get; set; }
 }
+
+/// <summary>Body for <c>POST /api/auth/verify-email-callback</c>.</summary>
+public sealed class VerifyEmailCallbackRequest
+{
+    public string TokenHash { get; set; } = string.Empty;
+
+    /// <summary>Supabase OTP type — usually <c>email</c> for signup confirmation.</summary>
+    public string Type { get; set; } = "email";
+}
+
+/// <summary>Session returned after verifying an email confirmation link.</summary>
+public sealed class VerifyEmailCallbackResponse
+{
+    public string AccessToken { get; set; } = string.Empty;
+    public string RefreshToken { get; set; } = string.Empty;
+    public string UserId { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+}
+
+/// <summary>Subset of Supabase <c>POST /auth/v1/verify</c> response.</summary>
+public sealed class SupabaseVerifyResponse
+{
+    [JsonPropertyName("access_token")]
+    public string? AccessToken { get; set; }
+
+    [JsonPropertyName("refresh_token")]
+    public string? RefreshToken { get; set; }
+
+    [JsonPropertyName("user")]
+    public SupabaseVerifyUser? User { get; set; }
+}
+
+public sealed class SupabaseVerifyUser
+{
+    [JsonPropertyName("id")]
+    public Guid Id { get; set; }
+
+    [JsonPropertyName("email")]
+    public string? Email { get; set; }
+}

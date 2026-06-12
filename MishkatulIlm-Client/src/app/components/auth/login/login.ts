@@ -69,7 +69,13 @@ export class Login implements OnInit {
         else void this.router.navigate(['/onboarding']);
       },
       error: (err: Error & { message?: string }) => {
-        this.submitError = err?.message || 'Could not sign in. Try again.';
+        const msg = err?.message || 'Could not sign in. Try again.';
+        if (/email not confirmed/i.test(msg)) {
+          this.submitError =
+            'Your email is not verified yet. Open the latest confirmation email and click the link, or register again to get a new one.';
+          return;
+        }
+        this.submitError = msg;
       },
     });
   }

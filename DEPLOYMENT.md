@@ -23,12 +23,12 @@
 
    ```html
    <h2>Confirm your signup</h2>
-   <p><a href="{{ .SiteURL }}auth/callback?token_hash={{ .TokenHash }}&type=signup">Confirm your email</a></p>
+   <p><a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">Confirm your email</a></p>
    ```
 
-   After saving, new emails must start with `https://your-app.vercel.app/auth/callback?token_hash=...` — **not** `supabase.co/auth/v1/verify?token=pkce_...`.
-
-   (`Site URL` should end with `/`, e.g. `https://your-app.vercel.app/`.)
+   Use **`{{ .RedirectTo }}`** (not `{{ .SiteURL }}auth/callback`) — it matches the signup redirect exactly.  
+   Use **`type=email`** (Supabase’s signup confirmation token type).  
+   After saving, new emails must start with `https://your-app.vercel.app/auth/callback?token_hash=...&type=email`.
 
 6. **Production checklist**
    - [ ] Fly `ConnectionStrings__DefaultConnection` → `db.kpvfrbgpbmlxkqqibpjp.supabase.co` (same project as auth)

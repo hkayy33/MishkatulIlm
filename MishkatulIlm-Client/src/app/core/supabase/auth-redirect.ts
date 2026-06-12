@@ -17,6 +17,29 @@ export function getAuthEmailRedirectUrl(): string {
   return `${origin.replace(/\/$/, '')}${AUTH_EMAIL_CALLBACK_PATH}`;
 }
 
+/**
+ * PKCE signup tokens (`pkce_…` in `{{ .TokenHash }}`) cannot be verified with verifyOtp on the app.
+ * They must hit Supabase `/auth/v1/verify` first, which confirms email and redirects back with `?code=`.
+ */
+export function buildSupabasePkceVerifyUrl(token: string, redirectTo?: string): string | null {
+  const trimmed = token.trim();
+  if (!trimmed.startsWith('pkce_')) return null;
+
+  const base = environment.supabaseUrl?.trim().replace(/\/$/, '');
+  if (!base) return null;
+
+  const url = new URL(`${base}/auth/v1/verify`);
+  url.searchParams.set('token', trimmed);
+  url.searchParams.set('type', 'email');
+  url.searchParams.set('redirect_to', redirectTo?.trim() || getAuthEmailRedirectUrl());
+  return url.toString();
+}
+
+/** True when TokenHash from the email template is a PKCE verifier token (not a direct OTP hash). */
+export function isPkceEmailToken(token: string): boolean {
+  return token.trim().startsWith('pkce_');
+}
+
 /** True when the current URL carries Supabase auth callback params (PKCE code, email OTP, tokens, or errors). */
 export function hasAuthCallbackParams(href: string): boolean {
   if (!href) return false;

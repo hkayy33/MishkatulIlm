@@ -19,16 +19,24 @@
      `https://your-app.vercel.app/auth/callback`  
      `http://localhost:4200/auth/callback` (local dev)
 
-5. **Authentication → Email Templates → Confirm signup** — use the **`token_hash` link** (required; default `{{ .ConfirmationURL }}` breaks with PKCE across browsers):
+5. **Authentication → Email Templates → Confirm signup** — pick **one** approach:
+
+   **Option A (recommended, simplest):** use Supabase’s built-in link (handles PKCE automatically):
 
    ```html
    <h2>Confirm your signup</h2>
+   <p><a href="{{ .ConfirmationURL }}">Confirm your email</a></p>
+   ```
+
+   The app completes sign-in when Supabase redirects back with `?code=…` on `/auth/callback`.
+
+   **Option B (custom link):** only if `{{ .TokenHash }}` does **not** start with `pkce_` (legacy OTP hash):
+
+   ```html
    <p><a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">Confirm your email</a></p>
    ```
 
-   Use **`{{ .RedirectTo }}`** (not `{{ .SiteURL }}auth/callback`) — it matches the signup redirect exactly.  
-   Use **`type=email`** (Supabase’s signup confirmation token type).  
-   After saving, new emails must start with `https://your-app.vercel.app/auth/callback?token_hash=...&type=email`.
+   If your links look like `token_hash=pkce_…`, you are on PKCE — use **Option A** or the app will auto-redirect through Supabase verify (deploy `auth-to-prod` latest).
 
 6. **Production checklist**
    - [ ] Fly `ConnectionStrings__DefaultConnection` → `db.kpvfrbgpbmlxkqqibpjp.supabase.co` (same project as auth)

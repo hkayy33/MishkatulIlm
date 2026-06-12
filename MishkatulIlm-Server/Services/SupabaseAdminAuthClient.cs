@@ -179,8 +179,13 @@ public sealed class SupabaseAdminAuthClient(
 
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _opts.ServiceRoleKey);
         req.Headers.TryAddWithoutValidation("apikey", _opts.ServiceRoleKey);
+
+        object payload = hash.StartsWith("pkce_", StringComparison.Ordinal)
+            ? new { token = hash, type = otpType }
+            : new { token_hash = hash, type = otpType };
+
         req.Content = new StringContent(
-            JsonSerializer.Serialize(new { token_hash = hash, type = otpType }),
+            JsonSerializer.Serialize(payload),
             Encoding.UTF8,
             "application/json");
 

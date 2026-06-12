@@ -16,7 +16,7 @@ import {
 } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import type { AuthUser, LoginRequest, RegisterRequest, RegisterResult } from '../models/auth.models';
-import { getAuthEmailRedirectUrl, hasAuthCallbackParams } from '../supabase/auth-redirect';
+import { getAuthEmailRedirectUrl, hasAuthCallbackParams, buildSupabasePkceVerifyUrl, isPkceEmailToken } from '../supabase/auth-redirect';
 import {
   getSupabaseBrowserClient,
   isSupabaseConfigured,
@@ -378,6 +378,16 @@ export class AuthService {
     const emailOtp = this.parseEmailOtpCallback(href);
     const newSignup = emailOtp?.type === 'signup' || emailOtp?.type === 'email';
 
+    // PKCE tokens in token_hash must go through Supabase verify (confirms email + returns ?code=).
+    if (emailOtp && isPkceEmailToken(emailOtp.tokenHash)) {
+      const verifyUrl = buildSupabasePkceVerifyUrl(emailOtp.tokenHash);
+      if (verifyUrl) {
+        this.authRedirectHandled = true;
+        globalThis.location.assign(verifyUrl);
+        return;
+      }
+    }
+
     try {
       let session: Session | null = null;
 
@@ -632,7 +642,11 @@ export class AuthService {
             apikey: environment.supabaseAnonKey,
             Authorization: `Bearer ${environment.supabaseAnonKey}`,
           },
-          body: JSON.stringify({ token_hash: tokenHash, type: otpType }),
+          body: JSON.stringify(
+            tokenHash.startsWith('pkce_')
+              ? { token: tokenHash, type: otpType }
+              : { token_hash: tokenHash, type: otpType },
+          ),
         });
         const body = (await res.json()) as {
           access_token?: string;

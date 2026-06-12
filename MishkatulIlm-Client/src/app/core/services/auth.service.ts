@@ -40,6 +40,7 @@ export class AuthService {
 
   private authListenerRegistered = false;
   private authRedirectHandled = false;
+  private postAuthLandingPromise: Promise<void> | null = null;
 
   private readonly _accessToken = signal<string | null>(null);
   private readonly _user = signal<AuthUser | null>(null);
@@ -270,14 +271,34 @@ export class AuthService {
   }
 
   /** After email verification, finish redirect to onboarding/dashboard from any landing URL. */
-  async completePostAuthLanding(): Promise<void> {
-    if (!isPlatformBrowser(this.platformId) || !isSupabaseConfigured()) return;
+  completePostAuthLanding(): Promise<void> {
+    if (!isPlatformBrowser(this.platformId) || !isSupabaseConfigured()) {
+      return Promise.resolve();
+    }
 
+    this.postAuthLandingPromise ??= this.runCompletePostAuthLanding().finally(() => {
+      this.postAuthLandingPromise = null;
+    });
+    return this.postAuthLandingPromise;
+  }
+
+  private async runCompletePostAuthLanding(): Promise<void> {
     await firstValueFrom(this.whenSessionReady$());
 
     const href = globalThis.location?.href ?? '';
+    const onCallback = this.isAuthCallbackRoute();
+
     if (hasAuthCallbackParams(href)) {
       await this.handleAuthRedirectResult();
+      return;
+    }
+
+    if (onCallback) {
+      if (this.isAuthenticated()) {
+        await this.finishAuthenticatedRedirect();
+      } else {
+        await this.router.navigateByUrl('/login?authError=session', { replaceUrl: true });
+      }
       return;
     }
 
@@ -294,15 +315,21 @@ export class AuthService {
 
     const href = globalThis.location?.href ?? '';
     const pendingAuthCallback = hasAuthCallbackParams(href);
+    const onCallback = this.isAuthCallbackRoute();
 
     if (this.authRedirectHandled) {
-      if (this.isAuthenticated() && pendingAuthCallback) {
+      if (this.isAuthenticated() && (pendingAuthCallback || onCallback)) {
         await this.finishAuthenticatedRedirect();
+      } else if (onCallback && !this.isAuthenticated()) {
+        await this.router.navigateByUrl('/login?authError=verify', { replaceUrl: true });
       }
       return;
     }
 
     if (!pendingAuthCallback) {
+      if (onCallback && this.isAuthenticated()) {
+        await this.finishAuthenticatedRedirect();
+      }
       return;
     }
 
@@ -347,16 +374,21 @@ export class AuthService {
     }
   }
 
+  private isAuthCallbackRoute(): boolean {
+    const path = globalThis.location?.pathname ?? '';
+    return path === '/auth/callback' || path.endsWith('/auth/callback');
+  }
+
   private isMarketingHomePath(): boolean {
     const path = globalThis.location?.pathname ?? '';
     return path === '' || path === '/';
   }
 
   private async finishAuthenticatedRedirect(): Promise<void> {
-    await firstValueFrom(this.syncServerProfile().pipe(catchError(() => of(void 0))));
-    await firstValueFrom(this.refreshServerProfile().pipe(catchError(() => of(void 0))));
     await this.navigateAfterAuthenticated();
     this.stripAuthCallbackParamsFromUrl();
+    void firstValueFrom(this.syncServerProfile().pipe(catchError(() => of(void 0))));
+    void firstValueFrom(this.refreshServerProfile().pipe(catchError(() => of(void 0))));
   }
 
   /** Remove ?code= / hash tokens from the address bar after a successful auth redirect. */

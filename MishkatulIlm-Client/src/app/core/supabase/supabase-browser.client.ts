@@ -14,9 +14,9 @@ export function getSupabaseBrowserClient(): SupabaseClient {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true,
+      // Exchanged explicitly in AuthService.handleAuthRedirectResult (avoids races with AuthCallback).
+      detectSessionInUrl: false,
       flowType: 'pkce',
-      // Default localStorage — required for reliable session restore across reloads.
     },
   });
 

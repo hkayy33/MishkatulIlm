@@ -15,7 +15,7 @@ export class AuthCallback {
 
   constructor() {
     afterNextRender(() => {
-      void this.auth.handleAuthRedirectResult().catch(() => {
+      void this.auth.completePostAuthLanding().catch(() => {
         this.errorMessage.set(
           'We could not finish signing you in. Try logging in with your email and password.',
         );

@@ -3,6 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, map, merge, of } from 'rxjs';
 import { AuthService } from './core/services/auth.service';
+import { isAuthCallbackRoute } from './core/supabase/auth-redirect';
 import { NavBar } from './shared/nav-bar/nav-bar';
 import { Footer } from './shared/footer/footer';
 
@@ -23,9 +24,14 @@ export class App {
     afterNextRender(() => {
       const path = globalThis.location?.pathname ?? '';
       const href = globalThis.location?.href ?? '';
-      const onCallback = path === '/auth/callback' || path.endsWith('/auth/callback');
+      const onCallback = isAuthCallbackRoute(path);
       if (onCallback) return;
-      if (!href.includes('code=') && !href.includes('token_hash=') && !href.includes('access_token=')) {
+      if (
+        !href.includes('code=') &&
+        !href.includes('token_hash=') &&
+        !href.includes('access_token=') &&
+        !href.includes('error=')
+      ) {
         return;
       }
       void this.auth.completePostAuthLanding();

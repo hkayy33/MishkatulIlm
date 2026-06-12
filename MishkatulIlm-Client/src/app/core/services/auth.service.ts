@@ -23,10 +23,14 @@ import {
   clearAuthCallbackSnapshot,
   getAuthCallbackCode,
   getAuthEmailRedirectUrl,
+  getPendingSignupEmail,
   hasAuthCallbackParams,
+  isAuthCallbackRoute,
   isPkceEmailToken,
+  parseAuthCallbackError,
   PENDING_SIGNUP_EMAIL_KEY,
   PENDING_PKCE_VERIFIER_KEY,
+  redirectToAuthCallbackIfNeeded,
   restorePkceVerifierBackup,
 } from '../supabase/auth-redirect';
 import {
@@ -77,8 +81,12 @@ export class AuthService {
 
     const href = globalThis.location?.href ?? '';
     const path = globalThis.location?.pathname ?? '';
-    const onCallback = path === '/auth/callback' || path.endsWith('/auth/callback');
+    const onCallback = isAuthCallbackRoute(path);
     const authLanding = hasAuthCallbackParams(href) || onCallback;
+
+    if (authLanding && redirectToAuthCallbackIfNeeded(href)) {
+      return Promise.resolve();
+    }
 
     if (authLanding) {
       captureAuthCallbackSnapshot(href);
@@ -414,6 +422,8 @@ export class AuthService {
     const newSignup =
       !!getAuthCallbackCode(href) || href.includes('token_hash=');
 
+    if (redirectToAuthCallbackIfNeeded(href)) return;
+
     if (this.isAuthenticated() && (hasAuthCallbackParams(href) || onCallback)) {
       await this.finishAuthenticatedRedirect(newSignup);
       return;
@@ -458,6 +468,13 @@ export class AuthService {
     const newSignup =
       !!getAuthCallbackCode(href) || href.includes('token_hash=');
 
+    if (redirectToAuthCallbackIfNeeded(href)) return;
+
+    if (parseAuthCallbackError(href)) {
+      await this.navigateAfterFailedAuthCallback(href);
+      return;
+    }
+
     if (this.isAuthenticated() && (pendingAuthCallback || onCallback)) {
       await this.finishAuthenticatedRedirect(newSignup);
       return;
@@ -473,7 +490,7 @@ export class AuthService {
           await this.finishAuthenticatedRedirect(newSignup);
           return;
         }
-        await this.navigateAfterFailedAuthCallback(href, 'verify');
+        await this.navigateAfterFailedAuthCallback(href);
       }
       return;
     }
@@ -547,7 +564,7 @@ export class AuthService {
           data: { session: stored },
           error: sessionError,
         } = await client.auth.getSession();
-        if (sessionError) throw sessionError;
+        if (sessionError) console.warn('[AuthService] getSession:', sessionError.message);
         session = stored;
       }
 
@@ -570,7 +587,7 @@ export class AuthService {
         await this.finishAuthenticatedRedirect(redirectAsNewSignup);
         return;
       }
-      await this.navigateAfterFailedAuthCallback(href, 'verify');
+      await this.navigateAfterFailedAuthCallback(href);
     }
   }
 
@@ -578,17 +595,38 @@ export class AuthService {
    * When Supabase ConfirmationURL confirms email but PKCE exchange fails (e.g. different browser),
    * the user still needs to sign in — not a generic "session" failure.
    */
-  private async navigateAfterFailedAuthCallback(
-    href: string,
-    _fallback: 'session' | 'verify' = 'session',
-  ): Promise<void> {
+  private async navigateAfterFailedAuthCallback(href: string): Promise<void> {
+    const authError = parseAuthCallbackError(href);
     const code = getAuthCallbackCode(href);
     const onCallback = this.isAuthCallbackRoute();
+    const pendingEmail = getPendingSignupEmail();
 
+    this.stripAuthCallbackParamsFromUrl();
+    clearAuthCallbackSnapshot();
+
+    if (authError) {
+      await this.router.navigateByUrl('/login?authError=verify', { replaceUrl: true });
+      return;
+    }
+
+    // Supabase returned ?code= (email confirmed) but PKCE exchange did not produce a session.
     if (code || onCallback) {
-      this.stripAuthCallbackParamsFromUrl();
-      clearAuthCallbackSnapshot();
+      if (pendingEmail) {
+        await this.router.navigateByUrl(
+          `/verify-email?email=${encodeURIComponent(pendingEmail)}&linkOpened=1`,
+          { replaceUrl: true },
+        );
+        return;
+      }
       await this.router.navigateByUrl('/login?confirmed=1', { replaceUrl: true });
+      return;
+    }
+
+    if (pendingEmail) {
+      await this.router.navigateByUrl(
+        `/verify-email?email=${encodeURIComponent(pendingEmail)}&linkOpened=1`,
+        { replaceUrl: true },
+      );
       return;
     }
 
@@ -596,8 +634,7 @@ export class AuthService {
   }
 
   private isAuthCallbackRoute(): boolean {
-    const path = globalThis.location?.pathname ?? '';
-    return path === '/auth/callback' || path.endsWith('/auth/callback');
+    return isAuthCallbackRoute(globalThis.location?.pathname ?? '');
   }
 
   private isMarketingHomePath(): boolean {

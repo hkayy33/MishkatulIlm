@@ -111,6 +111,59 @@ export function clearAuthCallbackSnapshot(): void {
   removeStorage('session', AUTH_CALLBACK_CODE_KEY);
 }
 
+export function getPendingSignupEmail(): string | null {
+  const email =
+    readStorage('local', PENDING_SIGNUP_EMAIL_KEY) ?? readStorage('session', PENDING_SIGNUP_EMAIL_KEY);
+  const trimmed = email?.trim() ?? '';
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/** Supabase error redirect (`?error=` / `#error=`) after a failed email-link verify. */
+export function parseAuthCallbackError(href: string): string | null {
+  if (!href) return null;
+  try {
+    const url = new URL(href);
+    const queryError =
+      url.searchParams.get('error_description')?.trim() ||
+      url.searchParams.get('error')?.trim() ||
+      '';
+    if (queryError) return queryError;
+
+    const hash = url.hash.replace(/^#/, '');
+    if (!hash) return null;
+    const hashParams = new URLSearchParams(hash);
+    return (
+      hashParams.get('error_description')?.trim() ||
+      hashParams.get('error')?.trim() ||
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
+export function isAuthCallbackRoute(pathname: string): boolean {
+  return pathname === AUTH_EMAIL_CALLBACK_PATH || pathname.endsWith(AUTH_EMAIL_CALLBACK_PATH);
+}
+
+/**
+ * Supabase may land auth params on Site URL (`/`) when redirect URLs are misconfigured.
+ * Normalize to `/auth/callback` so one code path handles email links.
+ */
+export function redirectToAuthCallbackIfNeeded(href: string): boolean {
+  if (!href || typeof globalThis === 'undefined') return false;
+  try {
+    const url = new URL(href);
+    if (isAuthCallbackRoute(url.pathname)) return false;
+    if (!hasAuthCallbackParams(href)) return false;
+    url.pathname = AUTH_EMAIL_CALLBACK_PATH;
+    globalThis.location.replace(url.toString());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const LOCAL_DEV_ORIGIN = 'http://localhost:4200';
 
 function browserOrigin(): string {

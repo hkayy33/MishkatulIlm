@@ -71,6 +71,10 @@ public sealed class OnboardingController(
                 OnboardingCompleted = user.OnboardingCompleted,
                 Summary = summary,
                 ScheduleProposal = proposalDto,
+                RejectionMessage =
+                    user.ApplicationStatus == ApplicationStatusCodes.Inactive
+                        ? user.ApplicationDeclineMessage
+                        : null,
             });
     }
 
@@ -293,7 +297,7 @@ public sealed class OnboardingController(
         if (user.ApplicationStatus == ApplicationStatusCodes.Active)
             return "matched";
         if (user.ApplicationStatus == ApplicationStatusCodes.Inactive)
-            return "inactive";
+            return "rejected";
         if (user.ApplicationStatus == ApplicationStatusCodes.AwaitingReply)
             return "awaiting_reply";
         return user.OnboardingCompleted ? "under_review" : "pending_application";

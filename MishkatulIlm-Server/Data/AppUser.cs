@@ -13,6 +13,11 @@ public sealed class AppUser
     /// <summary>PENDING, ACTIVE, or INACTIVE — admin-managed student application lifecycle.</summary>
     public string ApplicationStatus { get; set; } = ApplicationStatusCodes.Pending;
 
+    /// <summary>Reason shown on the student dashboard when an admin declines the application.</summary>
+    public string? ApplicationDeclineMessage { get; set; }
+
+    public DateTime? ApplicationDeclinedAtUtc { get; set; }
+
     /// <summary>When true, the user may call admin APIs and open the admin dashboard.</summary>
     public bool IsAdmin { get; set; }
 

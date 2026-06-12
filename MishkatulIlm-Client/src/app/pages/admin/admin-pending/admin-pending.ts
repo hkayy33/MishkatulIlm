@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import {
   AdminApiService,
   type AdminApplicationRow,
@@ -28,7 +29,7 @@ import { AdminLessonCalendar } from '../../../shared/admin-lesson-calendar/admin
 @Component({
   selector: 'app-admin-pending',
   standalone: true,
-  imports: [DatePipe, AdminLessonCalendar],
+  imports: [DatePipe, FormsModule, AdminLessonCalendar],
   templateUrl: './admin-pending.html',
   styleUrl: './admin-pending.scss',
 })
@@ -43,6 +44,8 @@ export class AdminPending {
   protected readonly actionUserId = signal<string | null>(null);
 
   protected readonly approveTarget = signal<AdminApplicationRow | null>(null);
+  protected readonly declineTarget = signal<AdminApplicationRow | null>(null);
+  protected readonly declineMessage = signal('');
   protected readonly availability = signal<AvailabilitySlotRow[]>([]);
   protected readonly slotsLoading = signal(false);
   protected readonly selectedWeekOneLessons = signal<WeekOneLessonPick[]>([]);
@@ -224,16 +227,43 @@ export class AdminPending {
     });
   }
 
-  markInactive(row: AdminApplicationRow): void {
+  openDecline(row: AdminApplicationRow): void {
     if (!row.onboardingCompleted) return;
+    this.declineTarget.set(row);
+    this.declineMessage.set('');
+    this.loadError.set(null);
+  }
+
+  closeDecline(): void {
+    this.declineTarget.set(null);
+    this.declineMessage.set('');
+  }
+
+  confirmDecline(): void {
+    const row = this.declineTarget();
+    if (!row) return;
+
+    const message = this.declineMessage().trim();
+    if (message.length < 10) {
+      this.loadError.set('Please include a message for the student (at least 10 characters).');
+      return;
+    }
+
     this.actionUserId.set(row.userId);
-    this.adminApi.setApplicationStatus(row.userId, 'inactive').subscribe({
+    this.loadError.set(null);
+    this.adminApi.declineApplication(row.userId, message).subscribe({
       next: () => {
+        this.actionUserId.set(null);
+        this.closeDecline();
         this.rows.update((list) => list.filter((r) => r.userId !== row.userId));
         this.navBadges.refresh();
       },
-      error: () => this.loadError.set('Could not update status.'),
-      complete: () => this.actionUserId.set(null),
+      error: (err: { error?: { message?: string } }) => {
+        this.loadError.set(err?.error?.message ?? 'Could not decline application.');
+        this.actionUserId.set(null);
+      },
     });
+  }
+
   }
 }

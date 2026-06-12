@@ -40,13 +40,21 @@
       [class.status-card--review]="presentation.tone === 'review'"
       [class.status-card--success]="presentation.tone === 'success'"
       [class.status-card--action]="presentation.tone === 'action'"
+      [class.status-card--rejected]="presentation.tone === 'rejected'"
     >
       <div class="status-card__top">
         <div class="status-badge" [class.status-badge--pulse]="presentation.tone === 'review'">
           <span class="status-badge__dot" aria-hidden="true"></span>
           <span class="status-badge__label">{{ presentation.label }}</span>
         </div>
-        <p class="status-card__detail">{{ presentation.detail }}</p>
+        @if (app?.status === 'rejected' && app?.rejectionMessage) {
+          <div class="rejection-reason" role="status">
+            <h2 class="rejection-reason__title">Reason</h2>
+            <p class="rejection-reason__message">{{ app.rejectionMessage }}</p>
+          </div>
+        } @else {
+          <p class="status-card__detail">{{ presentation.detail }}</p>
+        }
       </div>
 
       <div class="progress-track" aria-hidden="true">

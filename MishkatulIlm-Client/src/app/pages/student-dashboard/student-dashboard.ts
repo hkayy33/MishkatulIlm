@@ -24,7 +24,7 @@ import { StudentMatchedPortal } from './student-matched-portal';
 interface StatusPresentation {
   label: string;
   detail: string;
-  tone: 'pending' | 'review' | 'success' | 'neutral' | 'action';
+  tone: 'pending' | 'review' | 'success' | 'neutral' | 'action' | 'rejected';
 }
 
 @Component({
@@ -56,8 +56,9 @@ export class StudentDashboard {
   });
 
   protected readonly statusPresentation = computed((): StatusPresentation => {
-    const status = this.application()?.status ?? 'pending_application';
-    return statusPresentationFor(status);
+    const app = this.application();
+    const status = app?.status ?? 'pending_application';
+    return statusPresentationFor(status, app?.rejectionMessage ?? null);
   });
 
   protected readonly progressPercent = computed(() => {
@@ -72,8 +73,9 @@ export class StudentDashboard {
       case 'matched':
       case 'active':
         return 100;
+      case 'rejected':
       case 'inactive':
-        return 50;
+        return 100;
       case 'approved':
         return 85;
       case 'enrolled':
@@ -198,7 +200,10 @@ export class StudentDashboard {
   }
 }
 
-function statusPresentationFor(status: StudentApplicationStatus): StatusPresentation {
+function statusPresentationFor(
+  status: StudentApplicationStatus,
+  rejectionMessage: string | null,
+): StatusPresentation {
   switch (status) {
     case 'pending_application':
       return {
@@ -226,10 +231,13 @@ function statusPresentationFor(status: StudentApplicationStatus): StatusPresenta
         tone: 'success',
       };
     case 'inactive':
+    case 'rejected':
       return {
-        label: 'Inactive',
-        detail: 'Your application is on hold. Contact us if you have questions.',
-        tone: 'neutral',
+        label: 'Application rejected',
+        detail:
+          rejectionMessage?.trim() ||
+          'Your application was not accepted. Contact us if you have questions.',
+        tone: 'rejected',
       };
     case 'approved':
       return {
@@ -255,10 +263,15 @@ function statusPresentationFor(status: StudentApplicationStatus): StatusPresenta
 function normalizeApplication(app: StudentApplicationResponse): StudentApplicationResponse {
   const raw = app as StudentApplicationResponse & {
     ScheduleProposal?: StudentApplicationResponse['scheduleProposal'];
+    RejectionMessage?: string | null;
   };
   const proposal = app.scheduleProposal ?? raw.ScheduleProposal ?? null;
+  const rejectionMessage = app.rejectionMessage ?? raw.RejectionMessage ?? null;
+  const status =
+    app.status === 'inactive' ? ('rejected' as const) : app.status;
+
   if (!proposal) {
-    return { ...app, scheduleProposal: null };
+    return { ...app, status, rejectionMessage, scheduleProposal: null };
   }
 
   const lessons = (proposal.plannedLessons ?? []).map((l) => {
@@ -272,20 +285,24 @@ function normalizeApplication(app: StudentApplicationResponse): StudentApplicati
 
   return {
     ...app,
+    status,
+    rejectionMessage,
     scheduleProposal: { ...proposal, plannedLessons: lessons },
   };
 }
 
 function buildApplicationSteps(status: StudentApplicationStatus): ApplicationStep[] {
+  const rejected = status === 'rejected' || status === 'inactive';
   const applicationComplete =
-    status !== 'pending_application' && status !== 'inactive';
+    status !== 'pending_application' && !rejected;
   const reviewReached =
     status === 'under_review' ||
     status === 'awaiting_reply' ||
     status === 'matched' ||
     status === 'active' ||
     status === 'approved' ||
-    status === 'enrolled';
+    status === 'enrolled' ||
+    rejected;
   const matched =
     status === 'matched' || status === 'active' || status === 'approved' || status === 'enrolled';
   const enrolled = status === 'enrolled';
@@ -307,19 +324,23 @@ function buildApplicationSteps(status: StudentApplicationStatus): ApplicationSte
     },
     {
       id: 'review',
-      title: 'Under review',
-      description: reviewReached
-        ? 'Our team is reviewing your application.'
-        : 'We review applications after you submit the form.',
-      state: matched || enrolled ? 'complete' : reviewReached ? 'current' : 'upcoming',
+      title: rejected ? 'Application reviewed' : 'Under review',
+      description: rejected
+        ? 'Our team has reviewed your application.'
+        : reviewReached
+          ? 'Our team is reviewing your application.'
+          : 'We review applications after you submit the form.',
+      state: rejected ? 'complete' : matched || enrolled ? 'complete' : reviewReached ? 'current' : 'upcoming',
     },
     {
       id: 'matched',
       title: 'Matched with a teacher',
-      description: matched
-        ? 'You are matched and can manage your lessons below.'
-        : 'We will match you when a suitable teacher is available.',
-      state: enrolled || matched ? 'complete' : 'upcoming',
+      description: rejected
+        ? 'Your application was not accepted at this time.'
+        : matched
+          ? 'You are matched and can manage your lessons below.'
+          : 'We will match you when a suitable teacher is available.',
+      state: rejected ? 'current' : enrolled || matched ? 'complete' : 'upcoming',
     },
   ];
 }

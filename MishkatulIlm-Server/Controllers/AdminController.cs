@@ -325,6 +325,39 @@ public sealed class AdminController(
             });
     }
 
+    [HttpPost("applications/{userId:guid}/decline")]
+    public async Task<IActionResult> DeclineApplication(
+        Guid userId,
+        [FromBody] DeclineApplicationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!await IsCurrentUserAdminAsync(cancellationToken))
+            return Forbid();
+
+        var message = request.Message.Trim();
+        if (message.Length < 10)
+            return BadRequest(new { message = "Please include a message for the student (at least 10 characters)." });
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId && !u.IsAdmin, cancellationToken);
+        if (user is null)
+            return NotFound(new { message = "Student application not found." });
+
+        if (!user.OnboardingCompleted)
+            return BadRequest(new { message = "The student must complete onboarding before it can be declined." });
+
+        if (user.ApplicationStatus == ApplicationStatusCodes.Active)
+            return BadRequest(new { message = "Active students cannot be declined from pending applications." });
+
+        await scheduleProposals.SupersedeOpenProposalsForStudentAsync(userId, cancellationToken);
+
+        user.ApplicationStatus = ApplicationStatusCodes.Inactive;
+        user.ApplicationDeclineMessage = message;
+        user.ApplicationDeclinedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Ok(new { message = "The student will see this on their dashboard." });
+    }
+
     [HttpPatch("applications/{userId:guid}/status")]
     public async Task<IActionResult> SetApplicationStatus(
         Guid userId,
@@ -344,6 +377,10 @@ public sealed class AdminController(
         if (status == ApplicationStatusCodes.Active)
             return BadRequest(
                 new { message = "Use Approve with lesson slots to activate a student." });
+
+        if (status == ApplicationStatusCodes.Inactive)
+            return BadRequest(
+                new { message = "Use Decline with a message so the student knows why." });
 
         user.ApplicationStatus = status;
         await db.SaveChangesAsync(cancellationToken);

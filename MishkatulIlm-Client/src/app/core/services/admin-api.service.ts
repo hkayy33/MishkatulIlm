@@ -178,6 +178,12 @@ export class AdminApiService {
     return this.http.delete<{ message: string; removed: number }>(this.base('/calendar/slots'));
   }
 
+  declineApplication(userId: string, message: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(this.base(`/applications/${userId}/decline`), {
+      message,
+    });
+  }
+
   setApplicationStatus(userId: string, status: AdminApplicationStatus): Observable<void> {
     return this.http.patch<void>(this.base(`/applications/${userId}/status`), { status });
   }

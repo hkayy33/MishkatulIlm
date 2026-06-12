@@ -3,10 +3,13 @@ namespace MishkatulIlm_Server.Dtos;
 /// <summary>GET /api/onboarding/me — student-facing application status for the dashboard.</summary>
 public sealed class StudentApplicationResponse
 {
-    /// <summary>pending_application | under_review | approved | enrolled</summary>
+    /// <summary>pending_application | under_review | awaiting_reply | matched | rejected | …</summary>
     public string Status { get; init; } = "pending_application";
 
     public bool OnboardingCompleted { get; init; }
+
+    /// <summary>Present when <see cref="Status"/> is <c>rejected</c>.</summary>
+    public string? RejectionMessage { get; init; }
 
     public StudentApplicationSummary? Summary { get; init; }
 

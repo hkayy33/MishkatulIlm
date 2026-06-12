@@ -16,7 +16,16 @@ import {
 } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import type { AuthUser, LoginRequest, RegisterRequest, RegisterResult } from '../models/auth.models';
-import { getAuthEmailRedirectUrl, hasAuthCallbackParams, buildSupabasePkceVerifyUrl, isPkceEmailToken, PENDING_SIGNUP_EMAIL_KEY } from '../supabase/auth-redirect';
+import {
+  backupPkceVerifierFromSignup,
+  buildSupabasePkceVerifyUrl,
+  getAuthEmailRedirectUrl,
+  hasAuthCallbackParams,
+  isPkceEmailToken,
+  PENDING_SIGNUP_EMAIL_KEY,
+  PENDING_PKCE_VERIFIER_KEY,
+  restorePkceVerifierBackup,
+} from '../supabase/auth-redirect';
 import {
   getSupabaseBrowserClient,
   isSupabaseConfigured,
@@ -50,8 +59,7 @@ export class AuthService {
   readonly isAuthenticated = computed(() => !!this._accessToken());
 
   constructor() {
-    if (!isPlatformBrowser(this.platformId) || !isSupabaseConfigured()) return;
-    this.registerAuthListener();
+    // Auth listener is registered from initSession so PKCE verifier restore runs first.
   }
 
   /**
@@ -73,9 +81,12 @@ export class AuthService {
       path.endsWith('/auth/callback') ||
       hasAuthCallbackParams(href);
 
-    // Avoid consuming PKCE codes / hash tokens before handleAuthRedirectResult runs.
+    // Avoid getSession() consuming ?code= before we restore the signup PKCE verifier.
     if (deferForAuthCallback) {
       this.markSessionReady();
+      queueMicrotask(() => {
+        void this.completePostAuthLanding();
+      });
       return Promise.resolve();
     }
 
@@ -262,6 +273,7 @@ export class AuthService {
         if (result.needsEmailConfirmation && isPlatformBrowser(this.platformId)) {
           try {
             sessionStorage.setItem(PENDING_SIGNUP_EMAIL_KEY, body.email.trim());
+            backupPkceVerifierFromSignup();
           } catch {
             // ignore private mode / blocked storage
           }
@@ -312,6 +324,7 @@ export class AuthService {
     if (!isPlatformBrowser(this.platformId)) return;
     try {
       sessionStorage.removeItem(PENDING_SIGNUP_EMAIL_KEY);
+      sessionStorage.removeItem(PENDING_PKCE_VERIFIER_KEY);
     } catch {
       // ignore
     }
@@ -347,6 +360,11 @@ export class AuthService {
     ).pipe(
       map(({ error }) => {
         if (error) throw error;
+      }),
+      tap(() => {
+        if (isPlatformBrowser(this.platformId)) {
+          backupPkceVerifierFromSignup();
+        }
       }),
     );
   }
@@ -475,6 +493,18 @@ export class AuthService {
 
       if (!session) {
         session = await this.parseImplicitHashSession(client);
+      }
+
+      if (!session && hasPkceCode) {
+        restorePkceVerifierBackup();
+        const {
+          data: { session: urlSession },
+          error: urlSessionError,
+        } = await client.auth.getSession();
+        if (urlSessionError) {
+          console.warn('[AuthService] getSession after confirmation redirect:', urlSessionError.message);
+        }
+        session = urlSession;
       }
 
       if (!session) {
@@ -622,9 +652,25 @@ export class AuthService {
       const code = url.searchParams.get('code')?.trim();
       if (!code) return null;
 
-      const { data, error } = await client.auth.exchangeCodeForSession(code);
-      if (error) throw error;
-      return data.session;
+      const exchange = async (): Promise<Session | null> => {
+        restorePkceVerifierBackup();
+        const { data, error } = await client.auth.exchangeCodeForSession(code);
+        if (error) throw error;
+        return data.session;
+      };
+
+      try {
+        return await exchange();
+      } catch (first) {
+        console.warn('[AuthService] exchangeCodeForSession:', first);
+        if (!restorePkceVerifierBackup()) return null;
+        const { data, error } = await client.auth.exchangeCodeForSession(code);
+        if (error) {
+          console.warn('[AuthService] exchangeCodeForSession retry:', error.message);
+          return null;
+        }
+        return data.session;
+      }
     } catch (ex) {
       console.warn('[AuthService] exchangeCodeForSession:', ex);
       return null;

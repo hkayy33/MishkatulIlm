@@ -5,6 +5,45 @@ export const AUTH_EMAIL_CALLBACK_PATH = '/auth/callback';
 /** Set after register when email confirmation is required; used if PKCE link opens in another browser. */
 export const PENDING_SIGNUP_EMAIL_KEY = 'mishkatul_pending_signup_email';
 
+/** Backup of Supabase PKCE code_verifier from the original signup (survives failed /token exchange). */
+export const PENDING_PKCE_VERIFIER_KEY = 'mishkatul_pkce_verifier';
+
+/** localStorage key Supabase uses for the PKCE code_verifier (`sb-<project-ref>-auth-token-code-verifier`). */
+export function supabaseCodeVerifierStorageKey(): string | null {
+  const base = environment.supabaseUrl?.trim().replace(/\/$/, '') ?? '';
+  const match = /\/\/([^.]+)\.supabase\.co/.exec(base);
+  return match?.[1] ? `sb-${match[1]}-auth-token-code-verifier` : null;
+}
+
+export function backupPkceVerifierFromSignup(): void {
+  if (typeof globalThis === 'undefined' || !globalThis.localStorage) return;
+  const key = supabaseCodeVerifierStorageKey();
+  if (!key) return;
+  try {
+    const verifier = globalThis.localStorage.getItem(key);
+    if (verifier) {
+      globalThis.sessionStorage.setItem(PENDING_PKCE_VERIFIER_KEY, verifier);
+    }
+  } catch {
+    // ignore private mode
+  }
+}
+
+/** Restore signup PKCE verifier before exchanging `?code=` from the confirmation email. */
+export function restorePkceVerifierBackup(): boolean {
+  if (typeof globalThis === 'undefined' || !globalThis.localStorage) return false;
+  const key = supabaseCodeVerifierStorageKey();
+  if (!key) return false;
+  try {
+    const backup = globalThis.sessionStorage.getItem(PENDING_PKCE_VERIFIER_KEY);
+    if (!backup) return false;
+    globalThis.localStorage.setItem(key, backup);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const LOCAL_DEV_ORIGIN = 'http://localhost:4200';
 
 function browserOrigin(): string {

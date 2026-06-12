@@ -42,7 +42,8 @@ export class Login implements OnInit {
       .subscribe((ready) => {
         if (!ready) return;
         const u = this.auth.user();
-        if (u?.isAdmin) void this.router.navigate(['/admin'], { replaceUrl: true });
+        if (!u) return;
+        if (u.isAdmin) void this.router.navigate(['/admin'], { replaceUrl: true });
         else if (u?.onboardingCompleted) void this.router.navigate(['/dashboard'], { replaceUrl: true });
         else void this.router.navigate(['/onboarding'], { replaceUrl: true });
       });

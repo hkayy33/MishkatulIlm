@@ -11,8 +11,8 @@ const files = [
       "// Gitignored — local dev secrets.\n" +
       'export const localDevSecrets = {\n' +
       '  supabaseAnonKey: \'\',\n' +
-      "  /** Mac LAN IP when testing auth emails on a phone; use http://localhost:4200 on desktop only. */\n" +
-      '  authRedirectOrigin: \'http://192.168.1.40:4200\',\n' +
+      "  /** Override for phone/LAN testing (e.g. http://192.168.x.x:4200); desktop dev uses localhost. */\n" +
+      '  authRedirectOrigin: \'http://localhost:4200\',\n' +
       '};\n',
   },
   {

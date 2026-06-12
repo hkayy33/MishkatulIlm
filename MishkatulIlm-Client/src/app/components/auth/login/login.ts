@@ -22,12 +22,6 @@ export class Login implements OnInit {
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
 
-    const href = globalThis.location?.href ?? '';
-    if (href.includes('code=')) {
-      void this.auth.handleAuthRedirectResult();
-      return;
-    }
-
     if (this.route.snapshot.queryParamMap.get('confirmed') === '1') {
       this.submitInfo = 'Your email is confirmed. Sign in with your password to continue.';
     }

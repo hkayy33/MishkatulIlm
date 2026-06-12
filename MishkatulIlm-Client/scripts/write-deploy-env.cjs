@@ -23,6 +23,12 @@ const supabaseAnonKey = (process.env.SUPABASE_ANON_KEY || '').trim();
 function resolveAuthRedirectOrigin() {
   const explicit = (process.env.AUTH_REDIRECT_ORIGIN || '').trim();
   if (explicit) return explicit;
+  const productionHost = (process.env.VERCEL_PROJECT_PRODUCTION_URL || '').trim();
+  if (productionHost) {
+    return productionHost.startsWith('http')
+      ? productionHost
+      : `https://${productionHost.replace(/^https?:\/\//, '')}`;
+  }
   const vercelHost = (process.env.VERCEL_URL || '').trim().replace(/^https?:\/\//, '');
   if (vercelHost) return `https://${vercelHost}`;
   return undefined;

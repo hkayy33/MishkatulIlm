@@ -269,23 +269,40 @@ export class AuthService {
     );
   }
 
+  /** After email verification, finish redirect to onboarding/dashboard from any landing URL. */
+  async completePostAuthLanding(): Promise<void> {
+    if (!isPlatformBrowser(this.platformId) || !isSupabaseConfigured()) return;
+
+    await firstValueFrom(this.whenSessionReady$());
+
+    const href = globalThis.location?.href ?? '';
+    if (hasAuthCallbackParams(href)) {
+      await this.handleAuthRedirectResult();
+      return;
+    }
+
+    if (!this.isAuthenticated() || !this.isMarketingHomePath()) return;
+
+    const u = this._user();
+    if (!u || u.isAdmin || u.onboardingCompleted) return;
+
+    await this.finishAuthenticatedRedirect();
+  }
+
   async handleAuthRedirectResult(): Promise<void> {
     if (!isPlatformBrowser(this.platformId)) return;
 
     const href = globalThis.location?.href ?? '';
-    const onCallbackRoute = this.isAuthCallbackRoute();
+    const pendingAuthCallback = hasAuthCallbackParams(href);
 
     if (this.authRedirectHandled) {
-      if (onCallbackRoute && this.isAuthenticated()) {
+      if (this.isAuthenticated() && pendingAuthCallback) {
         await this.finishAuthenticatedRedirect();
       }
       return;
     }
 
-    if (!hasAuthCallbackParams(href)) {
-      if (onCallbackRoute && this.isAuthenticated()) {
-        await this.finishAuthenticatedRedirect();
-      }
+    if (!pendingAuthCallback) {
       return;
     }
 
@@ -330,15 +347,42 @@ export class AuthService {
     }
   }
 
-  private isAuthCallbackRoute(): boolean {
+  private isMarketingHomePath(): boolean {
     const path = globalThis.location?.pathname ?? '';
-    return path === '/auth/callback' || path.endsWith('/auth/callback');
+    return path === '' || path === '/';
   }
 
   private async finishAuthenticatedRedirect(): Promise<void> {
     await firstValueFrom(this.syncServerProfile().pipe(catchError(() => of(void 0))));
     await firstValueFrom(this.refreshServerProfile().pipe(catchError(() => of(void 0))));
     await this.navigateAfterAuthenticated();
+    this.stripAuthCallbackParamsFromUrl();
+  }
+
+  /** Remove ?code= / hash tokens from the address bar after a successful auth redirect. */
+  private stripAuthCallbackParamsFromUrl(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    try {
+      const url = new URL(globalThis.location.href);
+      const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+      const hadQuery =
+        url.searchParams.has('code') ||
+        url.searchParams.has('error') ||
+        url.searchParams.has('error_description');
+      const hadHash =
+        hashParams.has('access_token') || hashParams.has('error') || hashParams.has('code');
+
+      if (!hadQuery && !hadHash) return;
+
+      url.searchParams.delete('code');
+      url.searchParams.delete('error');
+      url.searchParams.delete('error_description');
+      url.hash = '';
+      globalThis.history.replaceState(globalThis.history.state, '', url.pathname + url.search);
+    } catch {
+      // ignore malformed URLs
+    }
   }
 
   private async navigateAfterAuthenticated(): Promise<void> {

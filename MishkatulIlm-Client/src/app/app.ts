@@ -1,7 +1,8 @@
-import { Component, inject, signal } from '@angular/core';
+import { afterNextRender, Component, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, map, merge, of } from 'rxjs';
+import { AuthService } from './core/services/auth.service';
 import { NavBar } from './shared/nav-bar/nav-bar';
 import { Footer } from './shared/footer/footer';
 
@@ -13,8 +14,16 @@ import { Footer } from './shared/footer/footer';
 })
 export class App {
   private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
 
   protected readonly title = signal('MishkatulIlm-Client');
+
+  constructor() {
+    // Supabase may redirect to Site URL root (/?code=...) instead of /auth/callback.
+    afterNextRender(() => {
+      void this.auth.completePostAuthLanding();
+    });
+  }
 
   protected readonly showMarketingShell = toSignal(
     merge(

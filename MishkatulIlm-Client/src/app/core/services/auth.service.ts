@@ -66,7 +66,7 @@ export class AuthService {
 
     this.registerAuthListener();
 
-    // PKCE callback is handled on /auth/callback after the router is ready (see AuthCallback).
+    // Auth callback URLs are handled after the router is ready (see completePostAuthLanding).
     return getSupabaseBrowserClient()
       .auth.getSession()
       .then(({ data, error }) => {
@@ -338,20 +338,27 @@ export class AuthService {
     const client = this.getClient();
 
     try {
-      let {
-        data: { session },
-        error: sessionError,
-      } = await client.auth.getSession();
-      if (sessionError) throw sessionError;
+      let session: Session | null = null;
 
       const emailOtp = this.parseEmailOtpCallback(href);
-      if (!session && emailOtp) {
-        const { data, error } = await client.auth.verifyOtp({
-          token_hash: emailOtp.tokenHash,
-          type: emailOtp.type,
-        });
-        if (error) throw error;
-        session = data.session;
+      if (emailOtp) {
+        session = await this.verifyEmailOtpSession(client, emailOtp.tokenHash, emailOtp.type);
+        if (!session) {
+          throw new Error('Email confirmation link is invalid or expired.');
+        }
+      }
+
+      if (!session) {
+        session = await this.parseImplicitHashSession(client);
+      }
+
+      if (!session) {
+        const {
+          data: { session: stored },
+          error: sessionError,
+        } = await client.auth.getSession();
+        if (sessionError) throw sessionError;
+        session = stored;
       }
 
       const hasPkceCode = href.includes('code=');
@@ -453,6 +460,46 @@ export class AuthService {
     } catch {
       return null;
     }
+  }
+
+  /** Parses `#access_token=...&refresh_token=...` from implicit-flow email confirmation. */
+  private async parseImplicitHashSession(
+    client: ReturnType<AuthService['getClient']>,
+  ): Promise<Session | null> {
+    const hash = globalThis.location?.hash?.replace(/^#/, '') ?? '';
+    if (!hash) return null;
+
+    const params = new URLSearchParams(hash);
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    if (!accessToken || !refreshToken) return null;
+
+    const { data, error } = await client.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (error) throw error;
+    return data.session;
+  }
+
+  /** Tries signup then email type — Supabase templates vary. */
+  private async verifyEmailOtpSession(
+    client: ReturnType<AuthService['getClient']>,
+    tokenHash: string,
+    type: EmailOtpType,
+  ): Promise<Session | null> {
+    const types: EmailOtpType[] =
+      type === 'signup' ? ['signup', 'email'] : type === 'email' ? ['email', 'signup'] : [type];
+
+    for (const otpType of types) {
+      const { data, error } = await client.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: otpType,
+      });
+      if (!error && data.session) return data.session;
+      if (error) console.warn('[AuthService] verifyOtp:', otpType, error.message);
+    }
+    return null;
   }
 
   private async navigateAfterAuthenticated(): Promise<void> {

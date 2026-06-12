@@ -19,8 +19,15 @@ export class App {
   protected readonly title = signal('MishkatulIlm-Client');
 
   constructor() {
-    // Supabase may redirect to Site URL root (/?code=...) instead of /auth/callback.
+    // Handle email-verification landing on Site URL root (/?code=... or /?token_hash=...).
     afterNextRender(() => {
+      const path = globalThis.location?.pathname ?? '';
+      const href = globalThis.location?.href ?? '';
+      const onCallback = path === '/auth/callback' || path.endsWith('/auth/callback');
+      if (onCallback) return;
+      if (!href.includes('code=') && !href.includes('token_hash=') && !href.includes('access_token=')) {
+        return;
+      }
       void this.auth.completePostAuthLanding();
     });
   }

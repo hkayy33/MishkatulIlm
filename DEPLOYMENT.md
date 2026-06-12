@@ -19,14 +19,26 @@
      `https://your-app.vercel.app/auth/callback`  
      `http://localhost:4200/auth/callback` (local dev)
 
-5. **Authentication → Email Templates → Confirm signup** — use a direct app link (not `{{ .ConfirmationURL }}`). PKCE confirmation links only work in the same browser that registered; `token_hash` works from any device:
+5. **Authentication → Email Templates → Confirm signup** — use the **`token_hash` link** (required; default `{{ .ConfirmationURL }}` breaks with PKCE across browsers):
 
    ```html
    <h2>Confirm your signup</h2>
    <p><a href="{{ .SiteURL }}auth/callback?token_hash={{ .TokenHash }}&type=signup">Confirm your email</a></p>
    ```
 
-   (`Site URL` in Supabase should end with `/`, e.g. `https://your-app.vercel.app/`.)
+   After saving, new emails must start with `https://your-app.vercel.app/auth/callback?token_hash=...` — **not** `supabase.co/auth/v1/verify?token=pkce_...`.
+
+   (`Site URL` should end with `/`, e.g. `https://your-app.vercel.app/`.)
+
+6. **Production checklist**
+   - [ ] Fly `ConnectionStrings__DefaultConnection` → `db.kpvfrbgpbmlxkqqibpjp.supabase.co` (same project as auth)
+   - [ ] Fly `Supabase__Url` → `https://kpvfrbgpbmlxkqqibpjp.supabase.co` (no `/rest/v1`)
+   - [ ] Fly `Cors__AllowedOrigins__0` → `https://al-usooliyyah.vercel.app`
+   - [ ] Vercel `API_BASE_URL` → `https://mishkatulilm-api.fly.dev`
+   - [ ] Vercel `SUPABASE_URL` + `SUPABASE_ANON_KEY` for project `kpvfrbgpbmlxkqqibpjp`
+   - [ ] Vercel `AUTH_REDIRECT_ORIGIN` → `https://al-usooliyyah.vercel.app`
+   - [ ] Email template uses `token_hash` link above
+   - [ ] Test: register → email link → lands on `/onboarding` (use a **new** email each test)
 
 Run migrations once (from your machine with connection string set):
 

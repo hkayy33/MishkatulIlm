@@ -2,6 +2,9 @@ import { environment } from '../../../environments/environment';
 
 export const AUTH_EMAIL_CALLBACK_PATH = '/auth/callback';
 
+/** Set after register when email confirmation is required; used if PKCE link opens in another browser. */
+export const PENDING_SIGNUP_EMAIL_KEY = 'mishkatul_pending_signup_email';
+
 const LOCAL_DEV_ORIGIN = 'http://localhost:4200';
 
 function browserOrigin(): string {

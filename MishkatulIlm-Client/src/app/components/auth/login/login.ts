@@ -23,7 +23,8 @@ export class Login implements OnInit {
     if (!isPlatformBrowser(this.platformId)) return;
 
     if (this.route.snapshot.queryParamMap.get('confirmed') === '1') {
-      this.submitInfo = 'Your email is confirmed. Sign in with your password to continue.';
+      this.submitInfo =
+        'Your email is confirmed. Sign in with your password to continue to onboarding.';
     }
 
     const err = this.route.snapshot.queryParamMap.get('authError');

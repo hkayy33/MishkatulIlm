@@ -46,6 +46,7 @@ export class VerifyEmail implements OnInit, OnDestroy {
   submitError: string | null = null;
   submitInfo: string | null = null;
   resendBusy = false;
+  verifyBusy = false;
   readonly cooldownSec = signal(0);
 
   private cooldownTicker: ReturnType<typeof setInterval> | null = null;
@@ -55,7 +56,11 @@ export class VerifyEmail implements OnInit, OnDestroy {
       void this.router.navigate(['/register']);
       return;
     }
-    if (this.route.snapshot.queryParamMap.get('firstSent') === '1') {
+
+    if (this.route.snapshot.queryParamMap.get('linkOpened') === '1') {
+      this.submitInfo =
+        'The email link could not sign you in automatically (common when opened from a mail app). Enter the 6-digit code below, or log in with your password if the link already confirmed your email.';
+    } else if (this.route.snapshot.queryParamMap.get('firstSent') === '1') {
       this.startCooldown(FIRST_SIGNUP_COOLDOWN_SEC);
       void this.router.navigate([], {
         relativeTo: this.route,
@@ -67,6 +72,42 @@ export class VerifyEmail implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopCooldownTicker();
+  }
+
+  onVerifyCode(event: Event): void {
+    event.preventDefault();
+    const form = event.target as HTMLFormElement;
+    const otp = (form.elements.namedItem('otp') as HTMLInputElement)?.value?.trim() ?? '';
+
+    this.submitError = null;
+    if (!/^\d{6}$/.test(otp)) {
+      this.submitError = 'Enter the 6-digit code from your email.';
+      return;
+    }
+    if (!this.auth.supabaseConfigured()) {
+      this.submitError = 'Supabase is not configured.';
+      return;
+    }
+
+    this.verifyBusy = true;
+    this.auth.verifySignupOtpCode(this.email, otp).subscribe({
+      next: () => {
+        this.verifyBusy = false;
+        const u = this.auth.user();
+        if (u?.isAdmin) void this.router.navigate(['/admin'], { replaceUrl: true });
+        else void this.router.navigate(['/onboarding'], { replaceUrl: true });
+      },
+      error: (err: Error & { message?: string }) => {
+        this.verifyBusy = false;
+        const msg = err?.message ?? 'Invalid or expired confirmation code.';
+        if (/already confirmed|already verified/i.test(msg)) {
+          this.submitInfo = 'Your email is already confirmed. You can log in with your password.';
+          this.submitError = null;
+          return;
+        }
+        this.submitError = msg;
+      },
+    });
   }
 
   resend(): void {

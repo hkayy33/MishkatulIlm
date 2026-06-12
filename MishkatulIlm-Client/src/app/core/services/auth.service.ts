@@ -16,7 +16,7 @@ import {
 } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import type { AuthUser, LoginRequest, RegisterRequest, RegisterResult } from '../models/auth.models';
-import { getAuthEmailRedirectUrl, hasAuthCallbackParams, buildSupabasePkceVerifyUrl, isPkceEmailToken } from '../supabase/auth-redirect';
+import { getAuthEmailRedirectUrl, hasAuthCallbackParams, buildSupabasePkceVerifyUrl, isPkceEmailToken, PENDING_SIGNUP_EMAIL_KEY } from '../supabase/auth-redirect';
 import {
   getSupabaseBrowserClient,
   isSupabaseConfigured,
@@ -258,7 +258,63 @@ export class AuthService {
         }
         return of({ needsEmailConfirmation: true } satisfies RegisterResult);
       }),
+      tap((result) => {
+        if (result.needsEmailConfirmation && isPlatformBrowser(this.platformId)) {
+          try {
+            sessionStorage.setItem(PENDING_SIGNUP_EMAIL_KEY, body.email.trim());
+          } catch {
+            // ignore private mode / blocked storage
+          }
+        }
+      }),
     );
+  }
+
+  /** Confirms signup with the 6-digit code from the email (`{{ .Token }}`). Works in any browser — no PKCE. */
+  verifySignupOtpCode(email: string, token: string): Observable<void> {
+    const normalizedEmail = email.trim();
+    const normalizedToken = token.trim();
+    const types: EmailOtpType[] = ['signup', 'email'];
+
+    const tryType = (index: number): Observable<void> => {
+      if (index >= types.length) {
+        return throwError(() => new Error('Invalid or expired confirmation code.'));
+      }
+      return from(
+        this.getClient().auth.verifyOtp({
+          email: normalizedEmail,
+          token: normalizedToken,
+          type: types[index]!,
+        }),
+      ).pipe(
+        switchMap(({ data, error }) => {
+          if (error) {
+            if (index + 1 < types.length) return tryType(index + 1);
+            return throwError(() => error);
+          }
+          if (!data.session) {
+            return throwError(() => new Error('Could not start a session. Try signing in with your password.'));
+          }
+          this.applySession(data.session);
+          this.clearPendingSignupEmail();
+          return this.syncServerProfile().pipe(
+            switchMap(() => this.refreshServerProfile().pipe(catchError(() => of(void 0)))),
+            map(() => void 0),
+          );
+        }),
+      );
+    };
+
+    return tryType(0);
+  }
+
+  private clearPendingSignupEmail(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    try {
+      sessionStorage.removeItem(PENDING_SIGNUP_EMAIL_KEY);
+    } catch {
+      // ignore
+    }
   }
 
   /** Dev-only: server builds a confirmation URL that bypasses Supabase email templates. */
@@ -469,6 +525,18 @@ export class AuthService {
       const url = new URL(href);
       if (url.searchParams.has('code')) {
         this.stripAuthCallbackParamsFromUrl();
+        // ConfirmationURL confirms email on Supabase before this; PKCE /token fails in another browser.
+        const pendingEmail =
+          isPlatformBrowser(this.platformId) ?
+            sessionStorage.getItem(PENDING_SIGNUP_EMAIL_KEY)?.trim()
+          : '';
+        if (pendingEmail) {
+          await this.router.navigateByUrl(
+            `/verify-email?email=${encodeURIComponent(pendingEmail)}&linkOpened=1`,
+            { replaceUrl: true },
+          );
+          return;
+        }
         await this.router.navigateByUrl('/login?confirmed=1', { replaceUrl: true });
         return;
       }
@@ -491,6 +559,7 @@ export class AuthService {
   }
 
   private async finishAuthenticatedRedirect(newSignup = false): Promise<void> {
+    this.clearPendingSignupEmail();
     await this.navigateAfterAuthenticated(newSignup);
     this.stripAuthCallbackParamsFromUrl();
     void firstValueFrom(this.syncServerProfile().pipe(catchError(() => of(void 0))));
@@ -779,6 +848,7 @@ export class AuthService {
       tap(({ data, error }) => {
         if (error) throw error;
         this.applySession(data.session);
+        this.clearPendingSignupEmail();
       }),
       switchMap(() => this.syncServerProfile()),
       switchMap(() => this.refreshServerProfile().pipe(catchError(() => of(void 0)))),

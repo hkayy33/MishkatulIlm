@@ -3,8 +3,7 @@
     <header class="auth-card__header">
       <h2>Confirm your email</h2>
       <p class="auth-card__lede">
-        We sent a confirmation link to <span class="verify-email__addr">{{ email }}</span>. Open it to verify your
-        account, then you can sign in and continue to onboarding.
+        We sent a confirmation email to <span class="verify-email__addr">{{ email }}</span>.
       </p>
     </header>
 
@@ -15,10 +14,37 @@
       <p class="auth-form__info" role="status">{{ submitInfo }}</p>
     }
 
+    <form class="auth-form verify-email__otp-form" novalidate (submit)="onVerifyCode($event)">
+      <p class="verify-email__hint verify-email__hint--lead">
+        Enter the <strong>6-digit code</strong> from the email (works in any browser — no link required).
+      </p>
+      <div class="auth-form__field">
+        <label for="verify-otp">Confirmation code</label>
+        <input
+          id="verify-otp"
+          name="otp"
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          maxlength="6"
+          pattern="[0-9]{6}"
+          placeholder="123456"
+          required
+        />
+      </div>
+      <button type="submit" class="auth-form__submit" [disabled]="verifyBusy">
+        {{ verifyBusy ? 'Verifying…' : 'Verify and continue' }}
+      </button>
+    </form>
+
     <div class="verify-email__actions">
+      <p class="verify-email__hint">
+        Or open the confirmation link in the <strong>same browser</strong> you used to register.
+      </p>
+
       <button
         type="button"
-        class="auth-form__submit"
+        class="auth-form__submit auth-form__submit--secondary"
         [disabled]="resendBusy || cooldownSec() > 0"
         (click)="resend()"
       >
@@ -32,7 +58,7 @@
       </button>
 
       <p class="verify-email__hint">
-        After you verify, <a routerLink="/login">go to log in</a>.
+        Already verified? <a routerLink="/login">Log in</a>.
       </p>
     </div>
 

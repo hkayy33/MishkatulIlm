@@ -20,7 +20,15 @@ const envDir = path.join(root, 'src/environments');
 const apiBaseUrl = (process.env.API_BASE_URL || '').trim();
 const supabaseUrl = (process.env.SUPABASE_URL || '').trim();
 const supabaseAnonKey = (process.env.SUPABASE_ANON_KEY || '').trim();
-const authRedirectOrigin = (process.env.AUTH_REDIRECT_ORIGIN || '').trim() || undefined;
+function resolveAuthRedirectOrigin() {
+  const explicit = (process.env.AUTH_REDIRECT_ORIGIN || '').trim();
+  if (explicit) return explicit;
+  const vercelHost = (process.env.VERCEL_URL || '').trim().replace(/^https?:\/\//, '');
+  if (vercelHost) return `https://${vercelHost}`;
+  return undefined;
+}
+
+const authRedirectOrigin = resolveAuthRedirectOrigin();
 
 if (!supabaseAnonKey) {
   console.error('write-deploy-env: SUPABASE_ANON_KEY is required for production builds.');

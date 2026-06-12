@@ -16,7 +16,7 @@ import {
 } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import type { AuthUser, LoginRequest, RegisterRequest, RegisterResult } from '../models/auth.models';
-import { getAuthEmailRedirectUrl } from '../supabase/auth-redirect';
+import { getAuthEmailRedirectUrl, hasAuthCallbackParams } from '../supabase/auth-redirect';
 import {
   getSupabaseBrowserClient,
   isSupabaseConfigured,
@@ -39,6 +39,7 @@ export class AuthService {
   });
 
   private authListenerRegistered = false;
+  private authRedirectHandled = false;
 
   private readonly _accessToken = signal<string | null>(null);
   private readonly _user = signal<AuthUser | null>(null);
@@ -64,6 +65,7 @@ export class AuthService {
 
     this.registerAuthListener();
 
+    // PKCE callback is handled on /auth/callback after the router is ready (see AuthCallback).
     return getSupabaseBrowserClient()
       .auth.getSession()
       .then(({ data, error }) => {
@@ -203,15 +205,13 @@ export class AuthService {
   }
 
   register(body: RegisterRequest): Observable<RegisterResult> {
-    const emailRedirectTo = isPlatformBrowser(this.platformId)
-      ? getAuthEmailRedirectUrl()
-      : '';
+    const emailRedirectTo = getAuthEmailRedirectUrl();
     return from(
       this.getClient().auth.signUp({
         email: body.email,
         password: body.password,
         options: {
-          emailRedirectTo: emailRedirectTo || undefined,
+          emailRedirectTo,
           data: {
             first_name: body.firstName,
             last_name: body.lastName,
@@ -255,12 +255,12 @@ export class AuthService {
   }
 
   resendSignupConfirmation(email: string): Observable<void> {
-    const redirectTo = isPlatformBrowser(this.platformId) ? getAuthEmailRedirectUrl() : '';
+    const emailRedirectTo = getAuthEmailRedirectUrl();
     return from(
       this.getClient().auth.resend({
         type: 'signup',
         email: email.trim(),
-        options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
+        options: { emailRedirectTo },
       }),
     ).pipe(
       map(({ error }) => {
@@ -272,8 +272,26 @@ export class AuthService {
   async handleAuthRedirectResult(): Promise<void> {
     if (!isPlatformBrowser(this.platformId)) return;
 
-    const client = this.getClient();
     const href = globalThis.location?.href ?? '';
+    const onCallbackRoute = this.isAuthCallbackRoute();
+
+    if (this.authRedirectHandled) {
+      if (onCallbackRoute && this.isAuthenticated()) {
+        await this.finishAuthenticatedRedirect();
+      }
+      return;
+    }
+
+    if (!hasAuthCallbackParams(href)) {
+      if (onCallbackRoute && this.isAuthenticated()) {
+        await this.finishAuthenticatedRedirect();
+      }
+      return;
+    }
+
+    this.authRedirectHandled = true;
+
+    const client = this.getClient();
 
     try {
       let {
@@ -294,9 +312,7 @@ export class AuthService {
       });
 
       if (session) {
-        await firstValueFrom(this.syncServerProfile().pipe(catchError(() => of(void 0))));
-        await firstValueFrom(this.refreshServerProfile().pipe(catchError(() => of(void 0))));
-        await this.navigateAfterAuthenticated();
+        await this.finishAuthenticatedRedirect();
       } else {
         await this.router.navigateByUrl('/login?authError=session', { replaceUrl: true });
       }
@@ -307,13 +323,22 @@ export class AuthService {
       } = await client.auth.getSession();
       if (recovered) {
         this.zone.run(() => this.applySession(recovered));
-        await firstValueFrom(this.syncServerProfile().pipe(catchError(() => of(void 0))));
-        await firstValueFrom(this.refreshServerProfile().pipe(catchError(() => of(void 0))));
-        await this.navigateAfterAuthenticated();
+        await this.finishAuthenticatedRedirect();
         return;
       }
       await this.router.navigateByUrl('/login?authError=verify', { replaceUrl: true });
     }
+  }
+
+  private isAuthCallbackRoute(): boolean {
+    const path = globalThis.location?.pathname ?? '';
+    return path === '/auth/callback' || path.endsWith('/auth/callback');
+  }
+
+  private async finishAuthenticatedRedirect(): Promise<void> {
+    await firstValueFrom(this.syncServerProfile().pipe(catchError(() => of(void 0))));
+    await firstValueFrom(this.refreshServerProfile().pipe(catchError(() => of(void 0))));
+    await this.navigateAfterAuthenticated();
   }
 
   private async navigateAfterAuthenticated(): Promise<void> {

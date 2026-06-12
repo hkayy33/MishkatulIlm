@@ -23,7 +23,12 @@
   text-align: center;
 }
 
-.verify-email__hint a {
+.verify-email__hint--lead {
+  text-align: left;
+}
+
+.auth-form__submit--secondary {
+  background: transparent;
   color: #6b5a45;
-  font-weight: 600;
+  border: 1px solid #c4b8a8;
 }

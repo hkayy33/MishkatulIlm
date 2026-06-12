@@ -156,6 +156,99 @@ public sealed class SupabaseAdminAuthClient(
         return (true, false);
     }
 
+    /// <summary>Exchanges a signup confirmation <paramref name="tokenHash"/> for a session via Supabase Auth.</summary>
+    public async Task<(SupabaseVerifyResponse? Result, string? ErrorMessage)> VerifyTokenHashAsync(
+        string tokenHash,
+        string type,
+        CancellationToken cancellationToken)
+    {
+        if (!IsConfigured)
+        {
+            logger.LogWarning("Supabase verify token_hash skipped: ServiceRoleKey or Url not configured.");
+            return (null, "Auth is not configured on the server.");
+        }
+
+        var hash = tokenHash.Trim();
+        if (hash.Length == 0)
+            return (null, "Missing token_hash.");
+
+        var otpType = string.IsNullOrWhiteSpace(type) ? "email" : type.Trim();
+        var baseUrl = _opts.Url.Trim().TrimEnd('/');
+        var client = httpClientFactory.CreateClient();
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/auth/v1/verify");
+
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _opts.ServiceRoleKey);
+        req.Headers.TryAddWithoutValidation("apikey", _opts.ServiceRoleKey);
+
+        object payload = hash.StartsWith("pkce_", StringComparison.Ordinal)
+            ? new { token = hash, type = otpType }
+            : new { token_hash = hash, type = otpType };
+
+        req.Content = new StringContent(
+            JsonSerializer.Serialize(payload),
+            Encoding.UTF8,
+            "application/json");
+
+        HttpResponseMessage res;
+        try
+        {
+            res = await client.SendAsync(req, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Supabase verify token_hash HTTP failure");
+            return (null, "Could not reach the auth service.");
+        }
+
+        var body = await res.Content.ReadAsStringAsync(cancellationToken);
+        if (!res.IsSuccessStatusCode)
+        {
+            logger.LogWarning(
+                "Supabase verify token_hash failed ({Status}) type={Type}: {Body}",
+                (int)res.StatusCode,
+                otpType,
+                body);
+            return (null, ParseSupabaseErrorMessage(body) ?? "Email confirmation link is invalid or expired.");
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<SupabaseVerifyResponse>(body);
+            if (parsed is null || string.IsNullOrWhiteSpace(parsed.AccessToken))
+            {
+                logger.LogWarning("Supabase verify token_hash: missing access_token: {Body}", body);
+                return (null, "Confirmation succeeded but no session was returned.");
+            }
+
+            return (parsed, null);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Supabase verify token_hash: invalid JSON: {Body}", body);
+            return (null, "Invalid response from the auth service.");
+        }
+    }
+
+    private static string? ParseSupabaseErrorMessage(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("msg", out var msg))
+                return msg.GetString();
+            if (doc.RootElement.TryGetProperty("message", out var message))
+                return message.GetString();
+            if (doc.RootElement.TryGetProperty("error_description", out var desc))
+                return desc.GetString();
+        }
+        catch
+        {
+            // ignore
+        }
+
+        return null;
+    }
+
     /// <summary>
     /// Builds a signup confirmation URL with an explicit <paramref name="redirectTo"/> (bypasses email templates).
     /// </summary>

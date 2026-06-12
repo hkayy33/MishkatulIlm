@@ -3,8 +3,7 @@
     <header class="auth-card__header">
       <h2>Confirm your email</h2>
       <p class="auth-card__lede">
-        We sent a confirmation link to <span class="verify-email__addr">{{ email }}</span>. Open it to verify your
-        account, then you can sign in and continue to onboarding.
+        We sent a confirmation email to <span class="verify-email__addr">{{ email }}</span>.
       </p>
     </header>
 
@@ -16,9 +15,18 @@
     }
 
     <div class="verify-email__actions">
+      <p class="verify-email__hint verify-email__hint--lead">
+        Open the confirmation link in the <strong>same browser</strong> you used to register. That
+        will sign you in and take you to onboarding.
+      </p>
+      <p class="verify-email__hint">
+        If you already clicked the link, you can
+        <a routerLink="/login">log in with your password</a>.
+      </p>
+
       <button
         type="button"
-        class="auth-form__submit"
+        class="auth-form__submit auth-form__submit--secondary"
         [disabled]="resendBusy || cooldownSec() > 0"
         (click)="resend()"
       >
@@ -32,7 +40,7 @@
       </button>
 
       <p class="verify-email__hint">
-        After you verify, <a routerLink="/login">go to log in</a>.
+        Already verified? <a routerLink="/login">Log in</a>.
       </p>
     </div>
 

@@ -23,7 +23,8 @@ export class Login implements OnInit {
     if (!isPlatformBrowser(this.platformId)) return;
 
     if (this.route.snapshot.queryParamMap.get('confirmed') === '1') {
-      this.submitInfo = 'Your email is confirmed. Sign in with your password to continue.';
+      this.submitInfo =
+        'Your email is confirmed. Sign in with your password to continue to onboarding.';
     }
 
     const err = this.route.snapshot.queryParamMap.get('authError');
@@ -31,8 +32,8 @@ export class Login implements OnInit {
       this.submitError =
         'Email confirmation failed or the link expired. Try signing in, or register again and use a fresh confirmation link.';
     } else if (err === 'session') {
-      this.submitError =
-        'We could not establish a session from that link. Try signing in with your email and password.';
+      this.submitInfo =
+        'Your email is confirmed. Sign in with your password below to continue to onboarding.';
     }
 
     this.auth
@@ -41,7 +42,8 @@ export class Login implements OnInit {
       .subscribe((ready) => {
         if (!ready) return;
         const u = this.auth.user();
-        if (u?.isAdmin) void this.router.navigate(['/admin'], { replaceUrl: true });
+        if (!u) return;
+        if (u.isAdmin) void this.router.navigate(['/admin'], { replaceUrl: true });
         else if (u?.onboardingCompleted) void this.router.navigate(['/dashboard'], { replaceUrl: true });
         else void this.router.navigate(['/onboarding'], { replaceUrl: true });
       });
@@ -69,7 +71,13 @@ export class Login implements OnInit {
         else void this.router.navigate(['/onboarding']);
       },
       error: (err: Error & { message?: string }) => {
-        this.submitError = err?.message || 'Could not sign in. Try again.';
+        const msg = err?.message || 'Could not sign in. Try again.';
+        if (/email not confirmed/i.test(msg)) {
+          this.submitError =
+            'Your email is not verified yet. Open the latest confirmation email and click the link, or register again to get a new one.';
+          return;
+        }
+        this.submitError = msg;
       },
     });
   }

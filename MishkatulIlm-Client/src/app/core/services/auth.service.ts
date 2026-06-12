@@ -16,7 +16,22 @@ import {
 } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import type { AuthUser, LoginRequest, RegisterRequest, RegisterResult } from '../models/auth.models';
-import { getAuthEmailRedirectUrl, hasAuthCallbackParams } from '../supabase/auth-redirect';
+import {
+  backupPkceVerifierFromSignup,
+  buildSupabasePkceVerifyUrl,
+  captureAuthCallbackSnapshot,
+  clearAuthCallbackSnapshot,
+  getAuthCallbackCode,
+  getAuthEmailRedirectUrl,
+  hasAuthCallbackParams,
+  isAuthCallbackRoute,
+  isPkceEmailToken,
+  parseAuthCallbackError,
+  PENDING_SIGNUP_EMAIL_KEY,
+  PENDING_PKCE_VERIFIER_KEY,
+  redirectToAuthCallbackIfNeeded,
+  restorePkceVerifierBackup,
+} from '../supabase/auth-redirect';
 import {
   getSupabaseBrowserClient,
   isSupabaseConfigured,
@@ -50,8 +65,7 @@ export class AuthService {
   readonly isAuthenticated = computed(() => !!this._accessToken());
 
   constructor() {
-    if (!isPlatformBrowser(this.platformId) || !isSupabaseConfigured()) return;
-    this.registerAuthListener();
+    // Auth listener is registered from initSession so PKCE verifier restore runs first.
   }
 
   /**
@@ -64,20 +78,58 @@ export class AuthService {
       return Promise.resolve();
     }
 
-    this.registerAuthListener();
+    const href = globalThis.location?.href ?? '';
+    const path = globalThis.location?.pathname ?? '';
+    const onCallback = isAuthCallbackRoute(path);
+    const authLanding = hasAuthCallbackParams(href) || onCallback;
 
-    // PKCE callback is handled on /auth/callback after the router is ready (see AuthCallback).
+    if (authLanding && redirectToAuthCallbackIfNeeded(href)) {
+      return Promise.resolve();
+    }
+
+    if (authLanding) {
+      captureAuthCallbackSnapshot(href);
+      restorePkceVerifierBackup();
+    }
+
+    const pendingCode = getAuthCallbackCode(href);
+
+    const applyInitSession = (session: Session | null, error?: unknown) => {
+      if (error) console.warn('[AuthService] initSession getSession:', error);
+      this.zone.run(() => {
+        if (session) {
+          this.applySession(session);
+          this.pushSessionToServer();
+        }
+        this.markSessionReady();
+      });
+      // Leave ?code= exchange to completePostAuthLanding (needs cross-tab verifier restore).
+      if (session && authLanding && !pendingCode) {
+        this.authRedirectHandled = true;
+        const newSignup = href.includes('token_hash=');
+        void this.finishAuthenticatedRedirect(newSignup);
+      }
+    };
+
+    if (authLanding) {
+      return getSupabaseBrowserClient()
+        .auth.getSession()
+        .then(({ data, error }) => {
+          applyInitSession(data.session, error);
+          this.registerAuthListener();
+        })
+        .catch((err) => {
+          console.warn('[AuthService] initSession failed:', err);
+          this.markSessionReady();
+          this.registerAuthListener();
+        });
+    }
+
+    this.registerAuthListener();
     return getSupabaseBrowserClient()
       .auth.getSession()
       .then(({ data, error }) => {
-        if (error) console.warn('[AuthService] initSession getSession:', error);
-        this.zone.run(() => {
-          if (data.session) {
-            this.applySession(data.session);
-            this.pushSessionToServer();
-          }
-          this.markSessionReady();
-        });
+        applyInitSession(data.session, error);
       })
       .catch((err) => {
         console.warn('[AuthService] initSession failed:', err);
@@ -170,7 +222,20 @@ export class AuthService {
 
   whenSessionReady$(): Observable<boolean> {
     if (!isPlatformBrowser(this.platformId)) return of(false);
-    return from(this.sessionReady).pipe(map(() => this.isAuthenticated()));
+    return from(this.sessionReady).pipe(
+      switchMap(() => {
+        if (this.isAuthenticated()) return of(true);
+        return from(getSupabaseBrowserClient().auth.getSession()).pipe(
+          map(({ data: { session } }) => {
+            if (session) {
+              this.applySession(session);
+              return true;
+            }
+            return false;
+          }),
+        );
+      }),
+    );
   }
 
   isApiRequest(url: string): boolean {
@@ -233,7 +298,30 @@ export class AuthService {
         }
         return of({ needsEmailConfirmation: true } satisfies RegisterResult);
       }),
+      tap((result) => {
+        if (result.needsEmailConfirmation && isPlatformBrowser(this.platformId)) {
+          try {
+            globalThis.localStorage?.setItem(PENDING_SIGNUP_EMAIL_KEY, body.email.trim());
+            backupPkceVerifierFromSignup();
+          } catch {
+            // ignore private mode / blocked storage
+          }
+        }
+      }),
     );
+  }
+
+  private clearPendingSignupEmail(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    try {
+      globalThis.localStorage?.removeItem(PENDING_SIGNUP_EMAIL_KEY);
+      globalThis.localStorage?.removeItem(PENDING_PKCE_VERIFIER_KEY);
+      globalThis.sessionStorage?.removeItem(PENDING_SIGNUP_EMAIL_KEY);
+      globalThis.sessionStorage?.removeItem(PENDING_PKCE_VERIFIER_KEY);
+      clearAuthCallbackSnapshot();
+    } catch {
+      // ignore
+    }
   }
 
   /** Dev-only: server builds a confirmation URL that bypasses Supabase email templates. */
@@ -267,6 +355,11 @@ export class AuthService {
       map(({ error }) => {
         if (error) throw error;
       }),
+      tap(() => {
+        if (isPlatformBrowser(this.platformId)) {
+          backupPkceVerifierFromSignup();
+        }
+      }),
     );
   }
 
@@ -287,18 +380,35 @@ export class AuthService {
 
     const href = globalThis.location?.href ?? '';
     const onCallback = this.isAuthCallbackRoute();
+    const newSignup =
+      !!getAuthCallbackCode(href) || href.includes('token_hash=');
 
-    if (hasAuthCallbackParams(href)) {
+    if (redirectToAuthCallbackIfNeeded(href)) return;
+
+    if (this.isAuthenticated() && (hasAuthCallbackParams(href) || onCallback)) {
+      await this.finishAuthenticatedRedirect(newSignup);
+      return;
+    }
+
+    if (hasAuthCallbackParams(href) || getAuthCallbackCode(href)) {
       await this.handleAuthRedirectResult();
       return;
     }
 
     if (onCallback) {
       if (this.isAuthenticated()) {
-        await this.finishAuthenticatedRedirect();
-      } else {
-        await this.router.navigateByUrl('/login?authError=session', { replaceUrl: true });
+        await this.finishAuthenticatedRedirect(newSignup);
+        return;
       }
+
+      const recovered = await this.tryRecoverSessionFromCallback(this.getClient());
+      if (recovered) {
+        this.zone.run(() => this.applySession(recovered));
+        await this.finishAuthenticatedRedirect(newSignup);
+        return;
+      }
+
+      await this.navigateAfterFailedAuthCallback(href);
       return;
     }
 
@@ -314,21 +424,41 @@ export class AuthService {
     if (!isPlatformBrowser(this.platformId)) return;
 
     const href = globalThis.location?.href ?? '';
-    const pendingAuthCallback = hasAuthCallbackParams(href);
+    const pendingAuthCallback = hasAuthCallbackParams(href) || !!getAuthCallbackCode(href);
     const onCallback = this.isAuthCallbackRoute();
+    const newSignup =
+      !!getAuthCallbackCode(href) || href.includes('token_hash=');
+
+    if (redirectToAuthCallbackIfNeeded(href)) return;
+
+    if (parseAuthCallbackError(href)) {
+      await this.navigateAfterFailedAuthCallback(href);
+      return;
+    }
+
+    if (this.isAuthenticated() && (pendingAuthCallback || onCallback)) {
+      await this.finishAuthenticatedRedirect(newSignup);
+      return;
+    }
 
     if (this.authRedirectHandled) {
       if (this.isAuthenticated() && (pendingAuthCallback || onCallback)) {
-        await this.finishAuthenticatedRedirect();
+        await this.finishAuthenticatedRedirect(newSignup);
       } else if (onCallback && !this.isAuthenticated()) {
-        await this.router.navigateByUrl('/login?authError=verify', { replaceUrl: true });
+        const recovered = await this.tryRecoverSessionFromCallback(this.getClient());
+        if (recovered) {
+          this.zone.run(() => this.applySession(recovered));
+          await this.finishAuthenticatedRedirect(newSignup);
+          return;
+        }
+        await this.navigateAfterFailedAuthCallback(href);
       }
       return;
     }
 
     if (!pendingAuthCallback) {
       if (onCallback && this.isAuthenticated()) {
-        await this.finishAuthenticatedRedirect();
+        await this.finishAuthenticatedRedirect(newSignup);
       }
       return;
     }
@@ -336,29 +466,67 @@ export class AuthService {
     this.authRedirectHandled = true;
 
     const client = this.getClient();
+    const emailOtp = this.parseEmailOtpCallback(href);
+    const pkceCode = getAuthCallbackCode(href);
+    const hasPkceCode = !!pkceCode;
+    const redirectAsNewSignup =
+      emailOtp?.type === 'signup' ||
+      emailOtp?.type === 'email' ||
+      (hasPkceCode && !emailOtp);
+
+    // PKCE tokens in token_hash must go through Supabase verify (confirms email + returns ?code=).
+    if (emailOtp && isPkceEmailToken(emailOtp.tokenHash)) {
+      const verifyUrl = buildSupabasePkceVerifyUrl(emailOtp.tokenHash);
+      if (verifyUrl) {
+        this.authRedirectHandled = true;
+        globalThis.location.assign(verifyUrl);
+        return;
+      }
+    }
 
     try {
-      let {
-        data: { session },
-        error: sessionError,
-      } = await client.auth.getSession();
-      if (sessionError) throw sessionError;
+      let session: Session | null = null;
 
-      const emailOtp = this.parseEmailOtpCallback(href);
-      if (!session && emailOtp) {
-        const { data, error } = await client.auth.verifyOtp({
-          token_hash: emailOtp.tokenHash,
-          type: emailOtp.type,
-        });
-        if (error) throw error;
-        session = data.session;
+      if (emailOtp) {
+        const otpResult = await this.verifyEmailOtpSession(
+          client,
+          emailOtp.tokenHash,
+          emailOtp.type,
+        );
+        if (otpResult.session) {
+          session = otpResult.session;
+        } else if (otpResult.confirmed) {
+          session = await this.waitForAuthSession(client);
+        } else {
+          throw new Error('Email confirmation link is invalid or expired.');
+        }
       }
 
-      const hasPkceCode = href.includes('code=');
+      if (!session) {
+        session = await this.parseImplicitHashSession(client);
+      }
+
       if (!session && hasPkceCode) {
-        const { data, error } = await client.auth.exchangeCodeForSession(href);
-        if (error) throw error;
-        session = data.session;
+        restorePkceVerifierBackup();
+        session = await this.exchangePkceCodeSession(client, href);
+      }
+
+      if (!session && hasPkceCode) {
+        const {
+          data: { session: stored },
+          error: sessionError,
+        } = await client.auth.getSession();
+        if (sessionError) console.warn('[AuthService] getSession after code exchange:', sessionError.message);
+        session = stored;
+      }
+
+      if (!session) {
+        const {
+          data: { session: stored },
+          error: sessionError,
+        } = await client.auth.getSession();
+        if (sessionError) console.warn('[AuthService] getSession:', sessionError.message);
+        session = stored;
       }
 
       this.zone.run(() => {
@@ -366,9 +534,9 @@ export class AuthService {
       });
 
       if (session) {
-        await this.finishAuthenticatedRedirect();
+        await this.finishAuthenticatedRedirect(redirectAsNewSignup);
       } else {
-        await this.router.navigateByUrl('/login?authError=session', { replaceUrl: true });
+        await this.navigateAfterFailedAuthCallback(href);
       }
     } catch (ex) {
       console.warn('[AuthService] handleAuthRedirectResult:', ex);
@@ -377,16 +545,41 @@ export class AuthService {
       } = await client.auth.getSession();
       if (recovered) {
         this.zone.run(() => this.applySession(recovered));
-        await this.finishAuthenticatedRedirect();
+        await this.finishAuthenticatedRedirect(redirectAsNewSignup);
         return;
       }
-      await this.router.navigateByUrl('/login?authError=verify', { replaceUrl: true });
+      await this.navigateAfterFailedAuthCallback(href);
     }
   }
 
+  /**
+   * When Supabase ConfirmationURL confirms email but PKCE exchange fails (e.g. different browser),
+   * the user still needs to sign in — not a generic "session" failure.
+   */
+  private async navigateAfterFailedAuthCallback(href: string): Promise<void> {
+    const authError = parseAuthCallbackError(href);
+    const code = getAuthCallbackCode(href);
+    const onCallback = this.isAuthCallbackRoute();
+
+    this.stripAuthCallbackParamsFromUrl();
+    clearAuthCallbackSnapshot();
+
+    if (authError) {
+      await this.router.navigateByUrl('/login?authError=verify', { replaceUrl: true });
+      return;
+    }
+
+    // Supabase returned ?code= (email confirmed) but PKCE exchange did not produce a session.
+    if (code || onCallback) {
+      await this.router.navigateByUrl('/login?confirmed=1', { replaceUrl: true });
+      return;
+    }
+
+    await this.router.navigateByUrl('/login?authError=verify', { replaceUrl: true });
+  }
+
   private isAuthCallbackRoute(): boolean {
-    const path = globalThis.location?.pathname ?? '';
-    return path === '/auth/callback' || path.endsWith('/auth/callback');
+    return isAuthCallbackRoute(globalThis.location?.pathname ?? '');
   }
 
   private isMarketingHomePath(): boolean {
@@ -394,8 +587,9 @@ export class AuthService {
     return path === '' || path === '/';
   }
 
-  private async finishAuthenticatedRedirect(): Promise<void> {
-    await this.navigateAfterAuthenticated();
+  private async finishAuthenticatedRedirect(newSignup = false): Promise<void> {
+    this.clearPendingSignupEmail();
+    await this.navigateAfterAuthenticated(newSignup);
     this.stripAuthCallbackParamsFromUrl();
     void firstValueFrom(this.syncServerProfile().pipe(catchError(() => of(void 0))));
     void firstValueFrom(this.refreshServerProfile().pipe(catchError(() => of(void 0))));
@@ -431,13 +625,64 @@ export class AuthService {
     }
   }
 
+  /** Tries hash tokens, PKCE code exchange, then stored session — used when callback params were already consumed. */
+  private async tryRecoverSessionFromCallback(
+    client: ReturnType<AuthService['getClient']>,
+  ): Promise<Session | null> {
+    const hashSession = await this.parseImplicitHashSession(client);
+    if (hashSession) return hashSession;
+
+    const href = globalThis.location?.href ?? '';
+    const pkceSession = await this.exchangePkceCodeSession(client, href);
+    if (pkceSession) return pkceSession;
+
+    const {
+      data: { session },
+    } = await client.auth.getSession();
+    return session;
+  }
+
+  private async exchangePkceCodeSession(
+    client: ReturnType<AuthService['getClient']>,
+    href: string,
+  ): Promise<Session | null> {
+    const code = getAuthCallbackCode(href);
+    if (!code) return null;
+
+    try {
+      const exchange = async (): Promise<Session | null> => {
+        restorePkceVerifierBackup();
+        const { data, error } = await client.auth.exchangeCodeForSession(code);
+        if (error) throw error;
+        return data.session;
+      };
+
+      try {
+        return await exchange();
+      } catch (first) {
+        console.warn('[AuthService] exchangeCodeForSession:', first);
+        if (!restorePkceVerifierBackup()) return null;
+        const { data, error } = await client.auth.exchangeCodeForSession(code);
+        if (error) {
+          console.warn('[AuthService] exchangeCodeForSession retry:', error.message);
+          return null;
+        }
+        return data.session;
+      }
+    } catch (ex) {
+      console.warn('[AuthService] exchangeCodeForSession:', ex);
+      return null;
+    }
+  }
+
   private parseEmailOtpCallback(href: string): { tokenHash: string; type: EmailOtpType } | null {
     try {
       const url = new URL(href);
-      const tokenHash = url.searchParams.get('token_hash')?.trim();
+      const raw = url.searchParams.get('token_hash');
+      const tokenHash = raw?.trim() ?? '';
       if (!tokenHash) return null;
 
-      const typeParam = url.searchParams.get('type')?.trim() || 'signup';
+      const typeParam = url.searchParams.get('type')?.trim() || 'email';
       const allowed: EmailOtpType[] = [
         'signup',
         'email',
@@ -455,7 +700,176 @@ export class AuthService {
     }
   }
 
-  private async navigateAfterAuthenticated(): Promise<void> {
+  /** Parses `#access_token=...&refresh_token=...` from implicit-flow email confirmation. */
+  private async parseImplicitHashSession(
+    client: ReturnType<AuthService['getClient']>,
+  ): Promise<Session | null> {
+    const hash = globalThis.location?.hash?.replace(/^#/, '') ?? '';
+    if (!hash) return null;
+
+    const params = new URLSearchParams(hash);
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    if (!accessToken || !refreshToken) return null;
+
+    const { data, error } = await client.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (error) {
+      console.warn('[AuthService] setSession from hash:', error.message);
+      return null;
+    }
+    return data.session;
+  }
+
+  /** Tries email then signup — Supabase signup confirmation uses type <c>email</c> for token_hash. */
+  private async verifyEmailOtpSession(
+    client: ReturnType<AuthService['getClient']>,
+    tokenHash: string,
+    type: EmailOtpType,
+  ): Promise<{ session: Session | null; confirmed: boolean }> {
+    const types: EmailOtpType[] =
+      type === 'email' ? ['email', 'signup'] : type === 'signup' ? ['email', 'signup'] : [type, 'email'];
+
+    for (const otpType of types) {
+      const { data, error } = await client.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: otpType,
+      });
+      if (!error && data.session) return { session: data.session, confirmed: true };
+      if (!error && data.user) return { session: null, confirmed: true };
+      if (error) console.warn('[AuthService] verifyOtp:', otpType, error.message);
+    }
+
+    const restSession = await this.verifyEmailOtpViaRest(tokenHash, types);
+    if (restSession) return { session: restSession, confirmed: true };
+
+    const serverSession = await this.verifyEmailOtpViaServer(tokenHash, type);
+    if (serverSession) return { session: serverSession, confirmed: true };
+
+    return { session: null, confirmed: false };
+  }
+
+  private async verifyEmailOtpViaRest(
+    tokenHash: string,
+    types: EmailOtpType[],
+  ): Promise<Session | null> {
+    if (!environment.supabaseUrl || !environment.supabaseAnonKey) return null;
+
+    for (const otpType of types) {
+      try {
+        const res = await fetch(`${environment.supabaseUrl.replace(/\/$/, '')}/auth/v1/verify`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: environment.supabaseAnonKey,
+            Authorization: `Bearer ${environment.supabaseAnonKey}`,
+          },
+          body: JSON.stringify(
+            tokenHash.startsWith('pkce_')
+              ? { token: tokenHash, type: otpType }
+              : { token_hash: tokenHash, type: otpType },
+          ),
+        });
+        const body = (await res.json()) as {
+          access_token?: string;
+          refresh_token?: string;
+          msg?: string;
+        };
+        if (!res.ok) {
+          console.warn('[AuthService] verify REST:', otpType, body.msg ?? res.status);
+          continue;
+        }
+        if (!body.access_token || !body.refresh_token) continue;
+
+        const { data, error } = await getSupabaseBrowserClient().auth.setSession({
+          access_token: body.access_token,
+          refresh_token: body.refresh_token,
+        });
+        if (error) {
+          console.warn('[AuthService] setSession after REST verify:', error.message);
+          continue;
+        }
+        return data.session;
+      } catch (ex) {
+        console.warn('[AuthService] verifyEmailOtpViaRest:', ex);
+      }
+    }
+    return null;
+  }
+
+  private async verifyEmailOtpViaServer(
+    tokenHash: string,
+    type: EmailOtpType,
+  ): Promise<Session | null> {
+    if (!this.apiConfigured()) return null;
+
+    try {
+      const base = environment.apiBaseUrl.replace(/\/$/, '');
+      const res = await firstValueFrom(
+        this.http.post<{
+          accessToken: string;
+          refreshToken: string;
+        }>(`${base}/api/auth/verify-email-callback`, {
+          tokenHash,
+          type,
+        }),
+      );
+      if (!res.accessToken || !res.refreshToken) return null;
+
+      const { data, error } = await getSupabaseBrowserClient().auth.setSession({
+        access_token: res.accessToken,
+        refresh_token: res.refreshToken,
+      });
+      if (error) {
+        console.warn('[AuthService] setSession after server verify:', error.message);
+        return null;
+      }
+      return data.session;
+    } catch (ex) {
+      console.warn('[AuthService] verifyEmailOtpViaServer:', ex);
+      return null;
+    }
+  }
+
+  /** After verifyOtp, Supabase may persist the session slightly after the API response. */
+  private waitForAuthSession(
+    client: ReturnType<AuthService['getClient']>,
+    timeoutMs = 5000,
+  ): Promise<Session | null> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (session: Session | null) => {
+        if (settled) return;
+        settled = true;
+        subscription.unsubscribe();
+        clearTimeout(timer);
+        resolve(session);
+      };
+
+      const {
+        data: { subscription },
+      } = client.auth.onAuthStateChange((event, session) => {
+        if (session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+          finish(session);
+        }
+      });
+
+      void client.auth.getSession().then(({ data: { session } }) => {
+        if (session) finish(session);
+      });
+
+      const timer = setTimeout(() => finish(null), timeoutMs);
+    });
+  }
+
+  private async navigateAfterAuthenticated(newSignup = false): Promise<void> {
+    if (newSignup) {
+      await this.router.navigateByUrl('/onboarding', { replaceUrl: true });
+      return;
+    }
+
     const u = this._user();
     if (u?.isAdmin) {
       await this.router.navigateByUrl('/admin', { replaceUrl: true });
@@ -478,6 +892,7 @@ export class AuthService {
       tap(({ data, error }) => {
         if (error) throw error;
         this.applySession(data.session);
+        this.clearPendingSignupEmail();
       }),
       switchMap(() => this.syncServerProfile()),
       switchMap(() => this.refreshServerProfile().pipe(catchError(() => of(void 0)))),

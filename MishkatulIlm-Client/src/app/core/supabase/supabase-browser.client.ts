@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { environment } from '../../../environments/environment';
-import { hasAuthCallbackParams, restorePkceVerifierBackup } from './auth-redirect';
+import { hasAuthCallbackParams, captureAuthCallbackSnapshot, restorePkceVerifierBackup } from './auth-redirect';
 /** One browser Supabase client so session storage and refresh are never split across instances. */
 let browserClient: SupabaseClient | null = null;
 
@@ -14,6 +14,7 @@ export function getSupabaseBrowserClient(): SupabaseClient {
   if (!browserClient) {
     const href = typeof globalThis !== 'undefined' ? (globalThis.location?.href ?? '') : '';
     if (href && hasAuthCallbackParams(href)) {
+      captureAuthCallbackSnapshot(href);
       restorePkceVerifierBackup();
     }
 
@@ -21,8 +22,8 @@ export function getSupabaseBrowserClient(): SupabaseClient {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        // Exchanged in AuthService.handleAuthRedirectResult; must be true so getSession() can parse ?code=.
-        detectSessionInUrl: true,
+        // Exchange ?code= once in AuthService after restoring the signup verifier (cross-tab safe).
+        detectSessionInUrl: false,
         flowType: 'pkce',
       },
     });

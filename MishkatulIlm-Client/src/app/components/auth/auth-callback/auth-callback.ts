@@ -19,7 +19,7 @@ export class AuthCallback implements OnInit {
       this.errorMessage.set(
         'We could not finish signing you in. Try logging in with your email and password.',
       );
-      void this.router.navigateByUrl('/login?authError=verify', { replaceUrl: true });
+      void this.router.navigateByUrl('/login?confirmed=1', { replaceUrl: true });
     });
   }
 }

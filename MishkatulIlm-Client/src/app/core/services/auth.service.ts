@@ -19,6 +19,9 @@ import type { AuthUser, LoginRequest, RegisterRequest, RegisterResult } from '..
 import {
   backupPkceVerifierFromSignup,
   buildSupabasePkceVerifyUrl,
+  captureAuthCallbackSnapshot,
+  clearAuthCallbackSnapshot,
+  getAuthCallbackCode,
   getAuthEmailRedirectUrl,
   hasAuthCallbackParams,
   isPkceEmailToken,
@@ -78,8 +81,11 @@ export class AuthService {
     const authLanding = hasAuthCallbackParams(href) || onCallback;
 
     if (authLanding) {
+      captureAuthCallbackSnapshot(href);
       restorePkceVerifierBackup();
     }
+
+    const pendingCode = getAuthCallbackCode(href);
 
     const applyInitSession = (session: Session | null, error?: unknown) => {
       if (error) console.warn('[AuthService] initSession getSession:', error);
@@ -90,14 +96,14 @@ export class AuthService {
         }
         this.markSessionReady();
       });
-      if (session && authLanding) {
+      // Leave ?code= exchange to completePostAuthLanding (needs cross-tab verifier restore).
+      if (session && authLanding && !pendingCode) {
         this.authRedirectHandled = true;
-        const newSignup = href.includes('code=') || href.includes('token_hash=');
+        const newSignup = href.includes('token_hash=');
         void this.finishAuthenticatedRedirect(newSignup);
       }
     };
 
-    // Email confirmation landing: exchange ?code= via Supabase before anything else runs.
     if (authLanding) {
       return getSupabaseBrowserClient()
         .auth.getSession()
@@ -288,7 +294,7 @@ export class AuthService {
       tap((result) => {
         if (result.needsEmailConfirmation && isPlatformBrowser(this.platformId)) {
           try {
-            sessionStorage.setItem(PENDING_SIGNUP_EMAIL_KEY, body.email.trim());
+            globalThis.localStorage?.setItem(PENDING_SIGNUP_EMAIL_KEY, body.email.trim());
             backupPkceVerifierFromSignup();
           } catch {
             // ignore private mode / blocked storage
@@ -339,8 +345,11 @@ export class AuthService {
   private clearPendingSignupEmail(): void {
     if (!isPlatformBrowser(this.platformId)) return;
     try {
-      sessionStorage.removeItem(PENDING_SIGNUP_EMAIL_KEY);
-      sessionStorage.removeItem(PENDING_PKCE_VERIFIER_KEY);
+      globalThis.localStorage?.removeItem(PENDING_SIGNUP_EMAIL_KEY);
+      globalThis.localStorage?.removeItem(PENDING_PKCE_VERIFIER_KEY);
+      globalThis.sessionStorage?.removeItem(PENDING_SIGNUP_EMAIL_KEY);
+      globalThis.sessionStorage?.removeItem(PENDING_PKCE_VERIFIER_KEY);
+      clearAuthCallbackSnapshot();
     } catch {
       // ignore
     }
@@ -402,14 +411,15 @@ export class AuthService {
 
     const href = globalThis.location?.href ?? '';
     const onCallback = this.isAuthCallbackRoute();
-    const newSignup = href.includes('code=') || href.includes('token_hash=');
+    const newSignup =
+      !!getAuthCallbackCode(href) || href.includes('token_hash=');
 
     if (this.isAuthenticated() && (hasAuthCallbackParams(href) || onCallback)) {
       await this.finishAuthenticatedRedirect(newSignup);
       return;
     }
 
-    if (hasAuthCallbackParams(href)) {
+    if (hasAuthCallbackParams(href) || getAuthCallbackCode(href)) {
       await this.handleAuthRedirectResult();
       return;
     }
@@ -443,9 +453,10 @@ export class AuthService {
     if (!isPlatformBrowser(this.platformId)) return;
 
     const href = globalThis.location?.href ?? '';
-    const pendingAuthCallback = hasAuthCallbackParams(href);
+    const pendingAuthCallback = hasAuthCallbackParams(href) || !!getAuthCallbackCode(href);
     const onCallback = this.isAuthCallbackRoute();
-    const newSignup = href.includes('code=') || href.includes('token_hash=');
+    const newSignup =
+      !!getAuthCallbackCode(href) || href.includes('token_hash=');
 
     if (this.isAuthenticated() && (pendingAuthCallback || onCallback)) {
       await this.finishAuthenticatedRedirect(newSignup);
@@ -478,13 +489,8 @@ export class AuthService {
 
     const client = this.getClient();
     const emailOtp = this.parseEmailOtpCallback(href);
-    const hasPkceCode = (() => {
-      try {
-        return new URL(href).searchParams.has('code');
-      } catch {
-        return href.includes('code=');
-      }
-    })();
+    const pkceCode = getAuthCallbackCode(href);
+    const hasPkceCode = !!pkceCode;
     const redirectAsNewSignup =
       emailOtp?.type === 'signup' ||
       emailOtp?.type === 'email' ||
@@ -524,18 +530,16 @@ export class AuthService {
 
       if (!session && hasPkceCode) {
         restorePkceVerifierBackup();
-        const {
-          data: { session: urlSession },
-          error: urlSessionError,
-        } = await client.auth.getSession();
-        if (urlSessionError) {
-          console.warn('[AuthService] getSession after confirmation redirect:', urlSessionError.message);
-        }
-        session = urlSession;
+        session = await this.exchangePkceCodeSession(client, href);
       }
 
-      if (!session) {
-        session = await this.exchangePkceCodeSession(client, href);
+      if (!session && hasPkceCode) {
+        const {
+          data: { session: stored },
+          error: sessionError,
+        } = await client.auth.getSession();
+        if (sessionError) console.warn('[AuthService] getSession after code exchange:', sessionError.message);
+        session = stored;
       }
 
       if (!session) {
@@ -576,22 +580,19 @@ export class AuthService {
    */
   private async navigateAfterFailedAuthCallback(
     href: string,
-    fallback: 'session' | 'verify' = 'session',
+    _fallback: 'session' | 'verify' = 'session',
   ): Promise<void> {
-    try {
-      const url = new URL(href);
-      if (url.searchParams.has('code')) {
-        this.stripAuthCallbackParamsFromUrl();
-        // Email is confirmed by Supabase before redirect; only the auto sign-in failed.
-        await this.router.navigateByUrl('/login?confirmed=1', { replaceUrl: true });
-        return;
-      }
-    } catch {
-      // ignore malformed URLs
+    const code = getAuthCallbackCode(href);
+    const onCallback = this.isAuthCallbackRoute();
+
+    if (code || onCallback) {
+      this.stripAuthCallbackParamsFromUrl();
+      clearAuthCallbackSnapshot();
+      await this.router.navigateByUrl('/login?confirmed=1', { replaceUrl: true });
+      return;
     }
 
-    const err = fallback === 'verify' ? 'verify' : 'session';
-    await this.router.navigateByUrl(`/login?authError=${err}`, { replaceUrl: true });
+    await this.router.navigateByUrl('/login?authError=verify', { replaceUrl: true });
   }
 
   private isAuthCallbackRoute(): boolean {
@@ -663,11 +664,10 @@ export class AuthService {
     client: ReturnType<AuthService['getClient']>,
     href: string,
   ): Promise<Session | null> {
-    try {
-      const url = new URL(href);
-      const code = url.searchParams.get('code')?.trim();
-      if (!code) return null;
+    const code = getAuthCallbackCode(href);
+    if (!code) return null;
 
+    try {
       const exchange = async (): Promise<Session | null> => {
         restorePkceVerifierBackup();
         const { data, error } = await client.auth.exchangeCodeForSession(code);

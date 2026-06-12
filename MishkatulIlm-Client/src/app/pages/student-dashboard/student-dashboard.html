@@ -47,10 +47,10 @@
           <span class="status-badge__dot" aria-hidden="true"></span>
           <span class="status-badge__label">{{ presentation.label }}</span>
         </div>
-        @if (app?.status === 'rejected' && app?.rejectionMessage) {
+        @if (app?.status === 'rejected' && app?.rejectionMessage; as reason) {
           <div class="rejection-reason" role="status">
             <h2 class="rejection-reason__title">Reason</h2>
-            <p class="rejection-reason__message">{{ app.rejectionMessage }}</p>
+            <p class="rejection-reason__message">{{ reason }}</p>
           </div>
         } @else {
           <p class="status-card__detail">{{ presentation.detail }}</p>

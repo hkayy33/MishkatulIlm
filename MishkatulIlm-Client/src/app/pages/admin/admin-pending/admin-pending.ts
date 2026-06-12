@@ -264,6 +264,4 @@ export class AdminPending {
       },
     });
   }
-
-  }
 }

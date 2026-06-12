@@ -69,8 +69,8 @@ public sealed class ConfigureSupabaseJwtBearerOptions(
 
     private string ResolveSupabaseProjectUrl()
     {
-        var fromSection = supabaseOptions.Value.Url?.Trim().TrimEnd('/') ?? string.Empty;
-        var fromConfig = configuration["Supabase:Url"]?.Trim().TrimEnd('/') ?? string.Empty;
+        var fromSection = SupabaseUrlNormalizer.NormalizeProjectUrl(supabaseOptions.Value.Url);
+        var fromConfig = SupabaseUrlNormalizer.NormalizeProjectUrl(configuration["Supabase:Url"]);
         var supabaseUrl = !string.IsNullOrEmpty(fromSection) ? fromSection : fromConfig;
 
         if (string.IsNullOrEmpty(supabaseUrl))
@@ -78,9 +78,6 @@ public sealed class ConfigureSupabaseJwtBearerOptions(
             throw new InvalidOperationException(
                 "Supabase:Url is not configured. Set it to your project root (e.g. https://xxxx.supabase.co).");
         }
-
-        if (supabaseUrl.EndsWith("/auth/v1", StringComparison.OrdinalIgnoreCase))
-            supabaseUrl = supabaseUrl[..^"/auth/v1".Length].TrimEnd('/');
 
         return supabaseUrl;
     }

@@ -35,7 +35,7 @@ public sealed class SupabaseJwtKeyProvider(
 
     public async Task RefreshAsync(CancellationToken cancellationToken)
     {
-        var url = options.CurrentValue.Url?.Trim().TrimEnd('/');
+        var url = SupabaseUrlNormalizer.NormalizeProjectUrl(options.CurrentValue.Url);
         if (string.IsNullOrWhiteSpace(url))
             return;
 

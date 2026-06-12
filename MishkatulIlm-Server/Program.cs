@@ -28,9 +28,10 @@ if (!string.IsNullOrWhiteSpace(connectionString))
 }
 
 builder.Services.Configure<SupabaseAuthOptions>(builder.Configuration.GetSection(SupabaseAuthOptions.SectionName));
+builder.Services.AddSingleton<IConfigureOptions<SupabaseAuthOptions>, ConfigureSupabaseAuthOptions>();
 
 var supabaseSection = builder.Configuration.GetSection(SupabaseAuthOptions.SectionName);
-var supabaseUrl = supabaseSection.GetValue<string>("Url")?.Trim().TrimEnd('/') ?? string.Empty;
+var supabaseUrl = SupabaseUrlNormalizer.NormalizeProjectUrl(supabaseSection.GetValue<string>("Url"));
 if (string.IsNullOrWhiteSpace(supabaseUrl))
 {
     throw new InvalidOperationException(
@@ -110,6 +111,29 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        var feature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        var logger = context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("GlobalExceptionHandler");
+        logger.LogError(feature?.Error, "Unhandled exception for {Method} {Path}", context.Request.Method, context.Request.Path);
+
+        if (!context.Response.HasStarted)
+        {
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            context.Response.ContentType = "application/problem+json";
+            await context.Response.WriteAsJsonAsync(new
+            {
+                title = "Server error",
+                status = 500,
+                detail = app.Environment.IsDevelopment() ? feature?.Error?.Message : "An unexpected error occurred.",
+            });
+        }
+    });
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -152,8 +176,24 @@ if (!string.IsNullOrWhiteSpace(connectionString))
 {
     await using var scope = app.Services.CreateAsyncScope();
     var db = scope.ServiceProvider.GetService<AppDbContext>();
+    var startupLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
     if (db is not null)
-        await db.Database.MigrateAsync();
+    {
+        try
+        {
+            var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
+            if (pending.Count > 0)
+                startupLogger.LogInformation("Applying {Count} pending migration(s): {Migrations}", pending.Count, string.Join(", ", pending));
+
+            await db.Database.MigrateAsync();
+            startupLogger.LogInformation("Database migrations are up to date.");
+        }
+        catch (Exception ex)
+        {
+            startupLogger.LogCritical(ex, "Database migration failed on startup.");
+            throw;
+        }
+    }
 }
 
 app.Run();

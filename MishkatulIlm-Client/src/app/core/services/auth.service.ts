@@ -353,10 +353,10 @@ export class AuthService {
   }
 
   private async finishAuthenticatedRedirect(): Promise<void> {
-    await firstValueFrom(this.syncServerProfile().pipe(catchError(() => of(void 0))));
-    await firstValueFrom(this.refreshServerProfile().pipe(catchError(() => of(void 0))));
     await this.navigateAfterAuthenticated();
     this.stripAuthCallbackParamsFromUrl();
+    void firstValueFrom(this.syncServerProfile().pipe(catchError(() => of(void 0))));
+    void firstValueFrom(this.refreshServerProfile().pipe(catchError(() => of(void 0))));
   }
 
   /** Remove ?code= / hash tokens from the address bar after a successful auth redirect. */

@@ -47,7 +47,7 @@ fly deploy
 
 ### Secrets
 
-Set production secrets (see `.env.example`):
+Set production secrets (see `.env.example`). Use the **project root** for `Supabase__Url` (e.g. `https://xxxx.supabase.co`) — not the REST API URL (`/rest/v1`).
 
 ```bash
 fly secrets set \

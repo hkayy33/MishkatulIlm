@@ -23,15 +23,12 @@
 
    ```html
    <h2>Confirm your signup</h2>
-   <p>Your confirmation code is:</p>
-   <p style="font-size:28px;letter-spacing:6px;font-weight:bold">{{ .Token }}</p>
-   <p>Enter this code at <a href="{{ .SiteURL }}/verify-email?email={{ .Email }}">Verify your email</a>.</p>
-   <p>Or click here if you are in the <strong>same browser</strong> you used to register:</p>
+   <p>Click the link below in the <strong>same browser</strong> you used to register:</p>
    <p><a href="{{ .ConfirmationURL }}">Confirm your email</a></p>
+   <p>If the link does not sign you in automatically, return to the site and log in with your password.</p>
    ```
 
-   - **6-digit code** — works in any browser (recommended for phone mail apps).
-   - **Confirmation link** — auto sign-in only in the same browser (PKCE); opening from a mail app triggers `invalid flow state` in Supabase logs — that is expected; use the code or log in with your password.
+   - **Confirmation link** — auto sign-in in the same browser (PKCE). Opening from a mail app may confirm the email but not start a session; log in with your password instead.
 
 6. **Production checklist**
    - [ ] Fly `ConnectionStrings__DefaultConnection` → `db.kpvfrbgpbmlxkqqibpjp.supabase.co` (same project as auth)

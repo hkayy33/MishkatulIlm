@@ -23,7 +23,6 @@ import {
   clearAuthCallbackSnapshot,
   getAuthCallbackCode,
   getAuthEmailRedirectUrl,
-  getPendingSignupEmail,
   hasAuthCallbackParams,
   isAuthCallbackRoute,
   isPkceEmailToken,
@@ -312,44 +311,6 @@ export class AuthService {
     );
   }
 
-  /** Confirms signup with the 6-digit code from the email (`{{ .Token }}`). Works in any browser — no PKCE. */
-  verifySignupOtpCode(email: string, token: string): Observable<void> {
-    const normalizedEmail = email.trim();
-    const normalizedToken = token.trim();
-    const types: EmailOtpType[] = ['signup', 'email'];
-
-    const tryType = (index: number): Observable<void> => {
-      if (index >= types.length) {
-        return throwError(() => new Error('Invalid or expired confirmation code.'));
-      }
-      return from(
-        this.getClient().auth.verifyOtp({
-          email: normalizedEmail,
-          token: normalizedToken,
-          type: types[index]!,
-        }),
-      ).pipe(
-        switchMap(({ data, error }) => {
-          if (error) {
-            if (index + 1 < types.length) return tryType(index + 1);
-            return throwError(() => error);
-          }
-          if (!data.session) {
-            return throwError(() => new Error('Could not start a session. Try signing in with your password.'));
-          }
-          this.applySession(data.session);
-          this.clearPendingSignupEmail();
-          return this.syncServerProfile().pipe(
-            switchMap(() => this.refreshServerProfile().pipe(catchError(() => of(void 0)))),
-            map(() => void 0),
-          );
-        }),
-      );
-    };
-
-    return tryType(0);
-  }
-
   private clearPendingSignupEmail(): void {
     if (!isPlatformBrowser(this.platformId)) return;
     try {
@@ -599,7 +560,6 @@ export class AuthService {
     const authError = parseAuthCallbackError(href);
     const code = getAuthCallbackCode(href);
     const onCallback = this.isAuthCallbackRoute();
-    const pendingEmail = getPendingSignupEmail();
 
     this.stripAuthCallbackParamsFromUrl();
     clearAuthCallbackSnapshot();
@@ -611,22 +571,7 @@ export class AuthService {
 
     // Supabase returned ?code= (email confirmed) but PKCE exchange did not produce a session.
     if (code || onCallback) {
-      if (pendingEmail) {
-        await this.router.navigateByUrl(
-          `/verify-email?email=${encodeURIComponent(pendingEmail)}&linkOpened=1`,
-          { replaceUrl: true },
-        );
-        return;
-      }
       await this.router.navigateByUrl('/login?confirmed=1', { replaceUrl: true });
-      return;
-    }
-
-    if (pendingEmail) {
-      await this.router.navigateByUrl(
-        `/verify-email?email=${encodeURIComponent(pendingEmail)}&linkOpened=1`,
-        { replaceUrl: true },
-      );
       return;
     }
 

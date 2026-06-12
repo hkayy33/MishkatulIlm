@@ -31,7 +31,6 @@ export function createAuthServiceStub(): AuthService {
     },
     markOnboardingCompleted: () => of(void 0),
     resendSignupConfirmation: () => of(void 0),
-    verifySignupOtpCode: () => of(void 0),
     handleAuthRedirectResult: () => Promise.resolve(),
     completePostAuthLanding: () => Promise.resolve(),
     initSession: () => Promise.resolve(),

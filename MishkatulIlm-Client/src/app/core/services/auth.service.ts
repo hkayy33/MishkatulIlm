@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { isPlatformBrowser } from '@angular/common';
 import { inject, Injectable, NgZone, PLATFORM_ID, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
-import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
+import type { AuthChangeEvent, EmailOtpType, Session } from '@supabase/supabase-js';
 import {
   catchError,
   firstValueFrom,
@@ -344,6 +344,16 @@ export class AuthService {
       } = await client.auth.getSession();
       if (sessionError) throw sessionError;
 
+      const emailOtp = this.parseEmailOtpCallback(href);
+      if (!session && emailOtp) {
+        const { data, error } = await client.auth.verifyOtp({
+          token_hash: emailOtp.tokenHash,
+          type: emailOtp.type,
+        });
+        if (error) throw error;
+        session = data.session;
+      }
+
       const hasPkceCode = href.includes('code=');
       if (!session && hasPkceCode) {
         const { data, error } = await client.auth.exchangeCodeForSession(href);
@@ -400,6 +410,8 @@ export class AuthService {
       const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
       const hadQuery =
         url.searchParams.has('code') ||
+        url.searchParams.has('token_hash') ||
+        url.searchParams.has('type') ||
         url.searchParams.has('error') ||
         url.searchParams.has('error_description');
       const hadHash =
@@ -408,12 +420,38 @@ export class AuthService {
       if (!hadQuery && !hadHash) return;
 
       url.searchParams.delete('code');
+      url.searchParams.delete('token_hash');
+      url.searchParams.delete('type');
       url.searchParams.delete('error');
       url.searchParams.delete('error_description');
       url.hash = '';
       globalThis.history.replaceState(globalThis.history.state, '', url.pathname + url.search);
     } catch {
       // ignore malformed URLs
+    }
+  }
+
+  private parseEmailOtpCallback(href: string): { tokenHash: string; type: EmailOtpType } | null {
+    try {
+      const url = new URL(href);
+      const tokenHash = url.searchParams.get('token_hash')?.trim();
+      if (!tokenHash) return null;
+
+      const typeParam = url.searchParams.get('type')?.trim() || 'signup';
+      const allowed: EmailOtpType[] = [
+        'signup',
+        'email',
+        'recovery',
+        'invite',
+        'email_change',
+        'magiclink',
+      ];
+      const type = allowed.includes(typeParam as EmailOtpType)
+        ? (typeParam as EmailOtpType)
+        : 'signup';
+      return { tokenHash, type };
+    } catch {
+      return null;
     }
   }
 

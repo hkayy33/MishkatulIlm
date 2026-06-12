@@ -32,7 +32,7 @@ export class Login implements OnInit {
         'Email confirmation failed or the link expired. Try signing in, or register again and use a fresh confirmation link.';
     } else if (err === 'session') {
       this.submitError =
-        'We could not establish a session from that link. Try signing in with your email and password.';
+        'We could not sign you in automatically from that link. If you already confirmed your email, sign in with your password below.';
     }
 
     this.auth

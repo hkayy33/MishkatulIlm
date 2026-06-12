@@ -66,7 +66,19 @@ export class AuthService {
 
     this.registerAuthListener();
 
-    // Auth callback URLs are handled after the router is ready (see completePostAuthLanding).
+    const path = globalThis.location?.pathname ?? '';
+    const href = globalThis.location?.href ?? '';
+    const deferForAuthCallback =
+      path === '/auth/callback' ||
+      path.endsWith('/auth/callback') ||
+      hasAuthCallbackParams(href);
+
+    // Avoid consuming PKCE codes / hash tokens before handleAuthRedirectResult runs.
+    if (deferForAuthCallback) {
+      this.markSessionReady();
+      return Promise.resolve();
+    }
+
     return getSupabaseBrowserClient()
       .auth.getSession()
       .then(({ data, error }) => {
@@ -170,7 +182,20 @@ export class AuthService {
 
   whenSessionReady$(): Observable<boolean> {
     if (!isPlatformBrowser(this.platformId)) return of(false);
-    return from(this.sessionReady).pipe(map(() => this.isAuthenticated()));
+    return from(this.sessionReady).pipe(
+      switchMap(() => {
+        if (this.isAuthenticated()) return of(true);
+        return from(getSupabaseBrowserClient().auth.getSession()).pipe(
+          map(({ data: { session } }) => {
+            if (session) {
+              this.applySession(session);
+              return true;
+            }
+            return false;
+          }),
+        );
+      }),
+    );
   }
 
   isApiRequest(url: string): boolean {
@@ -296,9 +321,17 @@ export class AuthService {
     if (onCallback) {
       if (this.isAuthenticated()) {
         await this.finishAuthenticatedRedirect();
-      } else {
-        await this.router.navigateByUrl('/login?authError=session', { replaceUrl: true });
+        return;
       }
+
+      const recovered = await this.tryRecoverSessionFromCallback(this.getClient());
+      if (recovered) {
+        this.zone.run(() => this.applySession(recovered));
+        await this.finishAuthenticatedRedirect();
+        return;
+      }
+
+      await this.navigateAfterFailedAuthCallback(href);
       return;
     }
 
@@ -321,6 +354,12 @@ export class AuthService {
       if (this.isAuthenticated() && (pendingAuthCallback || onCallback)) {
         await this.finishAuthenticatedRedirect();
       } else if (onCallback && !this.isAuthenticated()) {
+        const recovered = await this.tryRecoverSessionFromCallback(this.getClient());
+        if (recovered) {
+          this.zone.run(() => this.applySession(recovered));
+          await this.finishAuthenticatedRedirect();
+          return;
+        }
         await this.router.navigateByUrl('/login?authError=verify', { replaceUrl: true });
       }
       return;
@@ -336,20 +375,33 @@ export class AuthService {
     this.authRedirectHandled = true;
 
     const client = this.getClient();
+    const emailOtp = this.parseEmailOtpCallback(href);
+    const newSignup = emailOtp?.type === 'signup';
 
     try {
       let session: Session | null = null;
 
-      const emailOtp = this.parseEmailOtpCallback(href);
       if (emailOtp) {
-        session = await this.verifyEmailOtpSession(client, emailOtp.tokenHash, emailOtp.type);
-        if (!session) {
+        const otpResult = await this.verifyEmailOtpSession(
+          client,
+          emailOtp.tokenHash,
+          emailOtp.type,
+        );
+        if (otpResult.session) {
+          session = otpResult.session;
+        } else if (otpResult.confirmed) {
+          session = await this.waitForAuthSession(client);
+        } else {
           throw new Error('Email confirmation link is invalid or expired.');
         }
       }
 
       if (!session) {
         session = await this.parseImplicitHashSession(client);
+      }
+
+      if (!session) {
+        session = await this.exchangePkceCodeSession(client, href);
       }
 
       if (!session) {
@@ -361,21 +413,14 @@ export class AuthService {
         session = stored;
       }
 
-      const hasPkceCode = href.includes('code=');
-      if (!session && hasPkceCode) {
-        const { data, error } = await client.auth.exchangeCodeForSession(href);
-        if (error) throw error;
-        session = data.session;
-      }
-
       this.zone.run(() => {
         if (session) this.applySession(session);
       });
 
       if (session) {
-        await this.finishAuthenticatedRedirect();
+        await this.finishAuthenticatedRedirect(newSignup);
       } else {
-        await this.router.navigateByUrl('/login?authError=session', { replaceUrl: true });
+        await this.navigateAfterFailedAuthCallback(href);
       }
     } catch (ex) {
       console.warn('[AuthService] handleAuthRedirectResult:', ex);
@@ -384,11 +429,34 @@ export class AuthService {
       } = await client.auth.getSession();
       if (recovered) {
         this.zone.run(() => this.applySession(recovered));
-        await this.finishAuthenticatedRedirect();
+        await this.finishAuthenticatedRedirect(newSignup);
         return;
       }
-      await this.router.navigateByUrl('/login?authError=verify', { replaceUrl: true });
+      await this.navigateAfterFailedAuthCallback(href, 'verify');
     }
+  }
+
+  /**
+   * When Supabase ConfirmationURL confirms email but PKCE exchange fails (e.g. different browser),
+   * the user still needs to sign in — not a generic "session" failure.
+   */
+  private async navigateAfterFailedAuthCallback(
+    href: string,
+    fallback: 'session' | 'verify' = 'session',
+  ): Promise<void> {
+    try {
+      const url = new URL(href);
+      if (url.searchParams.has('code')) {
+        this.stripAuthCallbackParamsFromUrl();
+        await this.router.navigateByUrl('/login?confirmed=1', { replaceUrl: true });
+        return;
+      }
+    } catch {
+      // ignore malformed URLs
+    }
+
+    const err = fallback === 'verify' ? 'verify' : 'session';
+    await this.router.navigateByUrl(`/login?authError=${err}`, { replaceUrl: true });
   }
 
   private isAuthCallbackRoute(): boolean {
@@ -401,8 +469,8 @@ export class AuthService {
     return path === '' || path === '/';
   }
 
-  private async finishAuthenticatedRedirect(): Promise<void> {
-    await this.navigateAfterAuthenticated();
+  private async finishAuthenticatedRedirect(newSignup = false): Promise<void> {
+    await this.navigateAfterAuthenticated(newSignup);
     this.stripAuthCallbackParamsFromUrl();
     void firstValueFrom(this.syncServerProfile().pipe(catchError(() => of(void 0))));
     void firstValueFrom(this.refreshServerProfile().pipe(catchError(() => of(void 0))));
@@ -438,10 +506,46 @@ export class AuthService {
     }
   }
 
+  /** Tries hash tokens, PKCE code exchange, then stored session — used when callback params were already consumed. */
+  private async tryRecoverSessionFromCallback(
+    client: ReturnType<AuthService['getClient']>,
+  ): Promise<Session | null> {
+    const hashSession = await this.parseImplicitHashSession(client);
+    if (hashSession) return hashSession;
+
+    const href = globalThis.location?.href ?? '';
+    const pkceSession = await this.exchangePkceCodeSession(client, href);
+    if (pkceSession) return pkceSession;
+
+    const {
+      data: { session },
+    } = await client.auth.getSession();
+    return session;
+  }
+
+  private async exchangePkceCodeSession(
+    client: ReturnType<AuthService['getClient']>,
+    href: string,
+  ): Promise<Session | null> {
+    try {
+      const url = new URL(href);
+      const code = url.searchParams.get('code')?.trim();
+      if (!code) return null;
+
+      const { data, error } = await client.auth.exchangeCodeForSession(code);
+      if (error) throw error;
+      return data.session;
+    } catch (ex) {
+      console.warn('[AuthService] exchangeCodeForSession:', ex);
+      return null;
+    }
+  }
+
   private parseEmailOtpCallback(href: string): { tokenHash: string; type: EmailOtpType } | null {
     try {
       const url = new URL(href);
-      const tokenHash = url.searchParams.get('token_hash')?.trim();
+      const raw = url.searchParams.get('token_hash');
+      const tokenHash = raw ? decodeURIComponent(raw).trim() : '';
       if (!tokenHash) return null;
 
       const typeParam = url.searchParams.get('type')?.trim() || 'signup';
@@ -478,7 +582,10 @@ export class AuthService {
       access_token: accessToken,
       refresh_token: refreshToken,
     });
-    if (error) throw error;
+    if (error) {
+      console.warn('[AuthService] setSession from hash:', error.message);
+      return null;
+    }
     return data.session;
   }
 
@@ -487,7 +594,7 @@ export class AuthService {
     client: ReturnType<AuthService['getClient']>,
     tokenHash: string,
     type: EmailOtpType,
-  ): Promise<Session | null> {
+  ): Promise<{ session: Session | null; confirmed: boolean }> {
     const types: EmailOtpType[] =
       type === 'signup' ? ['signup', 'email'] : type === 'email' ? ['email', 'signup'] : [type];
 
@@ -496,13 +603,50 @@ export class AuthService {
         token_hash: tokenHash,
         type: otpType,
       });
-      if (!error && data.session) return data.session;
+      if (!error && data.session) return { session: data.session, confirmed: true };
+      if (!error && data.user) return { session: null, confirmed: true };
       if (error) console.warn('[AuthService] verifyOtp:', otpType, error.message);
     }
-    return null;
+    return { session: null, confirmed: false };
   }
 
-  private async navigateAfterAuthenticated(): Promise<void> {
+  /** After verifyOtp, Supabase may persist the session slightly after the API response. */
+  private waitForAuthSession(
+    client: ReturnType<AuthService['getClient']>,
+    timeoutMs = 5000,
+  ): Promise<Session | null> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (session: Session | null) => {
+        if (settled) return;
+        settled = true;
+        subscription.unsubscribe();
+        clearTimeout(timer);
+        resolve(session);
+      };
+
+      const {
+        data: { subscription },
+      } = client.auth.onAuthStateChange((event, session) => {
+        if (session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+          finish(session);
+        }
+      });
+
+      void client.auth.getSession().then(({ data: { session } }) => {
+        if (session) finish(session);
+      });
+
+      const timer = setTimeout(() => finish(null), timeoutMs);
+    });
+  }
+
+  private async navigateAfterAuthenticated(newSignup = false): Promise<void> {
+    if (newSignup) {
+      await this.router.navigateByUrl('/onboarding', { replaceUrl: true });
+      return;
+    }
+
     const u = this._user();
     if (u?.isAdmin) {
       await this.router.navigateByUrl('/admin', { replaceUrl: true });

@@ -28,7 +28,7 @@ export function hasAuthCallbackParams(href: string): boolean {
     const hash = url.hash.replace(/^#/, '');
     if (!hash) return false;
     const hashParams = new URLSearchParams(hash);
-    return hashParams.has('access_token') || hashParams.has('error');
+    return hashParams.has('access_token') || hashParams.has('error') || hashParams.has('code');
   } catch {
     return href.includes('code=') || href.includes('token_hash=');
   }

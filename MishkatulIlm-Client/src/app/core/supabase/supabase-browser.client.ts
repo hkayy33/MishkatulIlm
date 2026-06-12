@@ -14,9 +14,9 @@ export function getSupabaseBrowserClient(): SupabaseClient {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
+      // Exchanged explicitly in AuthService.handleAuthRedirectResult (avoids races with initSession).
       detectSessionInUrl: false,
-      // Implicit: email ConfirmationURL returns tokens in the URL hash (no PKCE flow state).
-      flowType: 'implicit',
+      flowType: 'pkce',
     },
   });
 

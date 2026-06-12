@@ -376,7 +376,18 @@ export class AuthService {
 
     const client = this.getClient();
     const emailOtp = this.parseEmailOtpCallback(href);
-    const newSignup = emailOtp?.type === 'signup' || emailOtp?.type === 'email';
+    const hasPkceCode = (() => {
+      try {
+        return new URL(href).searchParams.has('code');
+      } catch {
+        return href.includes('code=');
+      }
+    })();
+    // ConfirmationURL signup returns ?code=; treat as new signup for onboarding redirect.
+    const newSignup =
+      emailOtp?.type === 'signup' ||
+      emailOtp?.type === 'email' ||
+      (hasPkceCode && !emailOtp);
 
     // PKCE tokens in token_hash must go through Supabase verify (confirms email + returns ?code=).
     if (emailOtp && isPkceEmailToken(emailOtp.tokenHash)) {

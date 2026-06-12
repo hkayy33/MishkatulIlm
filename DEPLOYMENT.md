@@ -19,24 +19,16 @@
      `https://your-app.vercel.app/auth/callback`  
      `http://localhost:4200/auth/callback` (local dev)
 
-5. **Authentication → Email Templates → Confirm signup** — pick **one** approach:
-
-   **Option A (recommended, simplest):** use Supabase’s built-in link (handles PKCE automatically):
+5. **Authentication → Email Templates → Confirm signup** — use Supabase’s built-in confirmation link:
 
    ```html
    <h2>Confirm your signup</h2>
+   <p>Follow this link to confirm your account:</p>
    <p><a href="{{ .ConfirmationURL }}">Confirm your email</a></p>
    ```
 
-   The app completes sign-in when Supabase redirects back with `?code=…` on `/auth/callback`.
-
-   **Option B (custom link):** only if `{{ .TokenHash }}` does **not** start with `pkce_` (legacy OTP hash):
-
-   ```html
-   <p><a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">Confirm your email</a></p>
-   ```
-
-   If your links look like `token_hash=pkce_…`, you are on PKCE — use **Option A** or the app will auto-redirect through Supabase verify (deploy `auth-to-prod` latest).
+   Supabase verifies the email and redirects to `/auth/callback?code=…` (using the `emailRedirectTo` from signup).  
+   **Open the link in the same browser you used to register** so PKCE can complete and you land on onboarding automatically.
 
 6. **Production checklist**
    - [ ] Fly `ConnectionStrings__DefaultConnection` → `db.kpvfrbgpbmlxkqqibpjp.supabase.co` (same project as auth)
@@ -45,8 +37,8 @@
    - [ ] Vercel `API_BASE_URL` → `https://mishkatulilm-api.fly.dev`
    - [ ] Vercel `SUPABASE_URL` + `SUPABASE_ANON_KEY` for project `kpvfrbgpbmlxkqqibpjp`
    - [ ] Vercel `AUTH_REDIRECT_ORIGIN` → `https://al-usooliyyah.vercel.app`
-   - [ ] Email template uses `token_hash` link above
-   - [ ] Test: register → email link → lands on `/onboarding` (use a **new** email each test)
+   - [ ] Email template uses `{{ .ConfirmationURL }}` (not a custom `token_hash` link)
+   - [ ] Test: register in browser → open email link **in that same browser** → lands on `/onboarding`
 
 Run migrations once (from your machine with connection string set):
 

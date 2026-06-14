@@ -1,0 +1,100 @@
+<section class="reviews" aria-labelledby="reviews-title">
+  <div class="reviews-inner">
+    <header class="reviews-header">
+      <p class="reviews-eyebrow">Testimonials</p>
+      <h2 id="reviews-title" class="reviews-title">What Students Say</h2>
+    </header>
+
+    <div
+      class="reviews-carousel"
+      aria-roledescription="carousel"
+      [attr.aria-label]="'Student reviews, slide ' + (currentIndex() + 1) + ' of ' + reviews.length"
+      tabindex="0"
+      (keydown)="onCarouselKeydown($event)"
+      (mouseenter)="pauseAutoplay()"
+      (mouseleave)="resumeAutoplay()"
+    >
+      <button
+        type="button"
+        class="reviews-nav reviews-nav--prev"
+        (click)="prev()"
+        aria-label="Previous review"
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M14.5 6.5 9 12l5.5 5.5"
+            stroke="currentColor"
+            stroke-width="1.75"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+
+      <article class="review-card" aria-live="polite">
+        <header class="review-card__header">
+          <div class="review-card__avatar" aria-hidden="true">
+            {{ initials(activeReview().name) }}
+          </div>
+          <div class="review-card__meta">
+            <p class="review-card__name">{{ activeReview().name }}</p>
+            @if (activeReview().date) {
+              <p class="review-card__date">{{ activeReview().date }}</p>
+            }
+          </div>
+        </header>
+
+        <div
+          class="review-card__stars"
+          [attr.aria-label]="activeReview().rating + ' out of 5 stars'"
+        >
+          @for (star of [1, 2, 3, 4, 5]; track star) {
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path
+                d="M10 1.5 12.47 7.1l6.03.52-4.56 3.95 1.38 5.88L10 14.9l-5.32 2.55 1.38-5.88-4.56-3.95 6.03-.52L10 1.5Z"
+                [attr.fill]="star <= activeReview().rating ? 'currentColor' : 'none'"
+                [attr.stroke]="star <= activeReview().rating ? 'none' : 'currentColor'"
+                stroke-width="1.2"
+              />
+            </svg>
+          }
+        </div>
+
+        <blockquote class="review-card__quote">
+          <p>{{ activeReview().text }}</p>
+        </blockquote>
+      </article>
+
+      <button
+        type="button"
+        class="reviews-nav reviews-nav--next"
+        (click)="next()"
+        aria-label="Next review"
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M9.5 6.5 15 12l-5.5 5.5"
+            stroke="currentColor"
+            stroke-width="1.75"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+    </div>
+
+    <div class="reviews-dots" role="tablist" aria-label="Choose a review">
+      @for (review of reviews; track review.id; let index = $index) {
+        <button
+          type="button"
+          class="reviews-dot"
+          role="tab"
+          [class.reviews-dot--active]="index === currentIndex()"
+          [attr.aria-selected]="index === currentIndex()"
+          [attr.aria-label]="'Review by ' + review.name"
+          (click)="goTo(index)"
+        ></button>
+      }
+    </div>
+  </div>
+</section>

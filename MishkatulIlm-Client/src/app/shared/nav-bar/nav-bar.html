@@ -61,7 +61,14 @@
                     <p><span>Programs</span></p>
                 </li>
                 <li class="nav-link">
-                    <p><span>Pricing</span></p>
+                    <a
+                        routerLink="/pricing"
+                        class="nav-route-link"
+                        [attr.aria-current]="isPricingRoute() ? 'page' : null"
+                        (click)="closeMobileMenu()"
+                    >
+                        <span>Pricing</span>
+                    </a>
                 </li>
                 @if (auth.isAuthenticated()) {
                     <li class="nav-link nav-link--user">

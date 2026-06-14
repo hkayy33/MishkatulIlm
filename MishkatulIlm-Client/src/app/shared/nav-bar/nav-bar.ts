@@ -64,6 +64,14 @@ export class NavBar {
     { initialValue: this.pathIsAbout(this.router.url) },
   );
 
+  readonly isPricingRoute = toSignal(
+    merge(
+      of(null),
+      this.router.events.pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd)),
+    ).pipe(map(() => this.pathIsPricing(this.router.url))),
+    { initialValue: this.pathIsPricing(this.router.url) },
+  );
+
   constructor() {
     this.router.events
       .pipe(
@@ -93,6 +101,11 @@ export class NavBar {
   private pathIsAbout(url: string): boolean {
     const path = url.split('#')[0].split('?')[0];
     return path === '/about';
+  }
+
+  private pathIsPricing(url: string): boolean {
+    const path = url.split('#')[0].split('?')[0];
+    return path === '/pricing';
   }
 
   @HostListener('document:click', ['$event'])
@@ -151,7 +164,7 @@ export class NavBar {
   }
 
   onProgramsClick(): void {
-    this.programsNav.scrollToProgramsSection();
+    this.programsNav.navigateToProgramsSection();
     this.closeMobileMenu();
   }
 

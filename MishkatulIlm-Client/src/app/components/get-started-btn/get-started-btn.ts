@@ -13,6 +13,7 @@ import { RouterLink } from '@angular/router';
 export class GetStartedBtn {
   @Input() label = 'Get Started';
   @Input() variant: 'primary' | 'outline' = 'primary';
+  @Input() route = '/register';
   /** Larger tap target and typography for prominent placements. */
   @Input() size: 'default' | 'large' = 'default';
 }

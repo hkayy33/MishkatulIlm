@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { AboutUs } from './components/about-us/about-us';
 import { Homepage } from './components/homepage/homepage';
+import { PricingPage } from './components/pricing-page/pricing-page';
 import { PrivacyPolicy } from './pages/privacy-policy/privacy-policy';
 import { TermsOfUse } from './pages/terms-of-use/terms-of-use';
 import { Onboarding } from './components/onboarding/onboarding';
@@ -15,6 +16,7 @@ import { StudentDashboard } from './pages/student-dashboard/student-dashboard';
 export const routes: Routes = [
   { path: '', component: Homepage },
   { path: 'about', component: AboutUs },
+  { path: 'pricing', component: PricingPage },
   { path: 'dashboard', component: StudentDashboard, canActivate: [authGuard] },
   { path: 'privacy', component: PrivacyPolicy },
   { path: 'terms', component: TermsOfUse },

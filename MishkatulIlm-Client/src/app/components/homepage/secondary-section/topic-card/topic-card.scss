@@ -16,6 +16,24 @@ $text-body: #3d4540;
     border: 1px solid rgba(42, 34, 24, 0.12);
     border-radius: clamp(13px, 1.8vw, 16px);
     box-shadow: 0 3px 22px rgba(42, 34, 24, 0.075);
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+    transition:
+        transform 0.18s ease,
+        box-shadow 0.18s ease,
+        border-color 0.18s ease;
+
+    &:hover {
+        transform: translateY(-3px);
+        border-color: rgba(196, 163, 90, 0.45);
+        box-shadow: 0 10px 28px rgba(42, 34, 24, 0.12);
+    }
+
+    &:focus-visible {
+        outline: 2px solid $gold;
+        outline-offset: 3px;
+    }
 }
 
 .icon-ring {
@@ -61,6 +79,15 @@ $text-body: #3d4540;
     line-height: 1.3;
 }
 
+.card-title__arabic {
+    display: block;
+    margin-top: 0.2rem;
+    font-family: 'Amiri', Georgia, serif;
+    font-size: clamp(1.05rem, 2vw, 1.2rem);
+    font-weight: 400;
+    color: $green;
+}
+
 .card-summary {
     margin: 0;
     font-family: 'Source Sans 3', system-ui, sans-serif;
@@ -68,4 +95,16 @@ $text-body: #3d4540;
     line-height: 1.52;
     color: $text-body;
     max-width: 18rem;
+}
+
+.card-cta {
+    margin-top: clamp(0.75rem, 1.4vw, 0.95rem);
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: $green;
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
 }

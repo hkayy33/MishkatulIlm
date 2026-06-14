@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, output } from '@angular/core';
 
 export type TopicCardAccent = 'green' | 'gold';
 export type TopicCardIcon = 'book' | 'arabic' | 'chat';
@@ -6,7 +6,9 @@ export type TopicCardIcon = 'book' | 'arabic' | 'chat';
 export interface TopicCardData {
   id: string;
   title: string;
+  titleArabic?: string;
   summary: string;
+  details: string;
   accent: TopicCardAccent;
   icon: TopicCardIcon;
 }
@@ -19,4 +21,6 @@ export interface TopicCardData {
 })
 export class TopicCard {
   @Input({ required: true }) card!: TopicCardData;
+
+  readonly cardSelect = output<TopicCardData>();
 }

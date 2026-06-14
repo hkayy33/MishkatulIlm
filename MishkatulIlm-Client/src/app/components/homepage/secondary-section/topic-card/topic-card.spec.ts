@@ -17,6 +17,7 @@ describe('TopicCard', () => {
       id: 'test',
       title: 'Test',
       summary: 'Summary',
+      details: 'Details',
       accent: 'green',
       icon: 'book',
     });

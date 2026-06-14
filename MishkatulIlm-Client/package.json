@@ -2,7 +2,9 @@
   "name": "mishkatul-ilm-client",
   "version": "0.0.0",
   "scripts": {
-    "postinstall": "node scripts/ensure-local-env.cjs",
+    "postinstall": "node scripts/ensure-local-env.cjs && node scripts/reject-finder-duplicates.cjs",
+    "prestart": "node scripts/reject-finder-duplicates.cjs",
+    "prebuild": "node scripts/reject-finder-duplicates.cjs",
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",

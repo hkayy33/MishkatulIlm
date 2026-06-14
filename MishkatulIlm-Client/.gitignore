@@ -47,5 +47,6 @@ __screenshots__/
 .DS_Store
 Thumbs.db
 
-# Accidental macOS Finder duplicates
-* 2.*
+# Accidental macOS Finder duplicates (e.g. "file 2.ts", "component.spec 2.ts")
+**/* [0-9].*
+**/* [0-9][0-9].*

@@ -34,7 +34,7 @@ export class StudentPortalStore {
 
   readonly nextLesson = computed(() => this.portalData()?.portal?.nextLesson ?? null);
 
-  reloadPortal(month?: Date): void {
+  reloadPortal(month?: Date, onLoaded?: () => void): void {
     if (month) this.viewMonth = month;
 
     this.loading.set(true);
@@ -43,7 +43,10 @@ export class StudentPortalStore {
       .getPortal(this.viewMonth.getFullYear(), this.viewMonth.getMonth())
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
-        next: (data) => this.portalData.set(normalizePortalResponse(data)),
+        next: (data) => {
+          this.portalData.set(normalizePortalResponse(data));
+          onLoaded?.();
+        },
         error: (err: unknown) => {
           this.loadError.set(formatHttpError(err, 'Could not load your lessons.'));
         },
@@ -285,43 +288,45 @@ function normalizePaymentSummary(
   const p = paymentRaw as StudentPaymentSummary & {
     RequiresInitialPayment?: boolean;
     PaymentOverdue?: boolean;
-    HasActiveSubscription?: boolean;
-    SubscriptionCancelAtPeriodEnd?: boolean;
-    SubscriptionCurrentPeriodEndUtc?: string | null;
-    SubscriptionPastDue?: boolean;
-    CanMakePayment?: boolean;
-    CanCancelSubscription?: boolean;
+    ShowPaymentReminder?: boolean;
+    DaysUntilDue?: number | null;
+    CurrentSubmissionStatus?: StudentPaymentSummary['currentSubmissionStatus'];
+    CanSubmitPayment?: boolean;
+    CurrentPeriodPaid?: boolean;
+    ShowPaymentDetails?: boolean;
   };
 
   if (!paymentRaw) {
     return {
       nextPaymentDueUtc: null,
       lastPaymentAmount: null,
-      lastPaymentCurrency: 'GBP',
+      lastPaymentCurrency: 'USD',
       lastPaymentAtUtc: null,
       requiresInitialPayment: true,
       paymentOverdue: false,
-      hasActiveSubscription: false,
-      subscriptionCancelAtPeriodEnd: false,
-      subscriptionCurrentPeriodEndUtc: null,
-      subscriptionPastDue: false,
-      canMakePayment: true,
-      canCancelSubscription: false,
+      showPaymentReminder: false,
+      daysUntilDue: null,
+      currentSubmissionStatus: null,
+      canSubmitPayment: true,
+      currentPeriodPaid: false,
+      showPaymentDetails: true,
     };
   }
 
   return {
-    ...paymentRaw,
+    nextPaymentDueUtc: paymentRaw.nextPaymentDueUtc ?? null,
+    lastPaymentAmount: paymentRaw.lastPaymentAmount ?? null,
+    lastPaymentCurrency: paymentRaw.lastPaymentCurrency ?? 'USD',
+    lastPaymentAtUtc: paymentRaw.lastPaymentAtUtc ?? null,
     requiresInitialPayment:
       paymentRaw.requiresInitialPayment ?? p.RequiresInitialPayment ?? paymentRaw.lastPaymentAtUtc == null,
     paymentOverdue: paymentRaw.paymentOverdue ?? p.PaymentOverdue ?? false,
-    hasActiveSubscription: paymentRaw.hasActiveSubscription ?? p.HasActiveSubscription ?? false,
-    subscriptionCancelAtPeriodEnd:
-      paymentRaw.subscriptionCancelAtPeriodEnd ?? p.SubscriptionCancelAtPeriodEnd ?? false,
-    subscriptionCurrentPeriodEndUtc:
-      paymentRaw.subscriptionCurrentPeriodEndUtc ?? p.SubscriptionCurrentPeriodEndUtc ?? null,
-    subscriptionPastDue: paymentRaw.subscriptionPastDue ?? p.SubscriptionPastDue ?? false,
-    canMakePayment: paymentRaw.canMakePayment ?? p.CanMakePayment ?? false,
-    canCancelSubscription: paymentRaw.canCancelSubscription ?? p.CanCancelSubscription ?? false,
+    showPaymentReminder: paymentRaw.showPaymentReminder ?? p.ShowPaymentReminder ?? false,
+    daysUntilDue: paymentRaw.daysUntilDue ?? p.DaysUntilDue ?? null,
+    currentSubmissionStatus:
+      paymentRaw.currentSubmissionStatus ?? p.CurrentSubmissionStatus ?? null,
+    canSubmitPayment: paymentRaw.canSubmitPayment ?? p.CanSubmitPayment ?? false,
+    currentPeriodPaid: paymentRaw.currentPeriodPaid ?? p.CurrentPeriodPaid ?? false,
+    showPaymentDetails: paymentRaw.showPaymentDetails ?? p.ShowPaymentDetails ?? false,
   };
 }

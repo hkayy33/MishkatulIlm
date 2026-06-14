@@ -16,12 +16,12 @@ export interface StudentPaymentSummary {
   lastPaymentAtUtc: string | null;
   requiresInitialPayment: boolean;
   paymentOverdue: boolean;
-  hasActiveSubscription: boolean;
-  subscriptionCancelAtPeriodEnd: boolean;
-  subscriptionCurrentPeriodEndUtc: string | null;
-  subscriptionPastDue: boolean;
-  canMakePayment: boolean;
-  canCancelSubscription: boolean;
+  showPaymentReminder: boolean;
+  daysUntilDue: number | null;
+  currentSubmissionStatus: 'pending_verification' | 'paid' | 'rejected' | null;
+  canSubmitPayment: boolean;
+  currentPeriodPaid: boolean;
+  showPaymentDetails: boolean;
 }
 
 export interface StudentLessonMonthSummary {

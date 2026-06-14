@@ -33,6 +33,12 @@ export class SchedulingSettingsService {
         tutorCountry: '',
         tutorCity: '',
         tutorTimeZoneId: 'UTC',
+        paymentHourlyRateUsd: 5,
+        paymentAccountName: '',
+        paymentAccountNumber: '',
+        paymentSortCode: '',
+        paymentBankName: '',
+        paymentInstructions: '',
       };
     } finally {
       this.loading.set(false);
@@ -58,11 +64,23 @@ function normalizeSettings(raw: SchedulingSettings): SchedulingSettings {
     TutorCountry?: string;
     TutorCity?: string;
     TutorTimeZoneId?: string;
+    PaymentHourlyRateUsd?: number;
+    PaymentAccountName?: string;
+    PaymentAccountNumber?: string;
+    PaymentSortCode?: string;
+    PaymentBankName?: string;
+    PaymentInstructions?: string;
   };
   return {
     tutorDisplayName: r.tutorDisplayName ?? r.TutorDisplayName ?? 'Tutor',
     tutorCountry: r.tutorCountry ?? r.TutorCountry ?? '',
     tutorCity: r.tutorCity ?? r.TutorCity ?? '',
     tutorTimeZoneId: r.tutorTimeZoneId ?? r.TutorTimeZoneId ?? 'UTC',
+    paymentHourlyRateUsd: r.paymentHourlyRateUsd ?? r.PaymentHourlyRateUsd ?? 5,
+    paymentAccountName: r.paymentAccountName ?? r.PaymentAccountName ?? '',
+    paymentAccountNumber: r.paymentAccountNumber ?? r.PaymentAccountNumber ?? '',
+    paymentSortCode: r.paymentSortCode ?? r.PaymentSortCode ?? '',
+    paymentBankName: r.paymentBankName ?? r.PaymentBankName ?? '',
+    paymentInstructions: r.paymentInstructions ?? r.PaymentInstructions ?? '',
   };
 }

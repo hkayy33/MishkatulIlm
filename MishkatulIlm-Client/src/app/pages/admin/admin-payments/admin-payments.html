@@ -1,0 +1,158 @@
+<div class="admin-page admin-payments-page">
+  <h1 class="admin-title">Manage payments</h1>
+  <p class="admin-lead">
+    Review payment submissions from students. Approve once you have received the bank transfer.
+  </p>
+
+  @if (actionMessage()) {
+    <p class="admin-success">{{ actionMessage() }}</p>
+  }
+  @if (actionError()) {
+    <p class="admin-error">{{ actionError() }}</p>
+  }
+
+  <div class="admin-payments-filters" role="tablist" aria-label="Filter payments">
+    <button
+      type="button"
+      class="admin-filter-btn"
+      role="tab"
+      [class.is-active]="statusFilter() === 'pending_verification'"
+      (click)="setFilter('pending_verification')"
+    >
+      Pending
+    </button>
+    <button
+      type="button"
+      class="admin-filter-btn"
+      role="tab"
+      [class.is-active]="statusFilter() === 'paid'"
+      (click)="setFilter('paid')"
+    >
+      Paid
+    </button>
+    <button
+      type="button"
+      class="admin-filter-btn"
+      role="tab"
+      [class.is-active]="statusFilter() === 'rejected'"
+      (click)="setFilter('rejected')"
+    >
+      Rejected
+    </button>
+    <button
+      type="button"
+      class="admin-filter-btn"
+      role="tab"
+      [class.is-active]="statusFilter() === 'all'"
+      (click)="setFilter('all')"
+    >
+      All
+    </button>
+  </div>
+
+  @if (loading()) {
+    <p class="admin-muted">Loading…</p>
+  } @else if (loadError()) {
+    <p class="admin-error">{{ loadError() }}</p>
+  } @else if (rows().length === 0) {
+    <div class="admin-payments-empty">
+      <p class="admin-muted">No payment submissions in this view.</p>
+    </div>
+  } @else {
+    <div class="admin-table-wrap">
+      <table class="admin-table admin-table--payments">
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th>Period</th>
+            <th>Amount</th>
+            <th>Reference</th>
+            <th>Status</th>
+            <th>Submitted</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.id) {
+            <tr [class.is-expanded]="expandedId() === row.id">
+              <td>
+                <strong>{{ row.studentName }}</strong>
+                <div class="cell-sub">{{ row.email }}</div>
+              </td>
+              <td class="period-cell">{{ row.billingPeriodLabel }}</td>
+              <td class="amount-cell">{{ row.amount | currency: row.currency : 'symbol' : '1.0-2' }}</td>
+              <td><code class="admin-ref">{{ row.paymentReference }}</code></td>
+              <td>
+                <span
+                  class="status-pill"
+                  [class.status-pill--awaiting]="row.status === 'pending_verification'"
+                  [class.status-pill--ready]="row.status === 'paid'"
+                  [class.status-pill--draft]="row.status === 'rejected'"
+                >
+                  {{ statusLabel(row.status) }}
+                </span>
+              </td>
+              <td class="submitted-cell">{{ row.submittedAtUtc | date: 'medium' }}</td>
+              <td class="actions-cell">
+                <button type="button" class="admin-link-btn" (click)="toggleExpanded(row.id)">
+                  {{ expandedId() === row.id ? 'Hide details' : 'Details' }}
+                </button>
+                @if (row.status === 'pending_verification') {
+                  <button
+                    type="button"
+                    class="admin-btn admin-btn--success admin-btn--compact"
+                    [disabled]="actionId() === row.id"
+                    (click)="approve(row)"
+                  >
+                    {{ actionId() === row.id ? 'Saving…' : 'Mark paid' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="admin-btn admin-btn--danger-ghost admin-btn--compact"
+                    [disabled]="actionId() === row.id"
+                    (click)="reject(row)"
+                  >
+                    Reject
+                  </button>
+                }
+              </td>
+            </tr>
+            @if (expandedId() === row.id) {
+              <tr class="admin-payments-detail-row">
+                <td colspan="7">
+                  <div class="admin-payments-detail">
+                    <h3>Lesson breakdown</h3>
+                    @if (row.lessons.length === 0) {
+                      <p class="admin-muted">No lessons listed.</p>
+                    } @else {
+                      <table class="admin-payments-breakdown">
+                        <thead>
+                          <tr>
+                            <th>Lesson</th>
+                            <th>Hours</th>
+                            <th>Rate</th>
+                            <th>Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (line of row.lessons; track line.slotId) {
+                            <tr>
+                              <td>{{ formatSlotRange(line.startsAtUtc, line.endsAtUtc) }}</td>
+                              <td>{{ line.durationMinutes / 60 }} hr</td>
+                              <td>{{ line.hourlyRate | currency: row.currency : 'symbol' : '1.0-2' }}/hr</td>
+                              <td>{{ line.amount | currency: row.currency : 'symbol' : '1.0-2' }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

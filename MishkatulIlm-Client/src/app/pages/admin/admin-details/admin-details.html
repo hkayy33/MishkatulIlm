@@ -65,8 +65,54 @@
         </p>
       </div>
 
+      <h2 class="details-section-title">Payment account</h2>
+      <p class="admin-muted details-section-lead">
+        Shown to students when they pay for lessons. Hourly rate is used to calculate monthly totals ($5/hr default).
+      </p>
+
+      <label class="details-field">
+        <span>Hourly rate (USD)</span>
+        <input
+          type="number"
+          name="paymentHourlyRateUsd"
+          [(ngModel)]="paymentHourlyRateUsd"
+          min="1"
+          step="0.01"
+        />
+      </label>
+
+      <label class="details-field">
+        <span>Bank name</span>
+        <input type="text" name="paymentBankName" [(ngModel)]="paymentBankName" />
+      </label>
+
+      <label class="details-field">
+        <span>Account name</span>
+        <input type="text" name="paymentAccountName" [(ngModel)]="paymentAccountName" />
+      </label>
+
+      <label class="details-field">
+        <span>Sort code</span>
+        <input type="text" name="paymentSortCode" [(ngModel)]="paymentSortCode" />
+      </label>
+
+      <label class="details-field">
+        <span>Account number</span>
+        <input type="text" name="paymentAccountNumber" [(ngModel)]="paymentAccountNumber" />
+      </label>
+
+      <label class="details-field">
+        <span>Extra payment instructions (optional)</span>
+        <textarea
+          name="paymentInstructions"
+          rows="3"
+          [(ngModel)]="paymentInstructions"
+          placeholder="Any extra notes for students when paying."
+        ></textarea>
+      </label>
+
       <button type="submit" class="admin-btn" [disabled]="saving()">
-        {{ saving() ? 'Saving…' : 'Save tutor details' }}
+        {{ saving() ? 'Saving…' : 'Save settings' }}
       </button>
     </form>
   }

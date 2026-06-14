@@ -5,40 +5,61 @@ namespace MishkatulIlm_Server.Services;
 
 public static class StudentPaymentSummaryBuilder
 {
-    public static StudentPaymentSummaryDto Build(AppUser user)
+    public static StudentPaymentSummaryDto Build(
+        AppUser user,
+        PaymentSubmission? currentSubmission,
+        DateTime utcNow)
     {
+        var (billingYear, billingMonth) = LessonBillingService.ResolveBillingMonth(user, utcNow);
+        var dueUtc = LessonBillingService.ResolvePaymentDueUtc(user, billingYear, billingMonth, utcNow);
+        var daysUntilDue = dueUtc is null ? (int?)null : (dueUtc.Value.Date - utcNow.Date).Days;
+
         var hasPaid = user.LastPaymentAtUtc is not null;
-        var hasActiveSubscription = StripeSubscriptionStatusCodes.IsBillable(user.StripeSubscriptionStatus);
-        var subscriptionPastDue = StripeSubscriptionStatusCodes.IsPastDue(user.StripeSubscriptionStatus);
+        var currentStatus = currentSubmission?.Status;
+        var currentPeriodPaid = currentStatus == PaymentSubmissionStatusCodes.Paid;
+        var pendingVerification = currentStatus == PaymentSubmissionStatusCodes.PendingVerification;
 
         var paymentOverdue = hasPaid
-            && !hasActiveSubscription
-            && user.NextPaymentDueUtc is not null
-            && user.NextPaymentDueUtc.Value.Date < DateTime.UtcNow.Date;
+            && !currentPeriodPaid
+            && !pendingVerification
+            && dueUtc is not null
+            && dueUtc.Value.Date < utcNow.Date;
 
         var requiresInitialPayment = !hasPaid;
-        var canMakePayment = requiresInitialPayment
-            || ((paymentOverdue || subscriptionPastDue) && !hasActiveSubscription);
+        var paymentWindowOpen = requiresInitialPayment
+            || paymentOverdue
+            || (daysUntilDue is >= 0 and <= 5);
 
-        var hasManageableSubscription = !string.IsNullOrWhiteSpace(user.StripeSubscriptionId)
-            && (hasActiveSubscription || subscriptionPastDue);
+        var showReminder = paymentWindowOpen
+            && hasPaid
+            && !requiresInitialPayment
+            && daysUntilDue is >= 0 and <= 5
+            && !currentPeriodPaid
+            && !pendingVerification;
 
-        var canCancelSubscription = hasManageableSubscription && !user.StripeSubscriptionCancelAtPeriodEnd;
+        var showPaymentDetails = paymentWindowOpen || pendingVerification;
+
+        var canSubmitPayment = showPaymentDetails
+            && !currentPeriodPaid
+            && !pendingVerification
+            && paymentWindowOpen;
 
         return new StudentPaymentSummaryDto
         {
-            NextPaymentDueUtc = hasPaid ? user.NextPaymentDueUtc : null,
+            NextPaymentDueUtc = dueUtc,
             LastPaymentAmount = user.LastPaymentAmount,
-            LastPaymentCurrency = user.LastPaymentCurrency,
+            LastPaymentCurrency = string.IsNullOrWhiteSpace(user.LastPaymentCurrency)
+                ? LessonBillingService.DefaultCurrency
+                : user.LastPaymentCurrency,
             LastPaymentAtUtc = user.LastPaymentAtUtc,
             RequiresInitialPayment = requiresInitialPayment,
-            PaymentOverdue = paymentOverdue,
-            HasActiveSubscription = hasActiveSubscription,
-            SubscriptionCancelAtPeriodEnd = user.StripeSubscriptionCancelAtPeriodEnd,
-            SubscriptionCurrentPeriodEndUtc = user.StripeSubscriptionPeriodEndUtc,
-            SubscriptionPastDue = subscriptionPastDue,
-            CanMakePayment = canMakePayment,
-            CanCancelSubscription = canCancelSubscription,
+            PaymentOverdue = paymentOverdue || (requiresInitialPayment && dueUtc is not null && dueUtc.Value.Date < utcNow.Date),
+            ShowPaymentReminder = showReminder,
+            DaysUntilDue = daysUntilDue,
+            CurrentSubmissionStatus = currentStatus,
+            CanSubmitPayment = canSubmitPayment,
+            CurrentPeriodPaid = currentPeriodPaid,
+            ShowPaymentDetails = showPaymentDetails,
         };
     }
 }

@@ -14,5 +14,17 @@ public sealed class SchedulingSettings
     /// <summary>IANA time zone id (e.g. Europe/London).</summary>
     public string TutorTimeZoneId { get; set; } = "UTC";
 
+    public decimal PaymentHourlyRateUsd { get; set; } = 5m;
+
+    public string PaymentAccountName { get; set; } = PaymentAccountDefaults.AccountName;
+
+    public string PaymentAccountNumber { get; set; } = PaymentAccountDefaults.AccountNumber;
+
+    public string PaymentSortCode { get; set; } = PaymentAccountDefaults.SortCode;
+
+    public string PaymentBankName { get; set; } = string.Empty;
+
+    public string PaymentInstructions { get; set; } = string.Empty;
+
     public DateTime UpdatedAtUtc { get; set; }
 }

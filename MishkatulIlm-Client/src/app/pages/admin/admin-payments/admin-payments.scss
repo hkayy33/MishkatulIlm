@@ -1,0 +1,238 @@
+@use '../admin-page.shared';
+
+.admin-payments-page {
+  max-width: 1200px;
+}
+
+.admin-success {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  color: #1f5f3a;
+  margin: 0 0 1rem;
+}
+
+.admin-payments-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin-filter-btn {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  border: 1px solid rgba(28, 27, 24, 0.14);
+  border-radius: 999px;
+  padding: 0.4rem 0.95rem;
+  background: #fff;
+  color: #4a453e;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+  &:hover:not(.is-active) {
+    background: #faf8f4;
+    border-color: rgba(28, 27, 24, 0.22);
+  }
+
+  &.is-active {
+    background: #2f5a3f;
+    border-color: #2f5a3f;
+    color: #fff;
+  }
+}
+
+.admin-table--payments {
+  min-width: 880px;
+
+  tbody tr.is-expanded td {
+    background: rgba(47, 122, 79, 0.06);
+  }
+
+  tbody tr:not(.admin-payments-detail-row):hover td {
+    background: rgba(250, 248, 244, 0.85);
+  }
+}
+
+.cell-sub {
+  font-size: 0.82rem;
+  color: #6f6a62;
+  margin-top: 0.2rem;
+}
+
+.amount-cell {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #1c1b18;
+  white-space: nowrap;
+}
+
+.period-cell {
+  white-space: nowrap;
+  color: #4a453e;
+}
+
+.submitted-cell {
+  white-space: nowrap;
+  font-size: 0.88rem;
+  color: #5c584f;
+}
+
+.admin-ref {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  background: rgba(255, 243, 191, 0.85);
+  border: 1px solid rgba(197, 157, 95, 0.45);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #5c4a00;
+  letter-spacing: 0.02em;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+
+  &--ready {
+    color: #1f5f3a;
+    background: rgba(47, 122, 79, 0.16);
+  }
+
+  &--draft {
+    color: #8b3a32;
+    background: rgba(139, 58, 50, 0.12);
+  }
+
+  &--awaiting {
+    color: #2f4a6b;
+    background: rgba(91, 124, 153, 0.22);
+  }
+}
+
+.actions-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  min-width: 11rem;
+}
+
+.admin-link-btn {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid rgba(28, 27, 24, 0.14);
+  background: #fff;
+  color: #2f5a3f;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(47, 122, 79, 0.08);
+    border-color: rgba(47, 90, 63, 0.35);
+  }
+}
+
+.admin-btn--ghost {
+  background: transparent;
+  color: #5c574f;
+  border: 1px solid rgba(45, 42, 38, 0.2);
+}
+
+.admin-btn--success {
+  background: #2f5a3f;
+  border-color: #2f5a3f;
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    background: #264a34;
+  }
+}
+
+.admin-btn--compact {
+  padding: 0.38rem 0.72rem;
+  font-size: 0.82rem;
+}
+
+.admin-btn--danger-ghost {
+  background: transparent;
+  color: #8b3a32;
+  border: 1px solid rgba(139, 58, 50, 0.28);
+
+  &:hover:not(:disabled) {
+    background: rgba(139, 58, 50, 0.08);
+  }
+}
+
+.admin-payments-detail-row td {
+  padding: 0 !important;
+  background: #faf8f4;
+  border-bottom: 1px solid rgba(28, 27, 24, 0.1) !important;
+}
+
+.admin-payments-detail {
+  padding: 1rem 1.1rem 1.1rem;
+
+  h3 {
+    margin: 0 0 0.75rem;
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #5c584f;
+  }
+}
+
+.admin-payments-breakdown {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.88rem;
+  background: #fff;
+  border: 1px solid rgba(28, 27, 24, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+
+  th,
+  td {
+    text-align: left;
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid rgba(28, 27, 24, 0.06);
+  }
+
+  th {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6f6a62;
+    background: #fffef9;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  td:last-child,
+  th:last-child {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.admin-payments-empty {
+  padding: 2rem 1.25rem;
+  text-align: center;
+  border: 1px dashed rgba(28, 27, 24, 0.16);
+  border-radius: 10px;
+  background: #fffef9;
+}

@@ -23,6 +23,17 @@
         }
       </a>
       <a routerLink="students" routerLinkActive="is-active">Active students</a>
+      <a routerLink="payments" routerLinkActive="is-active" class="admin-nav__link">
+        <span>Manage payments</span>
+        @if (navBadges.counts().pendingPaymentSubmissions > 0) {
+          <span
+            class="admin-nav__badge"
+            [attr.aria-label]="navBadges.counts().pendingPaymentSubmissions + ' pending'"
+          >
+            {{ badgeLabel(navBadges.counts().pendingPaymentSubmissions) }}
+          </span>
+        }
+      </a>
       <a routerLink="calendar" routerLinkActive="is-active">Calendar</a>
       <a routerLink="details" routerLinkActive="is-active">Admin details</a>
     </nav>

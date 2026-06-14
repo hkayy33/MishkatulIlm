@@ -68,11 +68,16 @@ public sealed class AdminController(
             r => r.Status == ScheduleChangeRequestCodes.Pending,
             cancellationToken);
 
+        var pendingPaymentSubmissions = await db.PaymentSubmissions.AsNoTracking().CountAsync(
+            s => s.Status == PaymentSubmissionStatusCodes.PendingVerification,
+            cancellationToken);
+
         return Ok(
             new AdminBadgeCountsDto
             {
                 PendingApplications = pendingApplications,
                 PendingScheduleChanges = pendingScheduleChanges,
+                PendingPaymentSubmissions = pendingPaymentSubmissions,
             });
     }
 

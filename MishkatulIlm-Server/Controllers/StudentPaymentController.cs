@@ -1,14 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using MishkatulIlm_Server.Authentication;
 using MishkatulIlm_Server.Data;
-using MishkatulIlm_Server.Dtos;
-using MishkatulIlm_Server.Options;
 using MishkatulIlm_Server.Services;
-using Stripe;
-using Stripe.Checkout;
 
 namespace MishkatulIlm_Server.Controllers;
 
@@ -17,26 +12,16 @@ namespace MishkatulIlm_Server.Controllers;
 [Route("api/student")]
 public sealed class StudentPaymentController(
     AppDbContext db,
-    IOptions<StripeOptions> stripeOptions,
-    StripePaymentRecorder paymentRecorder,
-    StripeSubscriptionService subscriptionService,
-    StripeCheckoutPriceResolver priceResolver) : ControllerBase
+    StudentPaymentService paymentService) : ControllerBase
 {
-    [HttpPost("checkout-session")]
-    public async Task<IActionResult> CreateCheckoutSession(CancellationToken cancellationToken)
+    [HttpGet("payment-statement")]
+    public async Task<IActionResult> GetPaymentStatement(CancellationToken cancellationToken)
     {
         if (!User.TryGetSupabaseUserId(out var userId))
             return Unauthorized();
 
-        var options = stripeOptions.Value;
-        if (!options.IsConfigured)
-        {
-            return StatusCode(
-                StatusCodes.Status503ServiceUnavailable,
-                new { message = "Online payments are not configured yet. Please contact support." });
-        }
-
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId && !u.IsAdmin, cancellationToken);
+        var user = await db.Users.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId && !u.IsAdmin, cancellationToken);
         if (user is null)
             return NotFound(new { message = "Account not found." });
 
@@ -46,115 +31,56 @@ public sealed class StudentPaymentController(
                 new { message = "Payments are available after you accept your lesson schedule." });
         }
 
-        var payment = StudentPaymentSummaryBuilder.Build(user);
-        if (!payment.CanMakePayment)
+        var statement = await paymentService.GetStatementAsync(userId, cancellationToken);
+        if (statement is null)
         {
-            return BadRequest(new
+            var submission = await paymentService.GetCurrentSubmissionAsync(userId, cancellationToken);
+            var summary = StudentPaymentSummaryBuilder.Build(user, submission, DateTime.UtcNow);
+            if (!summary.ShowPaymentDetails)
             {
-                message = payment.HasActiveSubscription
-                    ? "You already have an active monthly subscription."
-                    : "Online payment is not required right now.",
-            });
+                var dueMessage = summary.NextPaymentDueUtc is null
+                    ? "Next payment is not scheduled yet."
+                    : $"Next payment is due on {summary.NextPaymentDueUtc.Value:MMMM d, yyyy}.";
+
+                return BadRequest(new { message = dueMessage });
+            }
+
+            return NotFound(new { message = "Account not found." });
         }
 
-        var (priceId, priceError) = await priceResolver.ResolvePriceIdAsync(cancellationToken);
-        if (priceId is null)
-        {
-            return StatusCode(
-                StatusCodes.Status503ServiceUnavailable,
-                new { message = priceError ?? "Could not resolve Stripe price." });
-        }
-
-        StripeConfiguration.ApiKey = options.SecretKey;
-        var clientBase = options.ClientAppUrl.Trim().TrimEnd('/');
-        var sessionService = new SessionService();
-        var sessionOptions = new SessionCreateOptions
-            {
-                Mode = "subscription",
-                ClientReferenceId = userId.ToString(),
-                Metadata = new Dictionary<string, string> { ["user_id"] = userId.ToString() },
-                LineItems =
-                [
-                    new SessionLineItemOptions
-                    {
-                        Price = priceId,
-                        Quantity = 1,
-                    },
-                ],
-                SuccessUrl = $"{clientBase}/dashboard?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
-                CancelUrl = $"{clientBase}/dashboard?payment=cancelled",
-            };
-
-        if (!string.IsNullOrWhiteSpace(user.StripeCustomerId))
-            sessionOptions.Customer = user.StripeCustomerId;
-        else
-            sessionOptions.CustomerEmail = user.Email;
-
-        var session = await sessionService.CreateAsync(sessionOptions, cancellationToken: cancellationToken);
-
-        if (string.IsNullOrWhiteSpace(session.Url))
-            return StatusCode(StatusCodes.Status502BadGateway, new { message = "Could not start checkout." });
-
-        return Ok(new { url = session.Url });
+        return Ok(statement);
     }
 
-    [HttpPost("confirm-payment")]
-    public async Task<IActionResult> ConfirmPayment(
-        [FromBody] ConfirmCheckoutPaymentRequest request,
-        CancellationToken cancellationToken)
+    [HttpPost("payment-submission")]
+    public async Task<IActionResult> SubmitPayment(CancellationToken cancellationToken)
     {
         if (!User.TryGetSupabaseUserId(out var userId))
             return Unauthorized();
 
-        var options = stripeOptions.Value;
-        if (!options.IsConfigured)
-        {
-            return StatusCode(
-                StatusCodes.Status503ServiceUnavailable,
-                new { message = "Online payments are not configured yet." });
-        }
-
-        var sessionId = request.SessionId.Trim();
-        if (sessionId.Length == 0)
-            return BadRequest(new { message = "Missing checkout session id." });
-
-        StripeConfiguration.ApiKey = options.SecretKey;
-        var session = await new SessionService().GetAsync(sessionId, cancellationToken: cancellationToken);
-
-        if (!session.Metadata.TryGetValue("user_id", out var ownerRaw))
-            ownerRaw = session.ClientReferenceId;
-
-        if (!Guid.TryParse(ownerRaw, out var ownerId) || ownerId != userId)
-            return Forbid();
-
-        var recorded = await paymentRecorder.TryRecordCheckoutSessionAsync(session, cancellationToken);
-        if (!recorded)
-        {
-            return BadRequest(
-                new { message = "Payment is not complete yet. Refresh in a moment or contact support." });
-        }
-
-        return Ok(new { message = "Payment recorded. Thank you!" });
-    }
-
-    [HttpPost("cancel-subscription")]
-    public async Task<IActionResult> CancelSubscription(CancellationToken cancellationToken)
-    {
-        if (!User.TryGetSupabaseUserId(out var userId))
-            return Unauthorized();
-
-        var (success, error, periodEndUtc) =
-            await subscriptionService.CancelAtPeriodEndAsync(userId, cancellationToken);
-
+        var (success, error, submission) = await paymentService.SubmitPaymentAsync(userId, cancellationToken);
         if (!success)
             return BadRequest(new { message = error });
 
         return Ok(new
         {
-            message = periodEndUtc is null
-                ? "Your monthly payments have been cancelled."
-                : $"Your subscription will end on {periodEndUtc:MMMM d, yyyy}. You can keep using lessons until then.",
-            subscriptionCurrentPeriodEndUtc = periodEndUtc,
+            message = "Payment submitted. We will verify it shortly.",
+            submissionId = submission!.Id,
+            status = submission.Status,
         });
+    }
+
+    [HttpGet("payment-history")]
+    public async Task<IActionResult> GetPaymentHistory(CancellationToken cancellationToken)
+    {
+        if (!User.TryGetSupabaseUserId(out var userId))
+            return Unauthorized();
+
+        var user = await db.Users.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId && !u.IsAdmin, cancellationToken);
+        if (user is null)
+            return NotFound(new { message = "Account not found." });
+
+        var history = await paymentService.GetPaymentHistoryAsync(userId, cancellationToken);
+        return Ok(history);
     }
 }

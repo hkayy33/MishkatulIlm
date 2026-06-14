@@ -16,19 +16,22 @@ public sealed class StudentPaymentSummaryDto
 {
     public DateTime? NextPaymentDueUtc { get; init; }
     public decimal? LastPaymentAmount { get; init; }
-    public string LastPaymentCurrency { get; init; } = "GBP";
+    public string LastPaymentCurrency { get; init; } = "USD";
     public DateTime? LastPaymentAtUtc { get; init; }
 
     /// <summary>True when the student must pay before their first lesson.</summary>
     public bool RequiresInitialPayment { get; init; }
 
     public bool PaymentOverdue { get; init; }
-    public bool HasActiveSubscription { get; init; }
-    public bool SubscriptionCancelAtPeriodEnd { get; init; }
-    public DateTime? SubscriptionCurrentPeriodEndUtc { get; init; }
-    public bool SubscriptionPastDue { get; init; }
-    public bool CanMakePayment { get; init; }
-    public bool CanCancelSubscription { get; init; }
+    public bool ShowPaymentReminder { get; init; }
+    public int? DaysUntilDue { get; init; }
+
+    /// <summary>pending_verification | paid | rejected | null</summary>
+    public string? CurrentSubmissionStatus { get; init; }
+
+    public bool CanSubmitPayment { get; init; }
+    public bool CurrentPeriodPaid { get; init; }
+    public bool ShowPaymentDetails { get; init; }
 }
 
 public sealed class StudentLessonMonthSummaryDto

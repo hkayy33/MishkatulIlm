@@ -77,6 +77,7 @@ public sealed class AdminBadgeCountsDto
 {
     public int PendingApplications { get; init; }
     public int PendingScheduleChanges { get; init; }
+    public int PendingPaymentSubmissions { get; init; }
 }
 
 public sealed class AdminScheduleChangeRequestListItem

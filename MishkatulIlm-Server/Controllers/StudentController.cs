@@ -14,7 +14,7 @@ namespace MishkatulIlm_Server.Controllers;
 public sealed class StudentController(
     AppDbContext db,
     StudentAccountDeletionService accountDeletion,
-    StripeSubscriptionSyncService subscriptionSync) : ControllerBase
+    StudentPaymentService paymentService) : ControllerBase
 {
     [HttpGet("portal")]
     public async Task<IActionResult> GetPortal(
@@ -34,9 +34,6 @@ public sealed class StudentController(
 
         if (user.ApplicationStatus != ApplicationStatusCodes.Active)
             return BadRequest(new { message = "Your student portal is available after you accept your lesson schedule." });
-
-        await subscriptionSync.TrySyncUserFromStripeAsync(user, cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
 
         var now = DateTime.UtcNow;
         var viewYear = year ?? now.Year;
@@ -70,6 +67,8 @@ public sealed class StudentController(
             .OrderBy(s => s.StartsAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
 
+        var currentSubmission = await paymentService.GetCurrentSubmissionAsync(userId, cancellationToken);
+
         return Ok(
             new StudentPortalResponse
             {
@@ -77,7 +76,7 @@ public sealed class StudentController(
                 {
                     Status = "active",
                     NextLesson = nextLessonSlot is null ? null : ToLessonDto(nextLessonSlot),
-                    Payment = StudentPaymentSummaryBuilder.Build(user),
+                    Payment = StudentPaymentSummaryBuilder.Build(user, currentSubmission, now),
                     MonthSummary = new StudentLessonMonthSummaryDto
                     {
                         PastLessonsCount = past.Count,

@@ -57,43 +57,45 @@
               <h2 id="payment-required-heading">Payment required</h2>
               <p>Complete your first payment before your lessons begin.</p>
             </div>
-            <button
-              type="button"
-              class="matched-btn"
-              [disabled]="paymentBusy()"
-              (click)="makePayment()"
-            >
-              {{ paymentBusy() ? 'Opening checkout…' : 'Make payment' }}
+            <button type="button" class="matched-btn" (click)="setTab('payments')">
+              View payment details
             </button>
           </div>
-        } @else if (paymentOverdue() || subscriptionPastDue()) {
+        } @else if (paymentOverdue()) {
           <div class="matched-payment-cta" role="region" aria-labelledby="payment-overdue-heading">
             <div>
               <h2 id="payment-overdue-heading">Payment overdue</h2>
-              <p>
-                @if (subscriptionPastDue()) {
-                  Your monthly payment could not be collected. Update your payment to keep your lessons.
-                } @else {
-                  Your monthly payment is due. Pay now to stay up to date.
-                }
-              </p>
+              <p>Your monthly payment is due. Pay now to stay up to date.</p>
             </div>
-            @if (canMakePayment()) {
-              <button
-                type="button"
-                class="matched-btn"
-                [disabled]="paymentBusy()"
-                (click)="makePayment()"
-              >
-                {{ paymentBusy() ? 'Opening checkout…' : 'Pay now' }}
-              </button>
-            }
+            <button type="button" class="matched-btn" (click)="setTab('payments')">
+              View payment details
+            </button>
           </div>
-        } @else if (subscriptionCancelAtPeriodEnd() && subscriptionPeriodEnd(); as end) {
+        } @else if (showPaymentReminder()) {
           <div class="matched-payment-cta matched-payment-cta--info" role="status">
             <div>
-              <h2>Subscription ending</h2>
-              <p>Monthly payments stop after {{ end | date: 'fullDate' }}. You can use lessons until then.</p>
+              <h2>Payment reminder</h2>
+              <p>
+                Your payment is due in {{ payment()?.daysUntilDue }} day@if (payment()?.daysUntilDue === 1) {} @else {s}.
+                Please submit payment before the due date.
+              </p>
+            </div>
+            <button type="button" class="matched-btn matched-btn--ghost" (click)="setTab('payments')">
+              View payment details
+            </button>
+          </div>
+        } @else if (pendingVerification()) {
+          <div class="matched-payment-cta matched-payment-cta--info" role="status">
+            <div>
+              <h2>Payment pending verification</h2>
+              <p>We received your payment submission and will confirm once it arrives.</p>
+            </div>
+          </div>
+        } @else if (currentPeriodPaid()) {
+          <div class="matched-payment-cta matched-payment-cta--success" role="status">
+            <div>
+              <h2>Paid</h2>
+              <p>Your payment for this billing period has been verified.</p>
             </div>
           </div>
         }
@@ -123,43 +125,39 @@
             <h2>Next payment</h2>
             @if (requiresInitialPayment()) {
               <p class="matched-card__value matched-card__value--muted">Payment required before your first lesson</p>
-              <button
-                type="button"
-                class="matched-btn matched-btn--compact"
-                [disabled]="paymentBusy()"
-                (click)="makePayment()"
-              >
-                {{ paymentBusy() ? 'Opening checkout…' : 'Make payment' }}
-              </button>
-            } @else if (paymentOverdue() || subscriptionPastDue()) {
-              <p class="matched-card__value matched-card__value--warn">Payment overdue</p>
-              @if (canMakePayment()) {
-                <button
-                  type="button"
-                  class="matched-btn matched-btn--compact"
-                  [disabled]="paymentBusy()"
-                  (click)="makePayment()"
-                >
-                  {{ paymentBusy() ? 'Opening checkout…' : 'Pay now' }}
+              @if (showPaymentDetails()) {
+                <button type="button" class="matched-summary-link" (click)="setTab('payments')">
+                  View payment details
                 </button>
               }
-            } @else if (hasActiveSubscription() && subscriptionPeriodEnd(); as end) {
-              <p class="matched-card__value">{{ end | date: 'fullDate' }}</p>
-              <p class="matched-card__sub">
-                @if (subscriptionCancelAtPeriodEnd()) {
-                  Monthly payments end on this date
-                } @else {
-                  Next monthly charge
-                }
-              </p>
-              <button type="button" class="matched-summary-link" (click)="setTab('payments')">
-                View payments
-              </button>
+            } @else if (paymentOverdue()) {
+              <p class="matched-card__value matched-card__value--warn">Payment overdue</p>
+              @if (showPaymentDetails()) {
+                <button type="button" class="matched-summary-link" (click)="setTab('payments')">
+                  View payment details
+                </button>
+              }
+            } @else if (currentPeriodPaid()) {
+              <p class="matched-card__value matched-card__value--success">Paid</p>
+              @if (nextPaymentDue(); as due) {
+                <p class="matched-card__sub">Next due {{ due | date: 'fullDate' }}</p>
+              }
+            } @else if (pendingVerification()) {
+              <p class="matched-card__value">Pending verification</p>
+              @if (showPaymentDetails()) {
+                <button type="button" class="matched-summary-link" (click)="setTab('payments')">
+                  View payment details
+                </button>
+              }
             } @else if (nextPaymentDue(); as due) {
-              <p class="matched-card__value">{{ due | date: 'fullDate' }}</p>
-              <button type="button" class="matched-summary-link" (click)="setTab('payments')">
-                View payments
-              </button>
+              @if (showPaymentDetails()) {
+                <p class="matched-card__value">{{ due | date: 'fullDate' }}</p>
+                <button type="button" class="matched-summary-link" (click)="setTab('payments')">
+                  View payment details
+                </button>
+              } @else {
+                <p class="matched-card__value">Next payment is due on {{ due | date: 'fullDate' }}</p>
+              }
             } @else {
               <p class="matched-card__value matched-card__value--muted">Not set yet</p>
             }
@@ -317,162 +315,204 @@
 
     @if (activeTab() === 'payments' && store.portalData(); as data) {
       @let payment = data.portal.payment;
-      @let summary = data.portal.monthSummary;
 
       <div class="matched-page">
         <h1 class="matched-page-title">Payments</h1>
-        <p class="matched-page-lead">Your payment dates and a summary of lessons this month.</p>
+        <p class="matched-page-lead">Monthly payment for your scheduled lessons at $5 per hour.</p>
 
         @if (requiresInitialPayment()) {
-          <div class="matched-payment-cta matched-payment-cta--page" role="region" aria-labelledby="payments-required-heading">
+          <div class="matched-payment-cta matched-payment-cta--page" role="region">
             <div>
-              <h2 id="payments-required-heading">First payment</h2>
-              <p>Pay now to confirm your place before your first lesson.</p>
+              <h2>First payment</h2>
+              <p>Pay for your scheduled lessons before your first lesson begins.</p>
             </div>
-            <button
-              type="button"
-              class="matched-btn"
-              [disabled]="paymentBusy()"
-              (click)="makePayment()"
-            >
-              {{ paymentBusy() ? 'Opening checkout…' : 'Make payment' }}
-            </button>
           </div>
-        } @else if (paymentOverdue() || subscriptionPastDue()) {
-          <div class="matched-payment-cta matched-payment-cta--page" role="region" aria-labelledby="payments-overdue-page-heading">
+        } @else if (paymentOverdue()) {
+          <div class="matched-payment-cta matched-payment-cta--page" role="region">
             <div>
-              <h2 id="payments-overdue-page-heading">Payment overdue</h2>
+              <h2>Payment overdue</h2>
+              <p>Your monthly payment is due. Transfer the amount below and submit once paid.</p>
+            </div>
+          </div>
+        } @else if (showPaymentReminder()) {
+          <div class="matched-payment-cta matched-payment-cta--info matched-payment-cta--page" role="status">
+            <div>
+              <h2>Payment reminder</h2>
               <p>
-                @if (subscriptionPastDue()) {
-                  We could not collect your monthly payment. Pay now or update your card in checkout.
-                } @else {
-                  Your monthly payment is due. Pay now to stay up to date.
-                }
+                Your payment is due in {{ payment.daysUntilDue }} day@if (payment.daysUntilDue === 1) {} @else {s}.
               </p>
             </div>
-            @if (canMakePayment()) {
+          </div>
+        }
+
+        @if (currentPeriodPaid()) {
+          <div class="matched-payment-status matched-payment-status--paid" role="status">
+            <strong>Paid</strong>
+            <span>Your payment for this billing period has been verified.</span>
+          </div>
+        } @else if (pendingVerification()) {
+          <div class="matched-payment-status matched-payment-status--pending" role="status">
+            <strong>Pending verification</strong>
+            <span>We are checking that we have received your payment.</span>
+          </div>
+        }
+
+        @if (!showPaymentDetails() && !currentPeriodPaid()) {
+          <section class="matched-card">
+            <h2>Next payment</h2>
+            @if (payment.nextPaymentDueUtc; as due) {
+              <p class="matched-card__value">Next payment is due on {{ due | date: 'fullDate' }}</p>
+            } @else {
+              <p class="matched-card__value matched-card__value--muted">Not scheduled yet</p>
+            }
+          </section>
+        } @else if (showPaymentDetails()) {
+          @if (paymentStatementLoading()) {
+            <p class="matched-muted">Loading payment details…</p>
+          } @else if (paymentStatementError(); as err) {
+            <section class="matched-card">
+              <h2>Next payment</h2>
+              <p class="matched-card__value">{{ err }}</p>
+            </section>
+          } @else if (paymentStatement(); as statement) {
+          <section class="matched-card matched-payment-form">
+            <h2>Payment summary — {{ statement.billingPeriodLabel }}</h2>
+
+            <dl class="matched-payment-meta">
+              <div>
+                <dt>Student</dt>
+                <dd>{{ statement.studentName }}</dd>
+              </div>
+              @if (statement.paymentDueUtc) {
+                <div>
+                  <dt>Payment due</dt>
+                  <dd>{{ statement.paymentDueUtc | date: 'fullDate' }}</dd>
+                </div>
+              }
+            </dl>
+
+            <h3>Lessons this billing period</h3>
+            @if (statement.lessons.length === 0) {
+              <p class="matched-muted">No billable lessons scheduled for this period.</p>
+            } @else {
+              <div class="matched-payment-breakdown-wrap">
+                <table class="matched-payment-breakdown">
+                  <thead>
+                    <tr>
+                      <th>Lesson</th>
+                      <th>Duration</th>
+                      <th>Rate</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (line of statement.lessons; track line.slotId) {
+                      <tr>
+                        <td>{{ formatLessonInZone(line.startsAtUtc, line.endsAtUtc) }}</td>
+                        <td>{{ formatLessonHours(line.durationMinutes) }} hr</td>
+                        <td>{{ line.hourlyRate | currency: statement.currency : 'symbol' : '1.0-2' }}/hr</td>
+                        <td>{{ line.amount | currency: statement.currency : 'symbol' : '1.0-2' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colspan="3"><strong>Total</strong></td>
+                      <td>
+                        <strong>{{ statement.totalAmount | currency: statement.currency : 'symbol' : '1.0-2' }}</strong>
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            }
+
+            <h3>Pay to</h3>
+            <dl class="matched-payment-meta matched-payment-meta--bank">
+              @if (statement.bankName) {
+                <div>
+                  <dt>Bank</dt>
+                  <dd>{{ statement.bankName }}</dd>
+                </div>
+              }
+              @if (statement.accountName) {
+                <div>
+                  <dt>Account name</dt>
+                  <dd>{{ statement.accountName }}</dd>
+                </div>
+              }
+              @if (statement.sortCode) {
+                <div>
+                  <dt>Sort code</dt>
+                  <dd>{{ statement.sortCode }}</dd>
+                </div>
+              }
+              @if (statement.accountNumber) {
+                <div>
+                  <dt>Account number</dt>
+                  <dd>{{ statement.accountNumber }}</dd>
+                </div>
+              }
+            </dl>
+            @if (statement.paymentInstructions) {
+              <p class="matched-muted">{{ statement.paymentInstructions }}</p>
+            }
+
+            <p class="matched-payment-reference" role="note">
+              Please use this exact payment reference:
+              <mark>{{ statement.paymentReference }}</mark>
+            </p>
+
+            @if (canSubmitPayment() && statement.totalAmount > 0) {
+              <p class="matched-muted">
+                After you have made the bank transfer, confirm below so we can verify your payment.
+              </p>
               <button
                 type="button"
                 class="matched-btn"
                 [disabled]="paymentBusy()"
-                (click)="makePayment()"
+                (click)="submitPayment()"
               >
-                {{ paymentBusy() ? 'Opening checkout…' : 'Pay now' }}
+                {{ paymentBusy() ? 'Submitting…' : 'I have made this payment' }}
               </button>
             }
-          </div>
-        }
-
-        <div class="matched-cards">
-          <article class="matched-card">
-            <h2>Next payment due</h2>
-            @if (requiresInitialPayment()) {
-              <p class="matched-card__value matched-card__value--muted">Due before your first lesson</p>
-            } @else if (paymentOverdue() || subscriptionPastDue()) {
-              <p class="matched-card__value matched-card__value--warn">Overdue</p>
-              @if (payment.nextPaymentDueUtc) {
-                <p class="matched-card__sub">Was due {{ payment.nextPaymentDueUtc | date: 'mediumDate' }}</p>
-              }
-            } @else if (hasActiveSubscription() && payment.subscriptionCurrentPeriodEndUtc) {
-              <p class="matched-card__value">{{ payment.subscriptionCurrentPeriodEndUtc | date: 'mediumDate' }}</p>
-              <p class="matched-card__sub">
-                @if (payment.subscriptionCancelAtPeriodEnd) {
-                  Subscription ends — no further charges
-                } @else {
-                  Next monthly charge (active subscription)
-                }
-              </p>
-            } @else if (payment.nextPaymentDueUtc) {
-              <p class="matched-card__value">{{ payment.nextPaymentDueUtc | date: 'mediumDate' }}</p>
-            } @else {
-              <p class="matched-card__value matched-card__value--muted">Not set yet</p>
-            }
-          </article>
-          <article class="matched-card">
-            <h2>Previous payment</h2>
-            @if (payment.lastPaymentAtUtc && payment.lastPaymentAmount != null) {
-              <p class="matched-card__value">
-                {{ payment.lastPaymentAmount | currency: payment.lastPaymentCurrency : 'symbol' : '1.0-2' }}
-              </p>
-              <p class="matched-card__sub">{{ payment.lastPaymentAtUtc | date: 'mediumDate' }}</p>
-            } @else {
-              <p class="matched-card__value matched-card__value--muted">No payments recorded yet</p>
-            }
-          </article>
-        </div>
-
-        @if (showSubscriptionManage()) {
-          <section class="matched-card matched-subscription-manage">
-            <h2>Monthly subscription</h2>
-            @if (subscriptionCancelAtPeriodEnd() && subscriptionPeriodEnd(); as end) {
-              <p class="matched-card__sub">
-                Your subscription is scheduled to end on {{ end | date: 'fullDate' }}. No further monthly charges will be
-                made after that date.
-              </p>
-            } @else {
-              <p class="matched-card__sub">
-                Your lessons are billed monthly. Cancelling stops future charges at the end of your current billing
-                period; you can keep using the portal until then.
-              </p>
-              @if (canCancelSubscription()) {
-              @if (!showCancelSubscriptionConfirm()) {
-                <button
-                  type="button"
-                  class="matched-btn matched-btn--ghost"
-                  [disabled]="paymentBusy()"
-                  (click)="showCancelSubscriptionConfirm.set(true)"
-                >
-                  Cancel monthly payments
-                </button>
-              } @else {
-              <div class="matched-subscription-manage__confirm" role="region" aria-labelledby="cancel-sub-heading">
-                <h3 id="cancel-sub-heading">Cancel monthly payments?</h3>
-                <p>You will not be charged again after your current billing period ends.</p>
-                <div class="matched-subscription-manage__actions">
-                  <button
-                    type="button"
-                    class="matched-btn matched-btn--danger"
-                    [disabled]="paymentBusy()"
-                    (click)="cancelSubscription()"
-                  >
-                    {{ paymentBusy() ? 'Cancelling…' : 'Yes, cancel payments' }}
-                  </button>
-                  <button
-                    type="button"
-                    class="matched-btn matched-btn--ghost"
-                    [disabled]="paymentBusy()"
-                    (click)="showCancelSubscriptionConfirm.set(false)"
-                  >
-                    Keep subscription
-                  </button>
-                </div>
-              </div>
-                }
-              }
-            }
           </section>
+          }
         }
 
-        <section class="matched-card matched-card--summary">
-          <h2>Lesson summary this month</h2>
-          <dl class="matched-summary-grid">
-            <div>
-              <dt>Past lessons</dt>
-              <dd>{{ summary.pastLessonsCount }}</dd>
-            </div>
-            <div>
-              <dt>Upcoming lessons</dt>
-              <dd>{{ summary.upcomingLessonsCount }}</dd>
-            </div>
-            <div>
-              <dt>Marked attending</dt>
-              <dd>{{ summary.attendingCount }}</dd>
-            </div>
-            <div>
-              <dt>Cannot attend</dt>
-              <dd>{{ summary.notAttendingCount }}</dd>
-            </div>
-          </dl>
+        <section class="matched-payment-history">
+          <h2>Payment history</h2>
+          @if (paymentHistoryLoading()) {
+            <p class="matched-muted">Loading payment history…</p>
+          } @else if (paymentHistoryError(); as historyErr) {
+            <p class="matched-muted">{{ historyErr }}</p>
+          } @else if (paymentHistory().length === 0) {
+            <p class="matched-muted">No payments recorded yet.</p>
+          } @else {
+            <ul class="matched-payment-history__list">
+              @for (item of paymentHistory(); track item.id) {
+                <li
+                  class="matched-payment-history__item"
+                  [class.matched-payment-history__item--paid]="item.status === 'paid'"
+                  [class.matched-payment-history__item--pending]="item.status === 'pending_verification'"
+                  [class.matched-payment-history__item--rejected]="item.status === 'rejected'"
+                >
+                  <div class="matched-payment-history__main">
+                    <span class="matched-payment-history__period">{{ item.billingPeriodLabel }}</span>
+                    <span class="matched-payment-history__amount">
+                      {{ item.amount | currency: item.currency : 'symbol' : '1.0-2' }}
+                    </span>
+                  </div>
+                  <div class="matched-payment-history__meta">
+                    <span class="matched-payment-history__status">{{ paymentStatusLabel(item.status) }}</span>
+                    <span class="matched-payment-history__date">
+                      {{ paymentHistoryDate(item) | date: 'mediumDate' }}
+                    </span>
+                  </div>
+                </li>
+              }
+            </ul>
+          }
         </section>
       </div>
     }
@@ -483,53 +523,6 @@
         <p class="matched-page-lead">
           Request a new lesson schedule or delete your account if you no longer need lessons.
         </p>
-
-        @if (showSubscriptionManage()) {
-          <section class="matched-account-block matched-subscription-manage">
-            <h2>Monthly subscription</h2>
-            @if (subscriptionCancelAtPeriodEnd() && subscriptionPeriodEnd(); as end) {
-              <p class="matched-muted">
-                Payments stop after {{ end | date: 'fullDate' }}. You can keep using lessons until then.
-              </p>
-            } @else if (canCancelSubscription()) {
-              <p class="matched-muted">
-                Cancel recurring billing anytime. You keep access until the end of the current period.
-              </p>
-              @if (!showCancelSubscriptionConfirm()) {
-                <button
-                  type="button"
-                  class="matched-btn matched-btn--ghost"
-                  [disabled]="paymentBusy()"
-                  (click)="showCancelSubscriptionConfirm.set(true)"
-                >
-                  Cancel monthly payments
-                </button>
-              } @else {
-                <div class="matched-subscription-manage__confirm">
-                  <p class="matched-muted">You will not be charged again after this billing period.</p>
-                  <div class="matched-subscription-manage__actions">
-                    <button
-                      type="button"
-                      class="matched-btn matched-btn--danger"
-                      [disabled]="paymentBusy()"
-                      (click)="cancelSubscription()"
-                    >
-                      {{ paymentBusy() ? 'Cancelling…' : 'Yes, cancel' }}
-                    </button>
-                    <button
-                      type="button"
-                      class="matched-btn matched-btn--ghost"
-                      [disabled]="paymentBusy()"
-                      (click)="showCancelSubscriptionConfirm.set(false)"
-                    >
-                      Keep subscription
-                    </button>
-                  </div>
-                </div>
-              }
-            }
-          </section>
-        }
 
         <section class="matched-account-block">
           <h2>Schedule change</h2>

@@ -55,6 +55,11 @@ export const routes: Routes = [
           import('./pages/admin/admin-students/admin-students').then((m) => m.AdminStudents),
       },
       {
+        path: 'payments',
+        loadComponent: () =>
+          import('./pages/admin/admin-payments/admin-payments').then((m) => m.AdminPayments),
+      },
+      {
         path: 'calendar',
         loadComponent: () =>
           import('./pages/admin/admin-calendar/admin-calendar').then((m) => m.AdminCalendar),

@@ -1,4 +1,9 @@
-<article class="card">
+<button
+  type="button"
+  class="card"
+  (click)="cardSelect.emit(card)"
+  [attr.aria-label]="'Learn more about ' + card.title"
+>
   <div
     class="icon-ring"
     [class.icon-ring--green]="card.accent === 'green'"
@@ -37,6 +42,12 @@
       }
     }
   </div>
-  <h3 class="card-title">{{ card.title }}</h3>
+  <h3 class="card-title">
+    {{ card.title }}
+    @if (card.titleArabic) {
+      <span class="card-title__arabic" dir="rtl" lang="ar">{{ card.titleArabic }}</span>
+    }
+  </h3>
   <p class="card-summary">{{ card.summary }}</p>
-</article>
+  <span class="card-cta">Learn more</span>
+</button>

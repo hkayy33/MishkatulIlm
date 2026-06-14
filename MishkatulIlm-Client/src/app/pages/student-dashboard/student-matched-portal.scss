@@ -337,6 +337,211 @@
   color: #8b2c2c;
 }
 
+.matched-card__value--success {
+  color: #2f5a3f;
+}
+
+.matched-payment-cta--success {
+  border-color: rgba(47, 122, 79, 0.35);
+  background: rgba(47, 122, 79, 0.1);
+}
+
+.matched-payment-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1.25rem;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.92rem;
+
+  strong {
+    font-size: 1rem;
+  }
+
+  &--paid {
+    border: 1px solid rgba(47, 122, 79, 0.35);
+    background: rgba(47, 122, 79, 0.1);
+    color: #2f5a3f;
+  }
+
+  &--pending {
+    border: 1px solid rgba(58, 90, 120, 0.3);
+    background: rgba(58, 90, 120, 0.08);
+    color: #3a4a5a;
+  }
+}
+
+.matched-payment-history {
+  margin-top: 1.5rem;
+
+  h2 {
+    margin: 0 0 0.85rem;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.15rem;
+  }
+
+  &__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  &__item {
+    padding: 0.85rem 1rem;
+    border: 1px solid rgba(58, 56, 52, 0.12);
+    border-radius: 8px;
+    background: #fff;
+
+    &--paid {
+      border-color: rgba(47, 122, 79, 0.25);
+      background: rgba(47, 122, 79, 0.06);
+    }
+
+    &--pending {
+      border-color: rgba(58, 90, 120, 0.25);
+      background: rgba(58, 90, 120, 0.06);
+    }
+
+    &--rejected {
+      border-color: rgba(139, 44, 44, 0.25);
+      background: rgba(139, 44, 44, 0.06);
+    }
+  }
+
+  &__main,
+  &__meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+  }
+
+  &__meta {
+    margin-top: 0.35rem;
+    font-size: 0.88rem;
+    color: #5a5854;
+  }
+
+  &__period {
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-weight: 600;
+    color: #2a2824;
+  }
+
+  &__amount {
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-weight: 600;
+    color: #2a2824;
+  }
+
+  &__status {
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+  }
+
+  &__date {
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+  }
+}
+
+.matched-payment-form {
+  margin-bottom: 1.25rem;
+
+  h2,
+  h3 {
+    margin: 0 0 0.75rem;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.15rem;
+  }
+
+  h3 {
+    margin-top: 1.25rem;
+    font-size: 1rem;
+  }
+}
+
+.matched-payment-meta {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+
+  div {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  dt {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6a665e;
+  }
+
+  dd {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+
+  &--bank {
+    margin-bottom: 0.75rem;
+  }
+}
+
+.matched-payment-breakdown-wrap {
+  overflow-x: auto;
+}
+
+.matched-payment-breakdown {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.88rem;
+
+  th,
+  td {
+    padding: 0.45rem 0.5rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    text-align: left;
+  }
+
+  th:last-child,
+  td:last-child {
+    text-align: right;
+  }
+
+  tfoot td {
+    border-bottom: none;
+    padding-top: 0.65rem;
+  }
+}
+
+.matched-payment-reference {
+  margin: 1rem 0;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(47, 122, 79, 0.35);
+  background: rgba(47, 122, 79, 0.08);
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.95rem;
+  color: #2a2824;
+
+  mark {
+    display: inline-block;
+    margin-left: 0.35rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    background: #fff3bf;
+    color: #5c4a00;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-weight: 700;
+    font-size: 1.05rem;
+  }
+}
+
 .matched-subscription-manage {
   margin-bottom: 1.25rem;
 

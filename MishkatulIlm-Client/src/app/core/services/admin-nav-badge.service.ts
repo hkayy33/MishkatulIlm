@@ -8,6 +8,7 @@ export class AdminNavBadgeService {
   readonly counts = signal<AdminBadgeCounts>({
     pendingApplications: 0,
     pendingScheduleChanges: 0,
+    pendingPaymentSubmissions: 0,
   });
 
   refresh(): void {
@@ -21,9 +22,12 @@ export class AdminNavBadgeService {
 function normalizeBadgeCounts(raw: AdminBadgeCounts & {
   PendingApplications?: number;
   PendingScheduleChanges?: number;
+  PendingPaymentSubmissions?: number;
 }): AdminBadgeCounts {
   return {
     pendingApplications: raw.pendingApplications ?? raw.PendingApplications ?? 0,
     pendingScheduleChanges: raw.pendingScheduleChanges ?? raw.PendingScheduleChanges ?? 0,
+    pendingPaymentSubmissions:
+      raw.pendingPaymentSubmissions ?? raw.PendingPaymentSubmissions ?? 0,
   };
 }

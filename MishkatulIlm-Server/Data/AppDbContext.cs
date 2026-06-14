@@ -10,6 +10,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<SchedulingSettings> SchedulingSettings => Set<SchedulingSettings>();
     public DbSet<ScheduleProposal> ScheduleProposals => Set<ScheduleProposal>();
     public DbSet<ScheduleChangeRequest> ScheduleChangeRequests => Set<ScheduleChangeRequest>();
+    public DbSet<PaymentSubmission> PaymentSubmissions => Set<PaymentSubmission>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -87,6 +88,29 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.TutorCountry).HasMaxLength(120).IsRequired();
             entity.Property(e => e.TutorCity).HasMaxLength(120).IsRequired();
             entity.Property(e => e.TutorTimeZoneId).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.PaymentHourlyRateUsd).HasPrecision(8, 2);
+            entity.Property(e => e.PaymentAccountName).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.PaymentAccountNumber).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.PaymentSortCode).HasMaxLength(32).IsRequired();
+            entity.Property(e => e.PaymentBankName).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.PaymentInstructions).HasMaxLength(2000).IsRequired();
+        });
+
+        modelBuilder.Entity<PaymentSubmission>(entity =>
+        {
+            entity.ToTable("payment_submissions");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.StudentUserId);
+            entity.HasIndex(e => new { e.StudentUserId, e.BillingYear, e.BillingMonth });
+            entity.Property(e => e.Status).HasMaxLength(32).IsRequired();
+            entity.Property(e => e.Amount).HasPrecision(12, 2);
+            entity.Property(e => e.Currency).HasMaxLength(8).IsRequired();
+            entity.Property(e => e.PaymentReference).HasMaxLength(120).IsRequired();
+            entity.Property(e => e.AdminNote).HasMaxLength(2000);
+            entity.HasOne(e => e.Student)
+                .WithMany()
+                .HasForeignKey(e => e.StudentUserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<ScheduleProposal>(entity =>

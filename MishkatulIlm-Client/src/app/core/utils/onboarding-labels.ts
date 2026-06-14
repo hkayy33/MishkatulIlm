@@ -1,17 +1,18 @@
 import { LESSON_TIME_SLOTS, WEEKDAYS } from '../models/onboarding.models';
 
 const SUBJECT_LABELS: Record<string, string> = {
-  'QURAN-MEMORISATION': 'Quran memorisation',
-  TAJWEED: 'Tajweed',
-  'ARABIC-LANGUAGE': 'Arabic language',
-  'QURAN-RECITATION-MASTERY': 'Quran recitation mastery',
-  'ISLAMIC-STUDIES': 'Islamic studies course',
-  'ISLAMIC-INHERITANCE': 'Islamic inheritance law',
+  'QURAN-RECITATION': 'Quran Recitation with tajweed',
+  'QURAN-MEMORISATION': 'Quran Memorization',
+  'ARABIC-LANGUAGE': 'Arabic Language',
+  'QURAN-RECITATION-MASTERY': 'Quran Recitation Mastery',
+  'ISLAMIC-STUDIES': 'Islamic Studies Course',
+  'ISLAMIC-INHERITANCE': 'Islamic Inheritance Law',
+  /** Legacy code — shown for older applications. */
+  TAJWEED: 'Quran Recitation with tajweed',
 };
 
 const LEVEL_LABELS: Record<string, string> = {
   BEGINNER: 'Beginner',
-  ELEMENTARY: 'Elementary',
   INTERMEDIATE: 'Intermediate',
   ADVANCED: 'Advanced',
 };
@@ -33,7 +34,6 @@ const AGE_LABELS: Record<string, string> = {
 };
 
 const FREQUENCY_LABELS: Record<string, string> = {
-  BIWEEKLY: 'Every two weeks',
   'ONCE-WEEK': 'Once per week',
   'TWICE-WEEK': 'Twice per week',
   'THREE-WEEK': 'Three times per week',

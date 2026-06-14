@@ -211,7 +211,6 @@ export class Onboarding {
   ];
 
   private readonly allLessonFrequencyOptions: SelectOption[] = [
-    { value: 'BIWEEKLY', label: 'Every two weeks' },
     { value: 'ONCE-WEEK', label: 'Once per week' },
     { value: 'TWICE-WEEK', label: 'Twice per week' },
     { value: 'THREE-WEEK', label: 'Three times per week' },
@@ -240,12 +239,12 @@ export class Onboarding {
   private readonly availabilitySelected = new Set<string>();
 
   subjectOptions: SubjectOption[] = [
-    { value: 'QURAN-MEMORISATION', label: 'Quran memorisation', selected: false },
-    { value: 'TAJWEED', label: 'Tajweed', selected: false },
-    { value: 'ARABIC-LANGUAGE', label: 'Arabic language', selected: false },
-    { value: 'QURAN-RECITATION-MASTERY', label: 'Quran recitation mastery', selected: false },
-    { value: 'ISLAMIC-STUDIES', label: 'Islamic studies course', selected: false },
-    { value: 'ISLAMIC-INHERITANCE', label: 'Islamic inheritance law', selected: false },
+    { value: 'QURAN-RECITATION', label: 'Quran Recitation with tajweed', selected: false },
+    { value: 'QURAN-MEMORISATION', label: 'Quran Memorization', selected: false },
+    { value: 'ARABIC-LANGUAGE', label: 'Arabic Language', selected: false },
+    { value: 'QURAN-RECITATION-MASTERY', label: 'Quran Recitation Mastery', selected: false },
+    { value: 'ISLAMIC-STUDIES', label: 'Islamic Studies Course', selected: false },
+    { value: 'ISLAMIC-INHERITANCE', label: 'Islamic Inheritance Law', selected: false },
   ];
 
   get selectedSubjectCount(): number {

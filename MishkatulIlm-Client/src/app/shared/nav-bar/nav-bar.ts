@@ -3,6 +3,7 @@ import {
   computed,
   effect,
   ElementRef,
+  HostBinding,
   HostListener,
   inject,
   signal,
@@ -44,7 +45,12 @@ export class NavBar {
 
   readonly mobileMenuOpen = signal(false);
 
-  /** White nav links on home hero; dark links on other routes (e.g. legal pages). */
+  @HostBinding('class.nav-bar--home')
+  protected get navBarOnHome(): boolean {
+    return this.isHomeRoute() ?? false;
+  }
+
+  /** Tracks home route for transparent nav and active link state. */
   readonly isHomeRoute = toSignal(
     merge(
       of(null),

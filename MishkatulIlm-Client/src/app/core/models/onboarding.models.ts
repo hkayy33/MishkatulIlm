@@ -25,8 +25,8 @@ export type LessonFrequencyCode =
   | 'FLEXIBLE';
 
 export type SubjectCode =
+  | 'QURAN-RECITATION'
   | 'QURAN-MEMORISATION'
-  | 'TAJWEED'
   | 'ARABIC-LANGUAGE'
   | 'QURAN-RECITATION-MASTERY'
   | 'ISLAMIC-STUDIES'

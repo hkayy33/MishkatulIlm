@@ -1,6 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { API_BASE_URL } from '../tokens/api-base-url.token';
 import type {
   AdminApplicationStatus,
@@ -18,6 +19,7 @@ import type {
   SchedulingSettings,
   UpdateSchedulingSettingsBody,
 } from '../models/scheduling-settings.models';
+import type { AdminPaymentSubmissionRow } from '../models/payment.models';
 
 export interface AdminUserRow {
   userId: string;
@@ -72,6 +74,7 @@ export interface AdminStudentRow {
 export interface AdminBadgeCounts {
   pendingApplications: number;
   pendingScheduleChanges: number;
+  pendingPaymentSubmissions: number;
 }
 
 export interface AdminScheduleChangeRequestRow {
@@ -215,4 +218,64 @@ export class AdminApiService {
   updateSchedulingSettings(body: UpdateSchedulingSettingsBody): Observable<SchedulingSettings> {
     return this.http.put<SchedulingSettings>(this.base('/settings/scheduling'), body);
   }
+
+  listPaymentSubmissions(status?: string): Observable<AdminPaymentSubmissionRow[]> {
+    let params = new HttpParams();
+    if (status) params = params.set('status', status);
+    return this.http
+      .get<AdminPaymentSubmissionRow[]>(this.base('/payment-submissions'), { params })
+      .pipe(map((rows) => rows.map(normalizeAdminPaymentSubmission)));
+  }
+
+  approvePaymentSubmission(
+    submissionId: string,
+    adminNote?: string,
+  ): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      this.base(`/payment-submissions/${submissionId}/approve`),
+      { adminNote: adminNote ?? null },
+    );
+  }
+
+  rejectPaymentSubmission(
+    submissionId: string,
+    adminNote?: string,
+  ): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      this.base(`/payment-submissions/${submissionId}/reject`),
+      { adminNote: adminNote ?? null },
+    );
+  }
+}
+
+function normalizeAdminPaymentSubmission(raw: AdminPaymentSubmissionRow): AdminPaymentSubmissionRow {
+  const r = raw as AdminPaymentSubmissionRow & Record<string, unknown>;
+  const lessonsRaw = (r.lessons ?? r['Lessons'] ?? []) as AdminPaymentSubmissionRow['lessons'];
+  return {
+    id: String(r.id ?? r['Id'] ?? ''),
+    studentUserId: String(r.studentUserId ?? r['StudentUserId'] ?? ''),
+    studentName: String(r.studentName ?? r['StudentName'] ?? ''),
+    email: String(r.email ?? r['Email'] ?? ''),
+    billingYear: Number(r.billingYear ?? r['BillingYear'] ?? 0),
+    billingMonth: Number(r.billingMonth ?? r['BillingMonth'] ?? 0),
+    billingPeriodLabel: String(r.billingPeriodLabel ?? r['BillingPeriodLabel'] ?? ''),
+    status: (r.status ?? r['Status'] ?? 'pending_verification') as AdminPaymentSubmissionRow['status'],
+    amount: Number(r.amount ?? r['Amount'] ?? 0),
+    currency: String(r.currency ?? r['Currency'] ?? 'USD'),
+    paymentReference: String(r.paymentReference ?? r['PaymentReference'] ?? ''),
+    submittedAtUtc: String(r.submittedAtUtc ?? r['SubmittedAtUtc'] ?? ''),
+    reviewedAtUtc: (r.reviewedAtUtc ?? r['ReviewedAtUtc'] ?? null) as string | null,
+    adminNote: (r.adminNote ?? r['AdminNote'] ?? null) as string | null,
+    lessons: lessonsRaw.map((line) => {
+      const l = line as typeof line & Record<string, unknown>;
+      return {
+        slotId: String(l.slotId ?? l['SlotId'] ?? ''),
+        startsAtUtc: String(l.startsAtUtc ?? l['StartsAtUtc'] ?? ''),
+        endsAtUtc: String(l.endsAtUtc ?? l['EndsAtUtc'] ?? ''),
+        durationMinutes: Number(l.durationMinutes ?? l['DurationMinutes'] ?? 0),
+        hourlyRate: Number(l.hourlyRate ?? l['HourlyRate'] ?? 5),
+        amount: Number(l.amount ?? l['Amount'] ?? 0),
+      };
+    }),
+  };
 }

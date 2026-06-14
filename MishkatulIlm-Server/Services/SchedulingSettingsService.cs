@@ -35,6 +35,14 @@ public sealed class SchedulingSettingsService(AppDbContext db)
         row.TutorCountry = country;
         row.TutorCity = city;
         row.TutorTimeZoneId = tz;
+        row.PaymentHourlyRateUsd = request.PaymentHourlyRateUsd > 0
+            ? request.PaymentHourlyRateUsd
+            : LessonBillingService.DefaultHourlyRateUsd;
+        row.PaymentAccountName = request.PaymentAccountName.Trim();
+        row.PaymentAccountNumber = request.PaymentAccountNumber.Trim();
+        row.PaymentSortCode = request.PaymentSortCode.Trim();
+        row.PaymentBankName = request.PaymentBankName.Trim();
+        row.PaymentInstructions = request.PaymentInstructions.Trim();
         row.UpdatedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         return ToDto(row);
@@ -44,7 +52,20 @@ public sealed class SchedulingSettingsService(AppDbContext db)
     {
         var row = await db.SchedulingSettings.FirstOrDefaultAsync(s => s.Id == SingletonId, cancellationToken);
         if (row is not null)
+        {
+            if (string.IsNullOrWhiteSpace(row.PaymentAccountName)
+                && string.IsNullOrWhiteSpace(row.PaymentAccountNumber)
+                && string.IsNullOrWhiteSpace(row.PaymentSortCode))
+            {
+                row.PaymentAccountName = PaymentAccountDefaults.AccountName;
+                row.PaymentAccountNumber = PaymentAccountDefaults.AccountNumber;
+                row.PaymentSortCode = PaymentAccountDefaults.SortCode;
+                row.UpdatedAtUtc = DateTime.UtcNow;
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
             return row;
+        }
 
         row = new SchedulingSettings
         {
@@ -53,12 +74,19 @@ public sealed class SchedulingSettingsService(AppDbContext db)
             TutorCountry = string.Empty,
             TutorCity = string.Empty,
             TutorTimeZoneId = "UTC",
+            PaymentHourlyRateUsd = LessonBillingService.DefaultHourlyRateUsd,
+            PaymentAccountName = PaymentAccountDefaults.AccountName,
+            PaymentAccountNumber = PaymentAccountDefaults.AccountNumber,
+            PaymentSortCode = PaymentAccountDefaults.SortCode,
             UpdatedAtUtc = DateTime.UtcNow,
         };
         db.SchedulingSettings.Add(row);
         await db.SaveChangesAsync(cancellationToken);
         return row;
     }
+
+    public async Task<SchedulingSettings> GetEntityAsync(CancellationToken cancellationToken = default) =>
+        await EnsureRowAsync(cancellationToken);
 
     private static SchedulingSettingsDto ToDto(SchedulingSettings row) =>
         new()
@@ -67,5 +95,11 @@ public sealed class SchedulingSettingsService(AppDbContext db)
             TutorCountry = row.TutorCountry,
             TutorCity = row.TutorCity,
             TutorTimeZoneId = row.TutorTimeZoneId,
+            PaymentHourlyRateUsd = row.PaymentHourlyRateUsd,
+            PaymentAccountName = row.PaymentAccountName,
+            PaymentAccountNumber = row.PaymentAccountNumber,
+            PaymentSortCode = row.PaymentSortCode,
+            PaymentBankName = row.PaymentBankName,
+            PaymentInstructions = row.PaymentInstructions,
         };
 }

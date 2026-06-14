@@ -39,6 +39,13 @@ export class AdminDetails implements OnInit {
   protected allCities: SearchableSelectOption[] = [];
   private pendingCityName = '';
 
+  protected paymentHourlyRateUsd = 5;
+  protected paymentAccountName = '';
+  protected paymentAccountNumber = '';
+  protected paymentSortCode = '';
+  protected paymentBankName = '';
+  protected paymentInstructions = '';
+
   protected readonly settingsLoading = this.settingsService.loading;
   protected readonly settingsLoadError = this.settingsService.loadError;
 
@@ -61,6 +68,12 @@ export class AdminDetails implements OnInit {
       this.tutorDisplayName = row.tutorDisplayName;
       this.selectedCountryName.set(row.tutorCountry);
       this.pendingCityName = row.tutorCity;
+      this.paymentHourlyRateUsd = row.paymentHourlyRateUsd;
+      this.paymentAccountName = row.paymentAccountName;
+      this.paymentAccountNumber = row.paymentAccountNumber;
+      this.paymentSortCode = row.paymentSortCode;
+      this.paymentBankName = row.paymentBankName;
+      this.paymentInstructions = row.paymentInstructions;
       void this.matchCountryFromName(row.tutorCountry);
     });
   }
@@ -123,6 +136,12 @@ export class AdminDetails implements OnInit {
         tutorCountry: country,
         tutorCity: city,
         tutorTimeZoneId,
+        paymentHourlyRateUsd: this.paymentHourlyRateUsd,
+        paymentAccountName: this.paymentAccountName.trim(),
+        paymentAccountNumber: this.paymentAccountNumber.trim(),
+        paymentSortCode: this.paymentSortCode.trim(),
+        paymentBankName: this.paymentBankName.trim(),
+        paymentInstructions: this.paymentInstructions.trim(),
       })
       .then(() => {
         this.saveMessage.set('Tutor details saved. Calendar times will use this location.');

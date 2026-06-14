@@ -1,7 +1,7 @@
 /* You can add global styles to this file, and also import other style files */
 :root {
     --nav-height: 12vh;
-    --nav-margin: 5px;
+    --nav-margin: 0;
 
     @media (max-width: 991px) {
         --nav-height: 4.25rem;

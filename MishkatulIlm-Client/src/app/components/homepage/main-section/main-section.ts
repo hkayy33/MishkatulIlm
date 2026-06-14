@@ -28,10 +28,10 @@ export class MainSection {
         'Learn letters, joining, and core vocabulary so you can understand the language behind the Quran.',
     },
     {
-      id: 'tajweed',
-      title: 'Tajweed & pronunciation',
+      id: 'quran-memorisation',
+      title: 'Quran memorization',
       summary:
-        'Apply the rules of beautiful recitation at a pace that fits your level, from basics onward.',
+        'Commit portions of the Quran to memory with guided revision, correction, and a steady plan.',
     },
   ];
 }

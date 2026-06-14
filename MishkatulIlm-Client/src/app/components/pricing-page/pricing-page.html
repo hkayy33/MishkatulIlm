@@ -1,0 +1,27 @@
+<article class="pricing-page" aria-labelledby="pricing-title">
+  <div class="pricing-inner">
+    <header class="pricing-hero">
+      <p class="pricing-eyebrow">Simple, transparent rates</p>
+      <h1 id="pricing-title">Pricing</h1>
+      <p class="pricing-intro">
+        One-on-one lessons at $5 per hour. Choose the weekly schedule that fits you — monthly totals
+        are based on four weeks of study.
+      </p>
+    </header>
+
+    <ul class="pricing-grid" aria-label="Monthly lesson pricing">
+      @for (plan of plans; track plan.hoursPerWeek) {
+        <li class="pricing-card">
+          <p class="pricing-card__hours">
+            {{ plan.hoursPerWeek }} hour{{ plan.hoursPerWeek === 1 ? '' : 's' }} / week
+          </p>
+          <p class="pricing-card__price">
+            <span class="pricing-card__amount">${{ plan.monthlyPrice }}</span>
+            <span class="pricing-card__period">/ month</span>
+          </p>
+          <p class="pricing-card__note">≈ 4 weeks of lessons</p>
+        </li>
+      }
+    </ul>
+  </div>
+</article>

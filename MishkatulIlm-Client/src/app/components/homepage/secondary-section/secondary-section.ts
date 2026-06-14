@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, afterNextRender, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgFor, NgIf } from '@angular/common';
 import { TopicCard, TopicCardData } from './topic-card/topic-card';
@@ -33,6 +33,10 @@ export class SecondarySection {
           this.showAllTopics.set(true);
         }
       }, SecondarySection.scrollThenExpandDelayMs);
+    });
+
+    afterNextRender(() => {
+      programsNav.fulfillPendingScrollIfNeeded();
     });
   }
 

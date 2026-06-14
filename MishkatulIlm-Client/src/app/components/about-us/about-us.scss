@@ -80,3 +80,39 @@ $accent-green: #1e4638;
         color: $text;
     }
 }
+
+.about-why {
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(42, 34, 24, 0.1);
+
+    h2 {
+        font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+        font-size: clamp(1.35rem, 3vw, 1.65rem);
+        font-weight: 600;
+        color: $text;
+        margin: 0 0 1.5rem;
+    }
+}
+
+.about-why-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 1.5rem;
+}
+
+.about-why-item {
+    h3 {
+        font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: $accent-green;
+        margin: 0 0 0.45rem;
+    }
+
+    p {
+        margin: 0;
+        color: $muted;
+    }
+}

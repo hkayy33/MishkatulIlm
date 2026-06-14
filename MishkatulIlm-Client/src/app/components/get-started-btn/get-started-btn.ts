@@ -14,6 +14,8 @@ export class GetStartedBtn {
   @Input() label = 'Get Started';
   @Input() variant: 'primary' | 'outline' = 'primary';
   @Input() route = '/register';
+  /** External link (e.g. WhatsApp). When set, renders an anchor instead of an in-app route. */
+  @Input() href?: string;
   /** Larger tap target and typography for prominent placements. */
   @Input() size: 'default' | 'large' = 'default';
 }

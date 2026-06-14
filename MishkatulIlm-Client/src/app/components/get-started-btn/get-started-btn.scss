@@ -14,11 +14,19 @@ $accent-gold-hover: #b08a4f;
 }
 
 :host-context(.action-buttons) button,
-:host-context(.nav-link--cta) button {
+:host-context(.action-buttons) a,
+:host-context(.nav-link--cta) button,
+:host-context(.nav-link--cta) a {
     width: 100%;
 }
 
-button {
+button,
+a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    text-decoration: none;
     appearance: none;
     border-radius: 10px;
     padding: 0.65rem 1.6rem;
@@ -39,7 +47,8 @@ button {
     }
 }
 
-button.btn-primary {
+button.btn-primary,
+a.btn-primary {
     border: 2px solid $accent-gold;
     background-color: $accent-gold;
     color: #fff;
@@ -51,7 +60,8 @@ button.btn-primary {
     }
 }
 
-button.btn-outline {
+button.btn-outline,
+a.btn-outline {
     border: 2px solid $accent-gold;
     background-color: transparent;
     color: #fff;
@@ -62,7 +72,8 @@ button.btn-outline {
     }
 }
 
-:host.size-large button {
+:host.size-large button,
+:host.size-large a {
     padding: 0.95rem 2.35rem;
     font-size: 1.0625rem;
     border-radius: 12px;

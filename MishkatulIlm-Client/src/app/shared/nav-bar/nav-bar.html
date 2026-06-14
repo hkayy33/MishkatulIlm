@@ -5,7 +5,15 @@
 >
     <div class="container" [class.container--home]="isHomeRoute()">
         <a routerLink="/" class="nav-logo" (click)="closeMobileMenu()">
-            <img src="/logo.png" alt="Mishkatul Ilm logo">
+            <img
+                class="nav-logo__img"
+                src="/logo.png"
+                srcset="/logo.png 1x, /logo@2x.png 2x"
+                width="651"
+                height="185"
+                alt="Al Usooliyyah Academy logo"
+                decoding="async"
+            >
         </a>
 
         <button

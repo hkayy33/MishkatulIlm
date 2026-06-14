@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MishkatulIlm-Server")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f8ef5c49fc924fa85c8bab7177a9c1f25666e96a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8ab75797274bddb9bf097efd731c2ad5b5a6dc16")]
 [assembly: System.Reflection.AssemblyProductAttribute("MishkatulIlm-Server")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MishkatulIlm-Server")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

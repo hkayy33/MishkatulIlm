@@ -1,4 +1,4 @@
-# Deploy MishkatulIlm (Vercel + Fly.io)
+# Deploy Al Usooliyyah Academy (Vercel + Fly.io)
 
 | Component | Platform | URL example |
 |-----------|----------|-------------|

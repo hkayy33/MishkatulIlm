@@ -63,12 +63,27 @@ $cream: rgba(252, 251, 247, 0.92);
 
 .footer-columns {
     display: grid;
-    gap: 2rem;
-    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 2.25rem;
+    grid-template-columns: 1fr;
+
+    @media (min-width: 640px) {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: clamp(1.5rem, 4vw, 2.5rem);
+    }
 }
 
 .footer-col {
     min-width: 0;
+
+    @media (max-width: 639px) {
+        padding-bottom: 0.25rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+        &:last-child {
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+    }
 }
 
 .footer-heading {
@@ -103,6 +118,7 @@ $cream: rgba(252, 251, 247, 0.92);
     text-decoration: none;
     font-size: 0.95rem;
     transition: color 0.2s ease;
+    word-break: break-word;
 
     &:hover {
         color: $gold;

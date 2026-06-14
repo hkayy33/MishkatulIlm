@@ -1,8 +1,20 @@
-<button
-  type="button"
-  [routerLink]="route"
-  [class.btn-primary]="variant === 'primary'"
-  [class.btn-outline]="variant === 'outline'"
->
-  {{ label }}
-</button>
+@if (href) {
+  <a
+    [href]="href"
+    target="_blank"
+    rel="noopener noreferrer"
+    [class.btn-primary]="variant === 'primary'"
+    [class.btn-outline]="variant === 'outline'"
+  >
+    {{ label }}
+  </a>
+} @else {
+  <button
+    type="button"
+    [routerLink]="route"
+    [class.btn-primary]="variant === 'primary'"
+    [class.btn-outline]="variant === 'outline'"
+  >
+    {{ label }}
+  </button>
+}

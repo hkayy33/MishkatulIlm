@@ -1,4 +1,17 @@
 <div class="hero">
+  <video
+    class="hero-bg-video"
+    autoplay
+    muted
+    loop
+    playsinline
+    preload="metadata"
+    aria-hidden="true"
+  >
+    <source src="/hero-background.mp4" type="video/mp4" />
+  </video>
+  <div class="hero-overlay" aria-hidden="true"></div>
+
   <div class="hero-layout">
     <div class="info-section">
       <h2 class="hero-title">
@@ -12,15 +25,6 @@
         <app-get-started-btn label="Get Started" variant="primary"></app-get-started-btn>
         <app-get-started-btn label="Learn More" variant="outline" route="/about"></app-get-started-btn>
       </div>
-    </div>
-    <div class="hero-visual" aria-hidden="true">
-      <img
-        class="hero-bg"
-        src="/Welcoming.png"
-        width="1718"
-        height="916"
-        alt=""
-      />
     </div>
   </div>
 </div>

@@ -1,4 +1,4 @@
-# MishkatulIlm
+# Al Usooliyyah Academy
 
 Islamic learning platform — Angular client and ASP.NET Core API.
 

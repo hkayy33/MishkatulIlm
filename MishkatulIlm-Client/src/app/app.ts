@@ -17,7 +17,7 @@ export class App {
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
 
-  protected readonly title = signal('MishkatulIlm-Client');
+  protected readonly title = signal('Al Usooliyyah Academy');
 
   constructor() {
     // Handle email-verification landing on Site URL root (/?code=... or /?token_hash=...).

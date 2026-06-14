@@ -18,7 +18,7 @@ export function formatHttpError(err: unknown, fallback: string): string {
   }
 
   if (err.status === 404) {
-    return `${fallback} (API not found — restart the MishkatulIlm API server and try again.)`;
+    return `${fallback} (API not found — restart the Al Usooliyyah Academy API server and try again.)`;
   }
 
   if (err.status === 401 || err.status === 403) {

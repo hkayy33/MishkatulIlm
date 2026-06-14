@@ -15,7 +15,7 @@ function devApiBaseUrl(redirectOrigin: string | undefined): string {
 
 export const environment = {
   production: false,
-  /** MishkatulIlm-Server `http` profile (see launchSettings.json). Use `https://localhost:7217` if you run the `https` profile. */
+  /** API server `http` profile (see launchSettings.json). Use `https://localhost:7217` if you run the `https` profile. */
   apiBaseUrl: devApiBaseUrl(localDevSecrets.authRedirectOrigin),
   supabaseUrl: 'https://kpvfrbgpbmlxkqqibpjp.supabase.co',
   supabaseAnonKey: localDevSecrets.supabaseAnonKey,

@@ -1,4 +1,5 @@
 $accent-gold: #c59d5f;
+$nav-green: #1e4638;
 $nav-text-dark: #1a1a1a;
 $nav-font:
     'Source Sans 3',
@@ -9,11 +10,16 @@ $nav-mobile-breakpoint: 991px;
 :host {
     display: block;
     width: 100%;
+    position: relative;
+    z-index: 20;
+}
+
+:host(.nav-bar--home) {
+    margin-bottom: calc(-1 * var(--nav-height, 12vh));
 }
 
 .nav-shell {
     position: relative;
-    z-index: 20;
     width: 100%;
 }
 
@@ -22,13 +28,12 @@ $nav-mobile-breakpoint: 991px;
     z-index: 21;
     height: var(--nav-height, 12vh);
     box-sizing: border-box;
-    margin-top: var(--nav-margin, 5px);
     display: flex;
     flex-direction: row;
     align-items: center;
     gap: 1rem;
-    background: rgba(252, 251, 247, 0.94);
-    box-shadow: 0 1px 0 rgba(42, 34, 24, 0.08);
+    background: $nav-green;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
 
     &.container--home {
         background: transparent;
@@ -43,12 +48,15 @@ $nav-mobile-breakpoint: 991px;
     margin-left: clamp(1rem, 3vw, 2.5rem);
     text-decoration: none;
 
-    img {
+    img,
+    .nav-logo__img {
         display: block;
-        width: clamp(140px, 18vw, 275px);
+        width: clamp(150px, 19vw, 290px);
         height: auto;
-        max-height: 80px;
+        max-height: 84px;
         object-fit: contain;
+        filter: drop-shadow(0 0 8px rgba(197, 157, 95, 0.4)) contrast(1.12) saturate(1.15)
+            brightness(1.04);
     }
 
     &:focus-visible {
@@ -67,7 +75,7 @@ $nav-mobile-breakpoint: 991px;
     border-radius: 8px;
     background: transparent;
     cursor: pointer;
-    color: $nav-text-dark;
+    color: #fff;
 
     &:focus-visible {
         outline: 2px solid $accent-gold;
@@ -108,7 +116,7 @@ $nav-mobile-breakpoint: 991px;
     margin: 0;
     padding: 0 clamp(1rem, 3vw, 2.5rem) 0 0;
     list-style: none;
-    color: $nav-text-dark;
+    color: #fff;
     font-family: $nav-font;
     font-size: 1rem;
     font-weight: 400;
@@ -125,7 +133,7 @@ $nav-mobile-breakpoint: 991px;
         cursor: pointer;
 
         &:focus-visible {
-            outline: 2px solid $accent-gold;
+            outline: 2px solid gold;
             outline-offset: 4px;
             border-radius: 4px;
         }
@@ -156,7 +164,7 @@ $nav-mobile-breakpoint: 991px;
             cursor: pointer;
 
             &:focus-visible {
-                outline: 2px solid $accent-gold;
+                outline: 2px solid gold;
                 outline-offset: 4px;
                 border-radius: 4px;
             }
@@ -173,7 +181,7 @@ $nav-mobile-breakpoint: 991px;
                 bottom: 0;
                 width: 100%;
                 height: 2px;
-                background-color: $accent-gold;
+                background-color: gold;
                 transform: scaleX(0);
                 transform-origin: left center;
                 transition: transform 0.25s ease;
@@ -228,18 +236,18 @@ $nav-mobile-breakpoint: 991px;
         transition: background-color 0.15s ease;
 
         &:hover {
-            background: rgba(0, 0, 0, 0.06);
+            background: rgba(255, 255, 255, 0.12);
         }
 
         &:focus-visible {
-            outline: 2px solid $accent-gold;
+            outline: 2px solid gold;
             outline-offset: 2px;
         }
     }
 
     .nav-user__icon {
         flex-shrink: 0;
-        color: $accent-gold;
+        color: gold;
     }
 
     .nav-user__name {
@@ -273,9 +281,9 @@ $nav-mobile-breakpoint: 991px;
         padding: 0.35rem 0;
         list-style: none;
         background: #fff;
-        border: 1px solid rgba(42, 34, 24, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.15);
         border-radius: 10px;
-        box-shadow: 0 8px 24px rgba(26, 20, 12, 0.12);
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
     }
 
     .nav-user-dropdown__item {
@@ -304,39 +312,6 @@ $nav-mobile-breakpoint: 991px;
         &--button {
             font: inherit;
         }
-    }
-}
-
-.container--home .nav-links {
-    color: #fff;
-
-    .nav-link:focus-visible {
-        outline-color: gold;
-    }
-
-    .nav-route-link:focus-visible {
-        outline-color: gold;
-    }
-
-    .nav-link span::after {
-        background-color: gold;
-    }
-
-    .nav-user__icon {
-        color: gold;
-    }
-
-    .nav-user:hover {
-        background: rgba(255, 255, 255, 0.12);
-    }
-
-    .nav-user-dropdown {
-        border-color: rgba(255, 255, 255, 0.15);
-        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
-    }
-
-    .nav-user-dropdown__item {
-        color: $nav-text-dark;
     }
 }
 
@@ -369,18 +344,14 @@ $nav-mobile-breakpoint: 991px;
         transform: translateY(-7px) rotate(-45deg);
     }
 
-    .nav-shell--home .nav-toggle {
-        color: #fff;
-    }
-
     .nav-shell--home.nav-shell--menu-open .container {
-        background: rgba(0, 43, 27, 0.96);
+        background: $nav-green;
         box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
     }
 
     .nav-menu {
         position: fixed;
-        top: calc(var(--nav-height, 4.25rem) + var(--nav-margin, 5px));
+        top: var(--nav-height, 4.25rem);
         left: 0;
         right: 0;
         z-index: 22;
@@ -390,8 +361,8 @@ $nav-mobile-breakpoint: 991px;
         opacity: 0;
         visibility: hidden;
         pointer-events: none;
-        background: rgba(252, 251, 247, 0.98);
-        box-shadow: 0 12px 32px rgba(42, 34, 24, 0.12);
+        background: $nav-green;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
         transition:
             max-height 0.32s ease,
             opacity 0.22s ease,
@@ -399,15 +370,11 @@ $nav-mobile-breakpoint: 991px;
     }
 
     .nav-menu--open {
-        max-height: calc(100dvh - var(--nav-height, 4.25rem) - var(--nav-margin, 5px));
+        max-height: calc(100dvh - var(--nav-height, 4.25rem));
         overflow-y: auto;
         opacity: 1;
         visibility: visible;
         pointer-events: auto;
-    }
-
-    .nav-shell--home .nav-menu {
-        background: rgba(0, 43, 27, 0.98);
     }
 
     .nav-links {
@@ -419,7 +386,7 @@ $nav-mobile-breakpoint: 991px;
         .nav-link {
             justify-content: flex-start;
             padding: 0.85rem 0.25rem;
-            border-bottom: 1px solid rgba(42, 34, 24, 0.08);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 
             .nav-route-link {
                 justify-content: flex-start;
@@ -445,12 +412,8 @@ $nav-mobile-breakpoint: 991px;
             position: static;
             margin-top: 0.5rem;
             box-shadow: none;
-            border: 1px solid rgba(42, 34, 24, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
         }
-    }
-
-    .nav-shell--home .nav-links .nav-link {
-        border-bottom-color: rgba(255, 255, 255, 0.12);
     }
 
     .nav-backdrop {
@@ -470,9 +433,10 @@ $nav-mobile-breakpoint: 991px;
     .nav-logo {
         margin-left: 1rem;
 
-        img {
-            width: clamp(120px, 38vw, 170px);
-            max-height: 56px;
+        img,
+        .nav-logo__img {
+            width: clamp(132px, 40vw, 188px);
+            max-height: 64px;
         }
     }
 }

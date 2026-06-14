@@ -41,7 +41,14 @@
                     </a>
                 </li>
                 <li class="nav-link">
-                    <p><span>About Us</span></p>
+                    <a
+                        routerLink="/about"
+                        class="nav-route-link"
+                        [attr.aria-current]="isAboutRoute() ? 'page' : null"
+                        (click)="closeMobileMenu()"
+                    >
+                        <span>About Us</span>
+                    </a>
                 </li>
                 <li
                     class="nav-link"
@@ -54,7 +61,7 @@
                     <p><span>Programs</span></p>
                 </li>
                 <li class="nav-link">
-                    <p><span>How It Works</span></p>
+                    <p><span>Pricing</span></p>
                 </li>
                 @if (auth.isAuthenticated()) {
                     <li class="nav-link nav-link--user">

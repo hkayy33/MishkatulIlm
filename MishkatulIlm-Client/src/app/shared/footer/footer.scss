@@ -113,6 +113,18 @@ $cream: rgba(252, 251, 247, 0.92);
         outline-offset: 3px;
         border-radius: 3px;
     }
+
+    &--whatsapp {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+
+        svg {
+            width: 1.15rem;
+            height: 1.15rem;
+            flex-shrink: 0;
+        }
+    }
 }
 
 .footer-bottom {

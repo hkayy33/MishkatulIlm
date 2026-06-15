@@ -172,6 +172,7 @@ function normalizePortalResponse(raw: StudentPortalResponse): StudentPortalRespo
   };
   const portalRaw = raw.portal ?? r.Portal ?? ({} as StudentPortalResponse['portal'] & {
     NextLesson?: StudentLessonRow;
+    NextBlockBookingIssue?: string | null;
   });
   const lessons = (raw.lessons ?? r.Lessons ?? [])
     .map((l) => normalizeLessonRow(l))
@@ -192,6 +193,10 @@ function normalizePortalResponse(raw: StudentPortalResponse): StudentPortalRespo
       portalRaw.scheduleChangeUpdate ??
         (portalRaw as { ScheduleChangeUpdate?: StudentScheduleChangeUpdate | null }).ScheduleChangeUpdate,
     ),
+    nextBlockBookingIssue:
+      portalRaw.nextBlockBookingIssue ??
+      (portalRaw as { NextBlockBookingIssue?: string | null }).NextBlockBookingIssue ??
+      null,
   };
 
   return {
@@ -294,6 +299,7 @@ function normalizePaymentSummary(
     CanSubmitPayment?: boolean;
     CurrentPeriodPaid?: boolean;
     ShowPaymentDetails?: boolean;
+    AwaitingNextBlockPayment?: boolean;
   };
 
   if (!paymentRaw) {
@@ -310,6 +316,7 @@ function normalizePaymentSummary(
       canSubmitPayment: true,
       currentPeriodPaid: false,
       showPaymentDetails: true,
+      awaitingNextBlockPayment: false,
     };
   }
 
@@ -328,5 +335,7 @@ function normalizePaymentSummary(
     canSubmitPayment: paymentRaw.canSubmitPayment ?? p.CanSubmitPayment ?? false,
     currentPeriodPaid: paymentRaw.currentPeriodPaid ?? p.CurrentPeriodPaid ?? false,
     showPaymentDetails: paymentRaw.showPaymentDetails ?? p.ShowPaymentDetails ?? false,
+    awaitingNextBlockPayment:
+      paymentRaw.awaitingNextBlockPayment ?? p.AwaitingNextBlockPayment ?? false,
   };
 }

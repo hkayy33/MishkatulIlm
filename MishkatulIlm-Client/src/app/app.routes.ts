@@ -9,6 +9,8 @@ import { Login } from './components/auth/login/login';
 import { Signup } from './components/auth/signup/signup';
 import { AuthCallback } from './components/auth/auth-callback/auth-callback';
 import { VerifyEmail } from './components/auth/verify-email/verify-email';
+import { ForgotPassword } from './components/auth/forgot-password/forgot-password';
+import { ResetPassword } from './components/auth/reset-password/reset-password';
 import { adminGuard } from './core/guards/admin.guard';
 import { authGuard } from './core/guards/auth.guard';
 import { StudentDashboard } from './pages/student-dashboard/student-dashboard';
@@ -22,6 +24,8 @@ export const routes: Routes = [
   { path: 'terms', component: TermsOfUse },
   { path: 'onboarding', component: Onboarding, canActivate: [authGuard] },
   { path: 'login', component: Login },
+  { path: 'forgot-password', component: ForgotPassword },
+  { path: 'reset-password', component: ResetPassword, canActivate: [authGuard] },
   { path: 'register', component: Signup },
   { path: 'verify-email', component: VerifyEmail },
   { path: 'auth/callback', component: AuthCallback },

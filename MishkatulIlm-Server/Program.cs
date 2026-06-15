@@ -44,12 +44,16 @@ builder.Services.AddHttpClient(nameof(SupabaseJwtKeyProvider), client =>
 });
 builder.Services.AddSingleton<SupabaseJwtKeyProvider>();
 builder.Services.AddHostedService<SupabaseJwksRefreshWorker>();
+builder.Services.AddHostedService<LessonRolloverWorker>();
 builder.Services.AddSingleton<IPostConfigureOptions<JwtBearerOptions>, ConfigureSupabaseJwtBearerOptions>();
 
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<SupabaseAdminAuthClient>();
 builder.Services.AddScoped<SchedulingSettingsService>();
 builder.Services.AddScoped<ScheduleProposalService>();
+builder.Services.AddScoped<LessonBillingContextService>();
+builder.Services.AddScoped<LessonRolloverService>();
+builder.Services.AddScoped<DevRolloverDemoService>();
 builder.Services.AddScoped<StudentPaymentService>();
 builder.Services.AddScoped<AdminPaymentSubmissionService>();
 builder.Services.AddScoped<StudentAccountDeletionService>();

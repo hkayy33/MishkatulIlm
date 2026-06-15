@@ -1,6 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
+import { AuthService } from '../../../core/services/auth.service';
 import { LocationsApiService } from '../../../core/services/locations-api.service';
 import { SchedulingSettingsService } from '../../../core/services/scheduling-settings.service';
 import {
@@ -23,10 +24,18 @@ import {
 export class AdminDetails implements OnInit {
   private readonly settingsService = inject(SchedulingSettingsService);
   private readonly locationsApi = inject(LocationsApiService);
+  private readonly auth = inject(AuthService);
 
   protected readonly saving = signal(false);
   protected readonly saveMessage = signal<string | null>(null);
   protected readonly saveError = signal<string | null>(null);
+  protected readonly passwordBusy = signal(false);
+  protected readonly passwordMessage = signal<string | null>(null);
+  protected readonly passwordError = signal<string | null>(null);
+  protected readonly oldPassword = signal('');
+  protected readonly newPassword = signal('');
+  protected readonly showOldPassword = signal(false);
+  protected readonly showNewPassword = signal(false);
   protected readonly loadingCountries = signal(false);
   protected readonly loadingCities = signal(false);
   protected readonly locationLoadError = signal<string | null>(null);
@@ -61,7 +70,10 @@ export class AdminDetails implements OnInit {
     timeZoneShortName(this.resolvedTimeZoneId()),
   );
 
+  private currentPasswordFieldFocused = false;
+
   ngOnInit(): void {
+    this.resetPasswordResetForm();
     this.loadCountries();
     void this.settingsService.ensureLoaded().then((row) => {
       if (this.settingsService.loadError()) return;
@@ -152,6 +164,89 @@ export class AdminDetails implements OnInit {
         );
       })
       .finally(() => this.saving.set(false));
+  }
+
+  protected resetPasswordResetForm(): void {
+    this.currentPasswordFieldFocused = false;
+    this.oldPassword.set('');
+    this.newPassword.set('');
+    this.showOldPassword.set(false);
+    this.showNewPassword.set(false);
+    this.guardAgainstPasswordAutofill();
+    for (const delay of [50, 250]) {
+      setTimeout(() => {
+        if (this.currentPasswordFieldFocused) return;
+        this.guardAgainstPasswordAutofill();
+      }, delay);
+    }
+  }
+
+  protected enableCurrentPasswordInput(event: Event): void {
+    (event.target as HTMLInputElement).removeAttribute('readonly');
+  }
+
+  protected onCurrentPasswordFocus(event: Event): void {
+    this.currentPasswordFieldFocused = true;
+    this.enableCurrentPasswordInput(event);
+  }
+
+  private guardAgainstPasswordAutofill(): void {
+    if (this.currentPasswordFieldFocused) return;
+    this.oldPassword.set('');
+    this.newPassword.set('');
+  }
+
+  protected submitPasswordReset(event: Event): void {
+    event.preventDefault();
+    if (this.passwordBusy()) return;
+
+    const current = this.oldPassword();
+    const next = this.newPassword().trim();
+
+    if (current.length < 8) {
+      this.passwordError.set('Enter your current password.');
+      this.passwordMessage.set(null);
+      return;
+    }
+    if (next.length < 8) {
+      this.passwordError.set('New password must be at least 8 characters.');
+      this.passwordMessage.set(null);
+      return;
+    }
+    if (current === next) {
+      this.passwordError.set('Choose a new password that is different from your current one.');
+      this.passwordMessage.set(null);
+      return;
+    }
+    if (!this.auth.supabaseConfigured()) {
+      this.passwordError.set('Password changes are not available right now.');
+      this.passwordMessage.set(null);
+      return;
+    }
+
+    this.passwordBusy.set(true);
+    this.passwordError.set(null);
+    this.passwordMessage.set(null);
+    this.auth
+      .changePassword(current, next)
+      .pipe(finalize(() => this.passwordBusy.set(false)))
+      .subscribe({
+        next: () => {
+          this.passwordMessage.set('Your password has been updated.');
+          this.oldPassword.set('');
+          this.newPassword.set('');
+          this.showOldPassword.set(false);
+          this.showNewPassword.set(false);
+        },
+        error: (err: Error & { message?: string }) => {
+          const msg = err?.message ?? '';
+          if (/invalid login credentials/i.test(msg)) {
+            this.passwordError.set('Your current password is incorrect.');
+            return;
+          }
+          this.passwordError.set(msg || 'Could not update your password. Try again.');
+        },
+      });
   }
 
   private loadCountries(): void {

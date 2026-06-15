@@ -11,6 +11,9 @@ export const PENDING_PKCE_VERIFIER_KEY = 'mishkatul_pkce_verifier';
 /** Saved `?code=` before Supabase SDK or the router strips query params from the callback URL. */
 export const AUTH_CALLBACK_CODE_KEY = 'mishkatul_auth_callback_code';
 
+/** Set while a password-recovery email link is being processed (PKCE may drop `type=recovery`). */
+export const PASSWORD_RECOVERY_PENDING_KEY = 'mishkatul_password_recovery_pending';
+
 /** localStorage key Supabase uses for the PKCE code_verifier (`sb-<project-ref>-auth-token-code-verifier`). */
 export function supabaseCodeVerifierStorageKey(): string | null {
   const base = environment.supabaseUrl?.trim().replace(/\/$/, '') ?? '';
@@ -111,6 +114,18 @@ export function clearAuthCallbackSnapshot(): void {
   removeStorage('session', AUTH_CALLBACK_CODE_KEY);
 }
 
+export function markPasswordRecoveryPending(): void {
+  writeStorage('session', PASSWORD_RECOVERY_PENDING_KEY, '1');
+}
+
+export function isPasswordRecoveryPending(): boolean {
+  return readStorage('session', PASSWORD_RECOVERY_PENDING_KEY) === '1';
+}
+
+export function clearPasswordRecoveryPending(): void {
+  removeStorage('session', PASSWORD_RECOVERY_PENDING_KEY);
+}
+
 export function getPendingSignupEmail(): string | null {
   const email =
     readStorage('local', PENDING_SIGNUP_EMAIL_KEY) ?? readStorage('session', PENDING_SIGNUP_EMAIL_KEY);
@@ -183,7 +198,11 @@ export function getAuthEmailRedirectUrl(): string {
  * PKCE signup tokens (`pkce_…` in `{{ .TokenHash }}`) cannot be verified with verifyOtp on the app.
  * They must hit Supabase `/auth/v1/verify` first, which confirms email and redirects back with `?code=`.
  */
-export function buildSupabasePkceVerifyUrl(token: string, redirectTo?: string): string | null {
+export function buildSupabasePkceVerifyUrl(
+  token: string,
+  redirectTo?: string,
+  type = 'signup',
+): string | null {
   const trimmed = token.trim();
   if (!trimmed.startsWith('pkce_')) return null;
 
@@ -192,7 +211,7 @@ export function buildSupabasePkceVerifyUrl(token: string, redirectTo?: string): 
 
   const url = new URL(`${base}/auth/v1/verify`);
   url.searchParams.set('token', trimmed);
-  url.searchParams.set('type', 'signup');
+  url.searchParams.set('type', type);
   url.searchParams.set('redirect_to', redirectTo?.trim() || getAuthEmailRedirectUrl());
   return url.toString();
 }

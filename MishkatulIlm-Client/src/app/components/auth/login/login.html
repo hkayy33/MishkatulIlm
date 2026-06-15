@@ -6,11 +6,11 @@
     </header>
 
     <form class="auth-form" novalidate (submit)="onSubmit($event)" autocomplete="on">
-      @if (submitInfo) {
-        <p class="auth-form__info" role="status">{{ submitInfo }}</p>
+      @if (submitInfo(); as info) {
+        <p class="auth-form__info" role="status">{{ info }}</p>
       }
-      @if (submitError) {
-        <p class="auth-form__error" role="alert">{{ submitError }}</p>
+      @if (submitError(); as err) {
+        <p class="auth-form__error" role="alert">{{ err }}</p>
       }
 
       <div class="form-field">
@@ -26,7 +26,10 @@
       </div>
 
       <div class="form-field">
-        <label for="login-password">Password</label>
+        <div class="form-field__label-row">
+          <label for="login-password">Password</label>
+          <a class="auth-form__link" routerLink="/forgot-password">Forgot password?</a>
+        </div>
         <input
           id="login-password"
           name="password"
@@ -43,7 +46,13 @@
         <label for="login-remember">Keep me signed in on this device</label>
       </div>
 
-      <button type="submit" class="auth-form__submit">Log in</button>
+      <button type="submit" class="auth-form__submit" [disabled]="submitBusy()">
+        @if (submitBusy()) {
+          Signing in…
+        } @else {
+          Log in
+        }
+      </button>
     </form>
 
     <p class="auth-card__switch">

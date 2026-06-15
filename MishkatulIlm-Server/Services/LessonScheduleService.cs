@@ -220,6 +220,56 @@ public static class LessonScheduleService
             .ToList();
     }
 
+    /// <summary>
+    /// Reads week-one templates from the student's most recent <see cref="BookingWeeks"/> block
+    /// (used when auto-rolling lessons forward).
+    /// </summary>
+    public static List<WeekOneLessonSlotDto> ExtractWeekOneLessonsFromLastBlock(
+        IReadOnlyList<(DateTime StartsAtUtc, DateTime EndsAtUtc)> lessons)
+    {
+        if (lessons.Count == 0)
+            return [];
+
+        var ordered = lessons
+            .Select(l => (
+                StartsAtUtc: DateTime.SpecifyKind(l.StartsAtUtc, DateTimeKind.Utc),
+                EndsAtUtc: DateTime.SpecifyKind(l.EndsAtUtc, DateTimeKind.Utc)))
+            .OrderBy(l => l.StartsAtUtc)
+            .ToList();
+
+        var lastStart = ordered[^1].StartsAtUtc;
+        var blockWeekOneStart = CalendarWeekStartUtc(lastStart).AddDays(-7 * (BookingWeeks - 1));
+
+        return ordered
+            .Where(l => CalendarWeekStartUtc(l.StartsAtUtc) == blockWeekOneStart)
+            .Select(l => new WeekOneLessonSlotDto
+            {
+                StartsAtUtc = l.StartsAtUtc,
+                DurationMinutes = Math.Max(1, (int)Math.Round((l.EndsAtUtc - l.StartsAtUtc).TotalMinutes)),
+            })
+            .OrderBy(l => l.StartsAtUtc)
+            .ToList();
+    }
+
+    /// <summary>Plans the next <see cref="BookingWeeks"/> block immediately after the previous week-one templates.</summary>
+    public static List<PlannedLessonSlotDto> PlanRolloverBlock(
+        IReadOnlyList<WeekOneLessonSlotDto> previousWeekOne,
+        string lessonFrequency)
+    {
+        if (previousWeekOne.Count == 0)
+            return [];
+
+        var nextWeekOne = previousWeekOne
+            .Select(l => new WeekOneLessonSlotDto
+            {
+                StartsAtUtc = DateTime.SpecifyKind(l.StartsAtUtc, DateTimeKind.Utc).AddDays(7 * BookingWeeks),
+                DurationMinutes = l.DurationMinutes,
+            })
+            .ToList();
+
+        return PlanFromWeekOneLessons(nextWeekOne, lessonFrequency);
+    }
+
     /// <summary>Legacy: single duration for all week-one starts.</summary>
     public static bool TryValidateWeekOneSlots(
         IReadOnlyList<DateTime> weekOneStartsUtc,

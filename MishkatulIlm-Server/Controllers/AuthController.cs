@@ -33,10 +33,17 @@ public sealed class AuthController(SupabaseAdminAuthClient supabaseAdmin) : Cont
         var typesToTry = new List<string>();
         var requested = string.IsNullOrWhiteSpace(request.Type) ? "email" : request.Type.Trim();
         typesToTry.Add(requested);
-        if (!string.Equals(requested, "email", StringComparison.OrdinalIgnoreCase))
-            typesToTry.Add("email");
-        if (!string.Equals(requested, "signup", StringComparison.OrdinalIgnoreCase))
-            typesToTry.Add("signup");
+        if (string.Equals(requested, "recovery", StringComparison.OrdinalIgnoreCase))
+        {
+            // Recovery links must not fall through to signup/email OTP types.
+        }
+        else
+        {
+            if (!string.Equals(requested, "email", StringComparison.OrdinalIgnoreCase))
+                typesToTry.Add("email");
+            if (!string.Equals(requested, "signup", StringComparison.OrdinalIgnoreCase))
+                typesToTry.Add("signup");
+        }
 
         SupabaseVerifyResponse? verified = null;
         string? lastError = null;

@@ -115,5 +115,118 @@
         {{ saving() ? 'Saving…' : 'Save settings' }}
       </button>
     </form>
+
+    <section class="details-password-section">
+      <h2 class="details-section-title">Reset password</h2>
+      <p class="admin-muted details-section-lead">
+        Update the password you use to sign in to the admin portal.
+      </p>
+
+      @if (passwordError()) {
+        <p class="admin-error">{{ passwordError() }}</p>
+      }
+      @if (passwordMessage()) {
+        <p class="admin-success">{{ passwordMessage() }}</p>
+      }
+
+      <form class="details-password-form" (submit)="submitPasswordReset($event)" autocomplete="off">
+        <input
+          type="text"
+          name="username"
+          autocomplete="username"
+          tabindex="-1"
+          aria-hidden="true"
+          class="password-form__decoy"
+        />
+        <input
+          type="password"
+          name="password"
+          autocomplete="current-password"
+          tabindex="-1"
+          aria-hidden="true"
+          class="password-form__decoy"
+        />
+        <div class="password-field">
+          <label for="admin-verify-password">Current password</label>
+          <div class="password-field__input-wrap">
+            <input
+              id="admin-verify-password"
+              name="admin-verify-password"
+              [type]="showOldPassword() ? 'text' : 'password'"
+              [ngModel]="oldPassword()"
+              (ngModelChange)="oldPassword.set($event)"
+              autocomplete="one-time-code"
+              readonly
+              (mousedown)="enableCurrentPasswordInput($event)"
+              (focus)="onCurrentPasswordFocus($event)"
+              required
+              minlength="8"
+              placeholder="••••••••"
+            />
+            <button
+              type="button"
+              class="password-field__toggle"
+              [attr.aria-label]="showOldPassword() ? 'Hide current password' : 'Show current password'"
+              [attr.aria-pressed]="showOldPassword()"
+              (click)="showOldPassword.set(!showOldPassword())"
+            >
+              @if (showOldPassword()) {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+              } @else {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              }
+            </button>
+          </div>
+        </div>
+
+        <div class="password-field">
+          <label for="admin-new-password">New password</label>
+          <div class="password-field__input-wrap">
+            <input
+              id="admin-new-password"
+              name="newPassword"
+              [type]="showNewPassword() ? 'text' : 'password'"
+              [ngModel]="newPassword()"
+              (ngModelChange)="newPassword.set($event)"
+              autocomplete="new-password"
+              required
+              minlength="8"
+              placeholder="At least 8 characters"
+            />
+            <button
+              type="button"
+              class="password-field__toggle"
+              [attr.aria-label]="showNewPassword() ? 'Hide new password' : 'Show new password'"
+              [attr.aria-pressed]="showNewPassword()"
+              (click)="showNewPassword.set(!showNewPassword())"
+            >
+              @if (showNewPassword()) {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+              } @else {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              }
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="admin-btn" [disabled]="passwordBusy()">
+          {{ passwordBusy() ? 'Updating…' : 'Update password' }}
+        </button>
+      </form>
+    </section>
   }
 </div>

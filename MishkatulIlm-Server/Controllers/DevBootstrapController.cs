@@ -21,6 +21,7 @@ public sealed class DevBootstrapController(
     IConfiguration configuration,
     AppDbContext db,
     SupabaseAdminAuthClient supabaseAdmin,
+    DevRolloverDemoService rolloverDemo,
     ILogger<DevBootstrapController> logger) : ControllerBase
 {
     /// <summary>
@@ -201,6 +202,20 @@ public sealed class DevBootstrapController(
                 email,
                 userId = newId.Value,
             });
+    }
+
+    /// <summary>Resets a demo student with a completed lesson block and an open payment window (dev only).</summary>
+    [HttpPost("rollover-demo/setup")]
+    public async Task<IActionResult> SetupRolloverDemo(CancellationToken cancellationToken)
+    {
+        if (!IsBootstrapAllowed())
+            return NotFound();
+
+        var (success, error, payload) = await rolloverDemo.SetupAsync(cancellationToken);
+        if (!success)
+            return BadRequest(new { message = error });
+
+        return Ok(payload);
     }
 
     private bool IsBootstrapAllowed() =>

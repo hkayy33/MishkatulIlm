@@ -39,7 +39,7 @@ public sealed class AdminPaymentSubmissionsController(
         if (!await IsCurrentUserAdminAsync(cancellationToken))
             return Forbid();
 
-        var (success, error) = await paymentSubmissions.ApproveAsync(
+        var (success, error, message) = await paymentSubmissions.ApproveAsync(
             submissionId,
             adminUserId,
             request.AdminNote,
@@ -48,7 +48,7 @@ public sealed class AdminPaymentSubmissionsController(
         if (!success)
             return BadRequest(new { message = error });
 
-        return Ok(new { message = "Payment marked as paid." });
+        return Ok(new { message });
     }
 
     [HttpPost("{submissionId:guid}/reject")]
@@ -63,7 +63,7 @@ public sealed class AdminPaymentSubmissionsController(
         if (!await IsCurrentUserAdminAsync(cancellationToken))
             return Forbid();
 
-        var (success, error) = await paymentSubmissions.RejectAsync(
+        var (success, error, message) = await paymentSubmissions.RejectAsync(
             submissionId,
             adminUserId,
             request.AdminNote,
@@ -72,7 +72,7 @@ public sealed class AdminPaymentSubmissionsController(
         if (!success)
             return BadRequest(new { message = error });
 
-        return Ok(new { message = "Payment submission rejected." });
+        return Ok(new { message });
     }
 
     private async Task<bool> IsCurrentUserAdminAsync(CancellationToken cancellationToken)

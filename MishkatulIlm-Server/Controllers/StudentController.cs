@@ -14,7 +14,9 @@ namespace MishkatulIlm_Server.Controllers;
 public sealed class StudentController(
     AppDbContext db,
     StudentAccountDeletionService accountDeletion,
-    StudentPaymentService paymentService) : ControllerBase
+    StudentPaymentService paymentService,
+    LessonBillingContextService billingContext,
+    LessonRolloverService lessonRollover) : ControllerBase
 {
     [HttpGet("portal")]
     public async Task<IActionResult> GetPortal(
@@ -35,7 +37,11 @@ public sealed class StudentController(
         if (user.ApplicationStatus != ApplicationStatusCodes.Active)
             return BadRequest(new { message = "Your student portal is available after you accept your lesson schedule." });
 
+        await lessonRollover.TryRolloverStudentAsync(userId, cancellationToken);
+
         var now = DateTime.UtcNow;
+        var billing = await billingContext.ResolveAsync(user, now, cancellationToken);
+        var nextBlockBookingIssue = await lessonRollover.ResolveNextBlockBookingIssueAsync(userId, cancellationToken);
         var viewYear = year ?? now.Year;
         var viewMonth = month is >= 1 and <= 12 ? month.Value : now.Month;
         var monthStart = new DateTime(viewYear, viewMonth, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -76,7 +82,7 @@ public sealed class StudentController(
                 {
                     Status = "active",
                     NextLesson = nextLessonSlot is null ? null : ToLessonDto(nextLessonSlot),
-                    Payment = StudentPaymentSummaryBuilder.Build(user, currentSubmission, now),
+                    Payment = StudentPaymentSummaryBuilder.Build(user, currentSubmission, now, billing),
                     MonthSummary = new StudentLessonMonthSummaryDto
                     {
                         PastLessonsCount = past.Count,
@@ -89,6 +95,7 @@ public sealed class StudentController(
                         ? null
                         : ToScheduleChangeUpdateDto(latestChangeRequest),
                     DeletionRequested = user.DeletionRequestedAtUtc is not null,
+                    NextBlockBookingIssue = nextBlockBookingIssue,
                 },
                 Lessons = lessons
                     .Select(ToLessonDto)

@@ -170,3 +170,5 @@ npm start
 - [ ] CORS on Fly includes your Vercel domain
 - [ ] Stripe `ClientAppUrl` and webhook point to Vercel / Fly
 - [ ] Admin email in `Admin__PromotedAdminEmails` for first admin user
+- [ ] Lesson rollover worker runs on Fly (included in API — no extra config)
+- [ ] Test rollover: student pays within 5-day window → admin approves → next 4-week block appears

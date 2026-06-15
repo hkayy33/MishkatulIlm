@@ -745,6 +745,75 @@
   }
 }
 
+.password-form {
+  margin-top: 0.5rem;
+
+  &__decoy {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+.password-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+
+  label {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  &__input-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 28rem;
+  }
+
+  input {
+    width: 100%;
+    box-sizing: border-box;
+    padding-right: 2.6rem;
+  }
+
+  &__toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.35rem;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #6f6a62;
+    cursor: pointer;
+
+    &:hover {
+      color: #3a3834;
+      background: rgba(28, 27, 24, 0.06);
+    }
+
+    &:focus-visible {
+      outline: 2px solid rgba(47, 90, 63, 0.45);
+      outline-offset: 1px;
+    }
+
+    svg {
+      width: 1.1rem;
+      height: 1.1rem;
+    }
+  }
+}
+
 @media (max-width: 720px) {
   .matched-shell {
     flex-direction: column;
@@ -760,4 +829,6 @@
     flex-direction: row;
     flex-wrap: wrap;
   }
+
+
 }

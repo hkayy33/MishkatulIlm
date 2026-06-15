@@ -26,6 +26,32 @@ public static class LessonBillingService
         return (nextMonthStart.Year, nextMonthStart.Month);
     }
 
+    public static IReadOnlyList<LessonSlot> SyntheticSlotsFromPlanned(
+        IReadOnlyList<PlannedLessonSlotDto> planned) =>
+        planned
+            .Select(l => new LessonSlot
+            {
+                Id = Guid.Empty,
+                StartsAtUtc = l.StartsAtUtc,
+                EndsAtUtc = l.EndsAtUtc,
+            })
+            .ToList();
+
+    public static string FormatRolloverBillingPeriod(IReadOnlyList<PlannedLessonSlotDto> planned)
+    {
+        if (planned.Count == 0)
+            return string.Empty;
+
+        var ordered = planned.OrderBy(l => l.StartsAtUtc).ToList();
+        var first = ordered[0].StartsAtUtc;
+        var last = ordered[^1].StartsAtUtc;
+
+        if (first.Year == last.Year && first.Month == last.Month)
+            return $"Next 4-week block ({FormatBillingPeriod(first.Year, first.Month)})";
+
+        return $"Next 4-week block ({first:dd MMM} – {last:dd MMM yyyy})";
+    }
+
     public static PaymentStatementDto BuildStatement(
         AppUser user,
         IReadOnlyList<LessonSlot> lessons,
@@ -33,18 +59,19 @@ public static class LessonBillingService
         int billingYear,
         int billingMonth,
         PaymentSubmission? currentSubmission,
-        DateTime utcNow)
+        DateTime utcNow,
+        string? billingPeriodLabelOverride = null,
+        bool billEntireLessonList = false)
     {
         var (monthStart, monthEnd) = MonthRangeUtc(billingYear, billingMonth);
         var hourlyRate = settings.PaymentHourlyRateUsd > 0
             ? settings.PaymentHourlyRateUsd
             : DefaultHourlyRateUsd;
 
-        var billableLessons = lessons
-            .Where(l =>
-                l.StartsAtUtc >= monthStart
-                && l.StartsAtUtc < monthEnd
-                && l.AttendanceStatus != AttendanceStatusCodes.NotAttending)
+        var billableLessons = (billEntireLessonList
+                ? lessons
+                : lessons.Where(l => l.StartsAtUtc >= monthStart && l.StartsAtUtc < monthEnd))
+            .Where(l => l.AttendanceStatus != AttendanceStatusCodes.NotAttending)
             .OrderBy(l => l.StartsAtUtc)
             .ToList();
 
@@ -80,7 +107,9 @@ public static class LessonBillingService
             PaymentReference = paymentReference,
             BillingYear = billingYear,
             BillingMonth = billingMonth,
-            BillingPeriodLabel = FormatBillingPeriod(billingYear, billingMonth),
+            BillingPeriodLabel = string.IsNullOrWhiteSpace(billingPeriodLabelOverride)
+                ? FormatBillingPeriod(billingYear, billingMonth)
+                : billingPeriodLabelOverride,
             PaymentDueUtc = dueUtc,
             ShowPaymentReminder = daysUntilDue is >= 0 and <= 5,
             DaysUntilDue = daysUntilDue,
@@ -110,4 +139,17 @@ public static class LessonBillingService
         var (_, monthEnd) = MonthRangeUtc(billingYear, billingMonth);
         return monthEnd.AddDays(-1).Date;
     }
+
+    /// <summary>Calendar billing month for the first lesson in a rollover block.</summary>
+    public static (int Year, int Month) BillingMonthForLessonStart(DateTime startsAtUtc)
+    {
+        var utc = DateTime.SpecifyKind(startsAtUtc, DateTimeKind.Utc);
+        return (utc.Year, utc.Month);
+    }
+
+    public static bool IsBillingPeriodPaid(
+        int billingYear,
+        int billingMonth,
+        IReadOnlySet<(int Year, int Month)> paidPeriods) =>
+        paidPeriods.Contains((billingYear, billingMonth));
 }

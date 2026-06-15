@@ -10,6 +10,9 @@ public sealed class StudentPortalDto
     public StudentScheduleChangeUpdateDto? ScheduleChangeUpdate { get; init; }
     public bool DeletionRequested { get; init; }
     public string? TimeZoneId { get; init; }
+
+    /// <summary>Set when payment is verified but the next block could not be booked (calendar conflict).</summary>
+    public string? NextBlockBookingIssue { get; init; }
 }
 
 public sealed class StudentPaymentSummaryDto
@@ -32,6 +35,9 @@ public sealed class StudentPaymentSummaryDto
     public bool CanSubmitPayment { get; init; }
     public bool CurrentPeriodPaid { get; init; }
     public bool ShowPaymentDetails { get; init; }
+
+    /// <summary>True when the previous lesson block ended and payment unlocks the next block.</summary>
+    public bool AwaitingNextBlockPayment { get; init; }
 }
 
 public sealed class StudentLessonMonthSummaryDto

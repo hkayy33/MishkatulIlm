@@ -44,6 +44,10 @@ export class StudentMatchedPortal implements OnInit {
   protected readonly scheduleChangeNote = signal('');
   protected readonly showDeleteConfirm = signal(false);
   protected readonly deleteConfirmText = signal('');
+  protected readonly oldPassword = signal('');
+  protected readonly newPassword = signal('');
+  protected readonly showOldPassword = signal(false);
+  protected readonly showNewPassword = signal(false);
   protected readonly actionBusy = signal(false);
   protected readonly summaryWeekStart = signal(startOfWeekMonday(new Date()));
   protected readonly dismissedUpdateKeys = signal<ReadonlySet<string>>(readDismissedUpdateKeys());
@@ -84,6 +88,12 @@ export class StudentMatchedPortal implements OnInit {
   protected readonly showPaymentDetails = computed(
     () => this.payment()?.showPaymentDetails ?? false,
   );
+  protected readonly awaitingNextBlockPayment = computed(
+    () => this.payment()?.awaitingNextBlockPayment ?? false,
+  );
+  protected readonly nextBlockBookingIssue = computed(
+    () => this.store.portalData()?.portal?.nextBlockBookingIssue ?? null,
+  );
 
   protected readonly scheduleChangeUpdate = computed(() => {
     const update = this.store.portalData()?.portal?.scheduleChangeUpdate ?? null;
@@ -106,6 +116,9 @@ export class StudentMatchedPortal implements OnInit {
       this.store.reloadPortalForWeek(this.summaryWeekStart());
     } else if (tab === 'lessons' || tab === 'account') {
       this.store.reloadPortal();
+      if (tab === 'account') {
+        this.resetPasswordResetForm();
+      }
     } else if (tab === 'payments') {
       this.paymentStatement.set(null);
       this.paymentStatementError.set(null);
@@ -301,6 +314,85 @@ export class StudentMatchedPortal implements OnInit {
         },
         error: (err: unknown) => {
           this.store.actionError.set(formatHttpError(err, 'Could not submit payment.'));
+        },
+      });
+  }
+
+  private currentPasswordFieldFocused = false;
+
+  protected resetPasswordResetForm(): void {
+    this.currentPasswordFieldFocused = false;
+    this.oldPassword.set('');
+    this.newPassword.set('');
+    this.showOldPassword.set(false);
+    this.showNewPassword.set(false);
+    this.guardAgainstPasswordAutofill();
+    for (const delay of [50, 250]) {
+      setTimeout(() => {
+        if (this.activeTab() !== 'account' || this.currentPasswordFieldFocused) return;
+        this.guardAgainstPasswordAutofill();
+      }, delay);
+    }
+  }
+
+  protected enableCurrentPasswordInput(event: Event): void {
+    (event.target as HTMLInputElement).removeAttribute('readonly');
+  }
+
+  protected onCurrentPasswordFocus(event: Event): void {
+    this.currentPasswordFieldFocused = true;
+    this.enableCurrentPasswordInput(event);
+  }
+
+  private guardAgainstPasswordAutofill(): void {
+    if (this.currentPasswordFieldFocused) return;
+    this.oldPassword.set('');
+    this.newPassword.set('');
+  }
+
+  protected submitPasswordReset(event: Event): void {
+    event.preventDefault();
+
+    const current = this.oldPassword();
+    const next = this.newPassword().trim();
+
+    if (current.length < 8) {
+      this.store.actionError.set('Enter your current password.');
+      return;
+    }
+    if (next.length < 8) {
+      this.store.actionError.set('New password must be at least 8 characters.');
+      return;
+    }
+    if (current === next) {
+      this.store.actionError.set('Choose a new password that is different from your current one.');
+      return;
+    }
+    if (!this.auth.supabaseConfigured()) {
+      this.store.actionError.set('Password changes are not available right now.');
+      return;
+    }
+
+    this.actionBusy.set(true);
+    this.store.actionError.set(null);
+    this.auth
+      .changePassword(current, next)
+      .pipe(finalize(() => this.actionBusy.set(false)))
+      .subscribe({
+        next: () => {
+          this.store.actionMessage.set('Your password has been updated.');
+          this.oldPassword.set('');
+          this.newPassword.set('');
+          this.showOldPassword.set(false);
+          this.showNewPassword.set(false);
+        },
+        error: (err: Error & { message?: string }) => {
+          const msg = err?.message ?? '';
+          if (/invalid login credentials/i.test(msg)) {
+            this.store.actionError.set('Your current password is incorrect.');
+            return;
+          }
+          this.store.actionError.set(msg || 'Could not update your password. Try again.');
         },
       });
   }

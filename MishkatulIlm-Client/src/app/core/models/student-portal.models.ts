@@ -22,6 +22,7 @@ export interface StudentPaymentSummary {
   canSubmitPayment: boolean;
   currentPeriodPaid: boolean;
   showPaymentDetails: boolean;
+  awaitingNextBlockPayment?: boolean;
 }
 
 export interface StudentLessonMonthSummary {
@@ -49,6 +50,7 @@ export interface StudentPortalInfo {
   hasPendingScheduleChangeRequest: boolean;
   scheduleChangeUpdate?: StudentScheduleChangeUpdate | null;
   deletionRequested: boolean;
+  nextBlockBookingIssue?: string | null;
 }
 
 export interface StudentPortalResponse {

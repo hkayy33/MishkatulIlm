@@ -12,7 +12,8 @@ namespace MishkatulIlm_Server.Controllers;
 [Route("api/student")]
 public sealed class StudentPaymentController(
     AppDbContext db,
-    StudentPaymentService paymentService) : ControllerBase
+    StudentPaymentService paymentService,
+    LessonBillingContextService billingContext) : ControllerBase
 {
     [HttpGet("payment-statement")]
     public async Task<IActionResult> GetPaymentStatement(CancellationToken cancellationToken)
@@ -35,7 +36,8 @@ public sealed class StudentPaymentController(
         if (statement is null)
         {
             var submission = await paymentService.GetCurrentSubmissionAsync(userId, cancellationToken);
-            var summary = StudentPaymentSummaryBuilder.Build(user, submission, DateTime.UtcNow);
+            var billing = await billingContext.ResolveAsync(user, DateTime.UtcNow, cancellationToken);
+            var summary = StudentPaymentSummaryBuilder.Build(user, submission, DateTime.UtcNow, billing);
             if (!summary.ShowPaymentDetails)
             {
                 var dueMessage = summary.NextPaymentDueUtc is null

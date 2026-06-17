@@ -6,14 +6,23 @@
     <div class="container" [class.container--home]="isHomeRoute()">
         <a routerLink="/" class="nav-logo" (click)="closeMobileMenu()">
             <img
-                class="nav-logo__img"
-                src="/logo.png"
-                srcset="/logo.png 1x, /logo@2x.png 2x"
-                width="651"
-                height="185"
-                alt="Al Usooliyyah Academy logo"
+                class="nav-logo__mark"
+                src="/logo-mark.png"
+                srcset="/logo-mark.png 1x, /logo-mark@2x.png 2x"
+                width="366"
+                height="368"
+                alt=""
+                aria-hidden="true"
                 decoding="async"
             >
+            <span class="nav-logo__text">
+                <span class="nav-logo__name">Al Usooliyyah</span>
+                <span class="nav-logo__academy">
+                    <span class="nav-logo__rule" aria-hidden="true"></span>
+                    Academy
+                    <span class="nav-logo__rule" aria-hidden="true"></span>
+                </span>
+            </span>
         </a>
 
         <button

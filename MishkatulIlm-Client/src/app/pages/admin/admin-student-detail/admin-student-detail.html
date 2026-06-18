@@ -1,0 +1,211 @@
+<div class="admin-page admin-student-detail-page">
+  <p class="admin-back">
+    <a routerLink="/admin/students">← Back to active students</a>
+  </p>
+
+  @if (loading()) {
+    <p class="admin-muted">Loading…</p>
+  } @else if (loadError()) {
+    <p class="admin-error">{{ loadError() }}</p>
+  } @else if (student(); as detail) {
+    <header class="student-detail-header">
+      <h1 class="admin-title">{{ studentName(detail) }}</h1>
+      <p class="admin-lead">
+        <a [href]="'mailto:' + detail.email">{{ detail.email }}</a>
+        @if (detail.phoneNumber) {
+          <span class="student-detail-header__sep">·</span>
+          <a [href]="'tel:' + detail.phoneNumber">{{ detail.phoneNumber }}</a>
+        }
+      </p>
+    </header>
+
+    <section class="admin-card student-profile-card">
+      <h2 class="admin-card-title">Profile</h2>
+      <dl class="student-details">
+        <div>
+          <dt>Level</dt>
+          <dd>{{ detail.currentLevel ? labelLevelCode(detail.currentLevel) : '—' }}</dd>
+        </div>
+        <div>
+          <dt>Location</dt>
+          <dd>{{ formatLocation(detail) }}</dd>
+        </div>
+        <div>
+          <dt>Subjects</dt>
+          <dd>{{ formatSubjects(detail.subjectCodes) }}</dd>
+        </div>
+        <div>
+          <dt>Lesson frequency</dt>
+          <dd>{{ detail.lessonFrequency ?? '—' }}</dd>
+        </div>
+        <div>
+          <dt>Preferred duration</dt>
+          <dd>
+            {{
+              detail.preferredLessonDuration
+                ? labelPreferredLessonDurationCode(detail.preferredLessonDuration)
+                : '—'
+            }}
+          </dd>
+        </div>
+        <div>
+          <dt>Member since</dt>
+          <dd>{{ detail.createdAtUtc | date: 'mediumDate' }}</dd>
+        </div>
+        <div class="student-details__wide">
+          <dt>Recurring schedule</dt>
+          <dd>
+            @if (formatSchedule(detail).length === 0) {
+              <span class="admin-muted">None</span>
+            } @else {
+              <ul class="lesson-list">
+                @for (slot of formatSchedule(detail); track slot) {
+                  <li>{{ slot }}</li>
+                }
+              </ul>
+            }
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="admin-card">
+      <h2 class="admin-card-title">Payment summary</h2>
+      <dl class="student-details student-details--payment">
+        <div>
+          <dt>Current status</dt>
+          <dd>
+            <span
+              class="payment-badge"
+              [class.payment-badge--yes]="detail.hasMadePayment"
+              [class.payment-badge--no]="!detail.hasMadePayment"
+            >
+              {{ detail.hasMadePayment ? 'Paid' : 'Unpaid' }}
+            </span>
+          </dd>
+        </div>
+        <div>
+          <dt>Next payment due</dt>
+          <dd>
+            @if (detail.hasMadePayment && detail.nextPaymentDueUtc) {
+              {{ detail.nextPaymentDueUtc | date: 'mediumDate' }}
+            } @else {
+              <span class="admin-muted">—</span>
+            }
+          </dd>
+        </div>
+        <div>
+          <dt>Last payment</dt>
+          <dd>
+            @if (detail.lastPaymentAtUtc && detail.lastPaymentAmount != null) {
+              {{ detail.lastPaymentAmount | currency: (detail.lastPaymentCurrency ?? 'USD') : 'symbol' : '1.0-2' }}
+              on {{ detail.lastPaymentAtUtc | date: 'mediumDate' }}
+            } @else {
+              <span class="admin-muted">None recorded</span>
+            }
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="admin-card">
+      <h2 class="admin-card-title">Upcoming lessons</h2>
+      @if (upcomingLessons().length === 0) {
+        <p class="admin-muted">No upcoming lessons scheduled.</p>
+      } @else {
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Duration</th>
+                <th>Attendance</th>
+                <th>Student note</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (lesson of upcomingLessons(); track lesson.slotId) {
+                <tr>
+                  <td class="nowrap">{{ formatLesson(lesson.startsAtUtc, lesson.endsAtUtc) }}</td>
+                  <td>{{ formatDuration(lesson.durationMinutes) }}</td>
+                  <td>{{ attendanceLabel(lesson) }}</td>
+                  <td>
+                    @if (lesson.studentNote) {
+                      {{ lesson.studentNote }}
+                    } @else {
+                      <span class="admin-muted">—</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+
+    <section class="admin-card">
+      <h2 class="admin-card-title">Payment history</h2>
+      @if (detail.paymentHistory.length === 0) {
+        <p class="admin-muted">No payment submissions yet.</p>
+      } @else {
+        <div class="admin-table-wrap">
+          <table class="admin-table admin-table--payments">
+            <thead>
+              <tr>
+                <th>Period</th>
+                <th>Amount</th>
+                <th>Reference</th>
+                <th>Status</th>
+                <th>Submitted</th>
+                <th>Lessons covered</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of detail.paymentHistory; track item.id) {
+                @let coveredLessons = billablePaymentLessons(item);
+                <tr>
+                  <td>{{ item.billingPeriodLabel }}</td>
+                  <td>{{ item.amount | currency: item.currency : 'symbol' : '1.0-2' }}</td>
+                  <td class="payment-ref">{{ item.paymentReference }}</td>
+                  <td>
+                    <span
+                      class="status-pill"
+                      [class.status-pill--paid]="item.status === 'paid'"
+                      [class.status-pill--awaiting]="item.status === 'pending_verification'"
+                      [class.status-pill--rejected]="item.status === 'rejected'"
+                    >
+                      {{ paymentStatusLabel(item.status) }}
+                    </span>
+                  </td>
+                  <td class="nowrap">{{ item.submittedAtUtc | date: 'medium' }}</td>
+                  <td class="payment-lessons-covered">
+                    @if (coveredLessons.length === 0) {
+                      <span class="admin-muted">—</span>
+                    } @else {
+                      <ul class="lesson-list">
+                        @for (lesson of coveredLessons; track lesson.startsAtUtc) {
+                          <li>
+                            {{ formatLesson(lesson.startsAtUtc, lesson.endsAtUtc) }}
+                            <span class="payment-lesson-duration">({{ formatDuration(lesson.durationMinutes) }})</span>
+                          </li>
+                        }
+                      </ul>
+                    }
+                  </td>
+                </tr>
+                @if (item.adminNote) {
+                  <tr class="payment-note-row">
+                    <td colspan="6">
+                      <span class="payment-note-label">Admin note:</span> {{ item.adminNote }}
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  }
+</div>

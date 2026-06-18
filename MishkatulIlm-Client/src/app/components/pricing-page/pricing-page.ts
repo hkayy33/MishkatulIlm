@@ -1,7 +1,12 @@
 import { Component } from '@angular/core';
+import {
+  LESSON_RATE_45_MIN_USD,
+  LESSON_RATE_60_MIN_USD,
+  monthlyPriceForLessonsPerWeek,
+} from '../../core/utils/lesson-pricing';
 
 interface PricingPlan {
-  hoursPerWeek: number;
+  lessonsPerWeek: number;
   monthlyPrice: number;
 }
 
@@ -12,12 +17,18 @@ interface PricingPlan {
   styleUrl: './pricing-page.scss',
 })
 export class PricingPage {
-  readonly plans: PricingPlan[] = [
-    { hoursPerWeek: 1, monthlyPrice: 20 },
-    { hoursPerWeek: 2, monthlyPrice: 40 },
-    { hoursPerWeek: 3, monthlyPrice: 60 },
-    { hoursPerWeek: 4, monthlyPrice: 80 },
-    { hoursPerWeek: 5, monthlyPrice: 100 },
-    { hoursPerWeek: 6, monthlyPrice: 120 },
-  ];
+  readonly rate45MinUsd = LESSON_RATE_45_MIN_USD;
+  readonly rate60MinUsd = LESSON_RATE_60_MIN_USD;
+
+  readonly lessonsPerWeekOptions = [1, 2, 3, 4, 5, 6] as const;
+
+  readonly fortyFiveMinutePlans: PricingPlan[] = this.lessonsPerWeekOptions.map((lessonsPerWeek) => ({
+    lessonsPerWeek,
+    monthlyPrice: monthlyPriceForLessonsPerWeek(lessonsPerWeek, 45),
+  }));
+
+  readonly sixtyMinutePlans: PricingPlan[] = this.lessonsPerWeekOptions.map((lessonsPerWeek) => ({
+    lessonsPerWeek,
+    monthlyPrice: monthlyPriceForLessonsPerWeek(lessonsPerWeek, 60),
+  }));
 }

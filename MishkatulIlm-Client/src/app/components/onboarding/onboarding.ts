@@ -47,6 +47,7 @@ type OnboardingFieldKey =
   | 'subjects'
   | 'currentLevel'
   | 'lessonFrequency'
+  | 'preferredLessonDuration'
   | 'availability';
 
 const ONBOARDING_FIELD_FOCUS_ORDER: OnboardingFieldKey[] = [
@@ -60,6 +61,7 @@ const ONBOARDING_FIELD_FOCUS_ORDER: OnboardingFieldKey[] = [
   'subjects',
   'currentLevel',
   'lessonFrequency',
+  'preferredLessonDuration',
   'availability',
 ];
 
@@ -74,6 +76,7 @@ const ONBOARDING_FIELD_ELEMENT_IDS: Record<OnboardingFieldKey, string> = {
   subjects: 'subjects-heading',
   currentLevel: 'current-level',
   lessonFrequency: 'lesson-frequency',
+  preferredLessonDuration: 'preferred-lesson-duration',
   availability: 'availability-heading',
 };
 
@@ -220,6 +223,23 @@ export class Onboarding {
 
   selectedLessonFrequency = '';
 
+  readonly preferredLessonDurationOptions: SelectOption[] = [
+    { value: 'MIN-45', label: '45 min' },
+    { value: 'MIN-60', label: '1 hour' },
+  ];
+
+  selectedPreferredLessonDuration = '';
+  protected readonly durationPricesInfoOpen = signal(false);
+
+  onPreferredLessonDurationPick(code: string): void {
+    this.selectedPreferredLessonDuration = code;
+    this.clearInvalid('preferredLessonDuration');
+  }
+
+  toggleDurationPricesInfo(): void {
+    this.durationPricesInfoOpen.update((open) => !open);
+  }
+
   get availableLessonFrequencies(): SelectOption[] {
     const allowed = new Set(allowedLessonFrequencyCodes(this.selectedSubjectCount));
     return [
@@ -310,6 +330,7 @@ export class Onboarding {
     const currentLevel =
       (form.elements.namedItem('current-level') as HTMLSelectElement)?.value ?? '';
     const lessonFrequency = this.selectedLessonFrequency.trim();
+    const preferredLessonDuration = this.selectedPreferredLessonDuration.trim();
     const subjectCodes = this.subjectOptions.filter((o) => o.selected).map((o) => o.value);
     const preferredAvailability = this.collectPreferredAvailability();
 
@@ -323,6 +344,7 @@ export class Onboarding {
       phone,
       currentLevel,
       lessonFrequency,
+      preferredLessonDuration,
       subjectCount: subjectCodes.length,
       availabilityCount: preferredAvailability.length,
     });
@@ -347,6 +369,7 @@ export class Onboarding {
       phoneNumber: phone,
       currentLevel,
       lessonFrequency,
+      preferredLessonDuration,
       subjectCodes,
       preferredAvailability,
     };
@@ -399,6 +422,7 @@ export class Onboarding {
     phone: string;
     currentLevel: string;
     lessonFrequency: string;
+    preferredLessonDuration: string;
     subjectCount: number;
     availabilityCount: number;
   }): Set<OnboardingFieldKey> {
@@ -417,6 +441,7 @@ export class Onboarding {
     ) {
       invalid.add('lessonFrequency');
     }
+    if (!values.preferredLessonDuration) invalid.add('preferredLessonDuration');
     if (values.subjectCount === 0) invalid.add('subjects');
     if (values.availabilityCount === 0) invalid.add('availability');
     return invalid;
@@ -451,6 +476,8 @@ export class Onboarding {
             lessonFrequencyConstraintHint(this.selectedSubjectCount) ??
             'Please select a lesson frequency that matches your subjects.'
           );
+        case 'preferredLessonDuration':
+          return 'Please select your preferred lesson duration.';
         case 'availability':
           return 'Select at least one preferred lesson time.';
       }
@@ -465,8 +492,14 @@ export class Onboarding {
     requestAnimationFrame(() => {
       const el = document.getElementById(elementId);
       el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) {
-        el.focus();
+      const focusTarget =
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLSelectElement ||
+        el instanceof HTMLButtonElement
+          ? el
+          : el?.querySelector('button, input, select');
+      if (focusTarget instanceof HTMLElement) {
+        focusTarget.focus();
       }
     });
   }

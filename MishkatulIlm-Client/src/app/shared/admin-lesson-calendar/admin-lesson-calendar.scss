@@ -157,6 +157,36 @@
   line-height: 1.45;
 }
 
+.slot-duration-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.slot-free-trial-btn {
+  width: 100%;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.5rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid rgba(47, 74, 107, 0.35);
+  background: rgba(91, 124, 153, 0.1);
+  color: #2f4a6b;
+  cursor: pointer;
+  text-align: left;
+
+  &--active {
+    background: rgba(91, 124, 153, 0.22);
+    box-shadow: inset 0 0 0 2px rgba(47, 74, 107, 0.35);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
 .slot-timeline {
   list-style: none;
   margin: 0;
@@ -166,6 +196,93 @@
   border: 1px solid rgba(28, 27, 24, 0.1);
   border-radius: 8px;
   background: #f7f5f2;
+  --slot-row-height: 3.1rem;
+  --slot-extension-height: 1.55rem;
+}
+
+.slot-timeline__item:not(.slot-timeline__item--extension):has(+ .slot-timeline__item--extension)
+  .slot-row {
+  border-bottom: none;
+}
+
+.slot-timeline__item--extension + .slot-timeline__item--extension .slot-row,
+.slot-timeline__item:not(.slot-timeline__item--extension)
+  + .slot-timeline__item--extension
+  .slot-row {
+  border-top: none;
+}
+
+.slot-timeline__item--extension:has(+ .slot-timeline__item--extension) .slot-row,
+.slot-timeline__item--extension:has(+ .slot-timeline__item:not(.slot-timeline__item--extension)) .slot-row {
+  border-bottom: none;
+}
+
+.slot-unified-block {
+  list-style: none;
+
+  &__button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: calc(var(--slot-row-height) + var(--slot-extension-height));
+    padding: 0.55rem 0.75rem;
+    border: none;
+    border-bottom: 1px solid rgba(28, 27, 24, 0.08);
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 0.88rem;
+    text-align: left;
+    cursor: pointer;
+    background: #fff;
+    transition: background 0.12s ease;
+
+    &--admin {
+      background: rgba(91, 124, 153, 0.16);
+
+      &:hover:not(:disabled) {
+        background: rgba(91, 124, 153, 0.26);
+      }
+
+      .slot-unified-block__status {
+        color: #2f4a6b;
+      }
+    }
+
+    &--booked {
+      background: #e8e6e1;
+      cursor: not-allowed;
+
+      .slot-row__time,
+      .slot-unified-block__status {
+        color: #7a7670;
+      }
+    }
+
+    &--selected-start,
+    &--selected-range {
+      background: rgba(197, 157, 95, 0.38);
+
+      .slot-unified-block__status {
+        color: #5c4820;
+      }
+    }
+  }
+
+  &__time {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+
+  &__status {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: right;
+    flex-shrink: 0;
+  }
 }
 
 .slot-row {
@@ -174,7 +291,7 @@
   justify-content: space-between;
   gap: 0.75rem;
   width: 100%;
-  min-height: 3.1rem;
+  min-height: var(--slot-row-height);
   padding: 0.55rem 0.75rem;
   border: none;
   border-bottom: 1px solid rgba(28, 27, 24, 0.08);
@@ -210,6 +327,21 @@
     font-weight: 600;
     color: #6b5420;
     text-align: right;
+  }
+
+  &--extension-15 {
+    min-height: var(--slot-extension-height);
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
+    font-size: 0.82rem;
+
+    .slot-row__time {
+      font-size: 0.82rem;
+    }
+
+    .slot-row__status {
+      font-size: 0.72rem;
+    }
   }
 
   &--open:hover:not(:disabled) {
@@ -294,9 +426,22 @@
     }
   }
 
-  &:disabled:not(.slot-row--selected-start):not(.slot-row--selected-range):not(.slot-row--confirmed):not(
-      .slot-row--booked-student
-    ):not(.slot-row--outside) {
+  &--admin {
+    background: rgba(91, 124, 153, 0.16);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: rgba(91, 124, 153, 0.26);
+    }
+
+    .slot-row__status {
+      color: #2f4a6b;
+    }
+  }
+
+  &:disabled:not(.slot-row--selected-start):not(.slot-row--selected-range):not(
+      .slot-row--confirmed
+    ):not(.slot-row--booked-student):not(.slot-row--outside):not(.slot-row--admin) {
     opacity: 0.55;
     cursor: not-allowed;
   }
@@ -314,11 +459,48 @@
     line-height: 1.4;
   }
 
+  &__preset {
+    margin: 0 0 0.75rem;
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #2f4a6b;
+  }
+
   &__actions {
     display: flex;
     gap: 0.5rem;
     justify-content: flex-end;
     margin-top: 0.75rem;
+  }
+}
+
+.slot-draft-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.slot-draft-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.85rem;
+
+  span {
+    font-weight: 600;
+    color: #5c584f;
+  }
+
+  input,
+  textarea {
+    padding: 0.45rem 0.55rem;
+    border: 1px solid rgba(28, 27, 24, 0.18);
+    border-radius: 6px;
+    font: inherit;
+    resize: vertical;
   }
 }
 

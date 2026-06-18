@@ -80,6 +80,10 @@
               <dd>{{ labelFrequencyCode(target.lessonFrequency ?? '') }}</dd>
             </div>
             <div class="approve-details__span">
+              <dt>Preferred lesson duration</dt>
+              <dd>{{ labelPreferredLessonDurationCode(target.preferredLessonDuration ?? '') }}</dd>
+            </div>
+            <div class="approve-details__span">
               <dt>Subjects</dt>
               <dd>{{ formatSubjects(target.subjectCodes) }}</dd>
             </div>

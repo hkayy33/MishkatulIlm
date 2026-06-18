@@ -151,7 +151,11 @@ public sealed class LessonScheduleServiceTests
       FirstName = "Test",
       LastName = "Student",
     };
-    var settings = new SchedulingSettings { PaymentHourlyRateUsd = 5m };
+    var settings = new SchedulingSettings
+    {
+        PaymentRate45MinUsd = 5m,
+        PaymentRate60MinUsd = 7m,
+    };
 
     var statement = LessonBillingService.BuildStatement(
       user,
@@ -165,7 +169,83 @@ public sealed class LessonScheduleServiceTests
       billEntireLessonList: true);
 
     Assert.Equal(4, statement.Lessons.Count);
-    Assert.Equal(20m, statement.TotalAmount);
+    Assert.Equal(28m, statement.TotalAmount);
+    Assert.All(statement.Lessons, line => Assert.Equal(7m, line.Amount));
+  }
+
+  [Fact]
+  public void BuildStatement_excludes_not_attending_lessons_from_total()
+  {
+    var user = new AppUser
+    {
+      Id = Guid.NewGuid(),
+      Email = "student@example.com",
+      FirstName = "Test",
+      LastName = "Student",
+    };
+    var settings = new SchedulingSettings { PaymentRate45MinUsd = 5m, PaymentRate60MinUsd = 7m };
+    var lessons = new List<LessonSlot>
+    {
+      new()
+      {
+        Id = Guid.NewGuid(),
+        StartsAtUtc = new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc),
+        EndsAtUtc = new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc),
+        AttendanceStatus = AttendanceStatusCodes.Attending,
+      },
+      new()
+      {
+        Id = Guid.NewGuid(),
+        StartsAtUtc = new DateTime(2026, 6, 12, 10, 0, 0, DateTimeKind.Utc),
+        EndsAtUtc = new DateTime(2026, 6, 12, 11, 0, 0, DateTimeKind.Utc),
+        AttendanceStatus = AttendanceStatusCodes.NotAttending,
+      },
+      new()
+      {
+        Id = Guid.NewGuid(),
+        StartsAtUtc = new DateTime(2026, 6, 19, 10, 0, 0, DateTimeKind.Utc),
+        EndsAtUtc = new DateTime(2026, 6, 19, 11, 0, 0, DateTimeKind.Utc),
+        AttendanceStatus = AttendanceStatusCodes.Attending,
+      },
+    };
+
+    var statement = LessonBillingService.BuildStatement(
+      user,
+      lessons,
+      settings,
+      billingYear: 2026,
+      billingMonth: 6,
+      currentSubmission: null,
+      utcNow: new DateTime(2026, 6, 20, 0, 0, 0, DateTimeKind.Utc));
+
+    Assert.Equal(2, statement.Lessons.Count);
+    Assert.Equal(14m, statement.TotalAmount);
+    Assert.DoesNotContain(
+      statement.Lessons,
+      line => line.StartsAtUtc == new DateTime(2026, 6, 12, 10, 0, 0, DateTimeKind.Utc));
+  }
+
+  [Theory]
+  [InlineData("NOT_ATTENDING")]
+  [InlineData("not_attending")]
+  [InlineData("ABSENT")]
+  public void IsBillableAttendance_returns_false_for_not_attending(string status)
+  {
+    Assert.False(LessonBillingService.IsBillableAttendance(status));
+  }
+
+  [Fact]
+  public void PriceLesson_uses_flat_rates_for_45_and_60_minutes()
+  {
+    var (amount45, rate45, label45) = LessonBillingService.PriceLesson(45, 5m, 7m);
+    var (amount60, rate60, label60) = LessonBillingService.PriceLesson(60, 5m, 7m);
+
+    Assert.Equal(5m, amount45);
+    Assert.Equal(5m, rate45);
+    Assert.Equal("45 min lesson", label45);
+    Assert.Equal(7m, amount60);
+    Assert.Equal(7m, rate60);
+    Assert.Equal("1 hour lesson", label60);
   }
 
   private static List<PlannedLessonSlotDto> PlanOnceWeekly() =>

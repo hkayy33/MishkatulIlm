@@ -141,9 +141,7 @@ public sealed class AdminPaymentSubmissionService(
         user.LastPaymentAmount = submission.Amount;
         user.LastPaymentCurrency = submission.Currency;
         user.LastPaymentAtUtc = utcNow;
-
-        var (_, monthEnd) = LessonBillingService.MonthRangeUtc(submission.BillingYear, submission.BillingMonth);
-        user.NextPaymentDueUtc = monthEnd.Date;
+        user.NextPaymentDueUtc = LessonBillingService.NextPaymentDueAfterPaid(utcNow);
 
         await db.SaveChangesAsync(cancellationToken);
         var rollover = await lessonRollover.TryRolloverStudentAsync(user.Id, cancellationToken);

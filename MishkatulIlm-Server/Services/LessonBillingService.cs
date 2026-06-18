@@ -5,8 +5,12 @@ namespace MishkatulIlm_Server.Services;
 
 public static class LessonBillingService
 {
-    public const decimal DefaultHourlyRateUsd = 5m;
+    public const decimal DefaultRate45MinUsd = 5m;
+    public const decimal DefaultRate60MinUsd = 7m;
     public const string DefaultCurrency = "USD";
+
+    /// <summary>Legacy alias — prefer <see cref="DefaultRate60MinUsd"/>.</summary>
+    public const decimal DefaultHourlyRateUsd = DefaultRate60MinUsd;
 
     public static (DateTime MonthStartUtc, DateTime MonthEndUtc) MonthRangeUtc(int year, int month)
     {
@@ -52,6 +56,35 @@ public static class LessonBillingService
         return $"Next 4-week block ({first:dd MMM} – {last:dd MMM yyyy})";
     }
 
+    public static (decimal Rate45MinUsd, decimal Rate60MinUsd) ResolveRates(SchedulingSettings settings)
+    {
+        var rate45 = settings.PaymentRate45MinUsd > 0
+            ? settings.PaymentRate45MinUsd
+            : DefaultRate45MinUsd;
+        var rate60 = settings.PaymentRate60MinUsd > 0
+            ? settings.PaymentRate60MinUsd
+            : DefaultRate60MinUsd;
+        return (rate45, rate60);
+    }
+
+    public static (decimal Amount, decimal LessonRate, string RateLabel) PriceLesson(
+        int durationMinutes,
+        decimal rate45MinUsd,
+        decimal rate60MinUsd)
+    {
+        if (durationMinutes <= 0)
+            durationMinutes = 60;
+
+        if (durationMinutes <= 52)
+            return (rate45MinUsd, rate45MinUsd, "45 min lesson");
+
+        if (durationMinutes <= 75)
+            return (rate60MinUsd, rate60MinUsd, "1 hour lesson");
+
+        var amount = Math.Round(rate60MinUsd * durationMinutes / 60m, 2, MidpointRounding.AwayFromZero);
+        return (amount, rate60MinUsd, $"{durationMinutes} min lesson");
+    }
+
     public static PaymentStatementDto BuildStatement(
         AppUser user,
         IReadOnlyList<LessonSlot> lessons,
@@ -64,14 +97,12 @@ public static class LessonBillingService
         bool billEntireLessonList = false)
     {
         var (monthStart, monthEnd) = MonthRangeUtc(billingYear, billingMonth);
-        var hourlyRate = settings.PaymentHourlyRateUsd > 0
-            ? settings.PaymentHourlyRateUsd
-            : DefaultHourlyRateUsd;
+        var (rate45MinUsd, rate60MinUsd) = ResolveRates(settings);
 
         var billableLessons = (billEntireLessonList
                 ? lessons
                 : lessons.Where(l => l.StartsAtUtc >= monthStart && l.StartsAtUtc < monthEnd))
-            .Where(l => l.AttendanceStatus != AttendanceStatusCodes.NotAttending)
+            .Where(l => IsBillableAttendance(l.AttendanceStatus))
             .OrderBy(l => l.StartsAtUtc)
             .ToList();
 
@@ -79,18 +110,16 @@ public static class LessonBillingService
             .Select(l =>
             {
                 var minutes = (int)Math.Round((l.EndsAtUtc - l.StartsAtUtc).TotalMinutes);
-                if (minutes <= 0)
-                    minutes = 60;
-
-                var hours = minutes / 60m;
-                var amount = Math.Round(hours * hourlyRate, 2, MidpointRounding.AwayFromZero);
+                var (amount, lessonRate, rateLabel) = PriceLesson(minutes, rate45MinUsd, rate60MinUsd);
                 return new PaymentLessonLineItemDto
                 {
                     SlotId = l.Id,
                     StartsAtUtc = l.StartsAtUtc,
                     EndsAtUtc = l.EndsAtUtc,
                     DurationMinutes = minutes,
-                    HourlyRate = hourlyRate,
+                    LessonRate = lessonRate,
+                    HourlyRate = lessonRate,
+                    RateLabel = rateLabel,
                     Amount = amount,
                 };
             })
@@ -113,7 +142,9 @@ public static class LessonBillingService
             PaymentDueUtc = dueUtc,
             ShowPaymentReminder = daysUntilDue is >= 0 and <= 5,
             DaysUntilDue = daysUntilDue,
-            HourlyRate = hourlyRate,
+            Rate45MinUsd = rate45MinUsd,
+            Rate60MinUsd = rate60MinUsd,
+            HourlyRate = rate60MinUsd,
             Currency = DefaultCurrency,
             TotalAmount = totalAmount,
             Lessons = lineItems,
@@ -136,8 +167,24 @@ public static class LessonBillingService
         if (user.NextPaymentDueUtc is not null)
             return user.NextPaymentDueUtc.Value.Date;
 
-        var (_, monthEnd) = MonthRangeUtc(billingYear, billingMonth);
-        return monthEnd.AddDays(-1).Date;
+        return NextPaymentDueAfterPaid(user.LastPaymentAtUtc.Value);
+    }
+
+    /// <summary>Next manual payment is due one calendar month after the last payment date.</summary>
+    public static DateTime NextPaymentDueAfterPaid(DateTime paidAtUtc) =>
+        DateTime.SpecifyKind(paidAtUtc, DateTimeKind.Utc).Date.AddMonths(1);
+
+    /// <summary>Lessons marked not attending are excluded from payment totals and covered-lesson lists.</summary>
+    public static bool IsBillableAttendance(string? attendanceStatus)
+    {
+        if (string.IsNullOrWhiteSpace(attendanceStatus))
+            return true;
+
+        return attendanceStatus.Trim().ToUpperInvariant() switch
+        {
+            AttendanceStatusCodes.NotAttending or "NOT_ATTENDING" or "NOTATTENDING" or "ABSENT" => false,
+            _ => true,
+        };
     }
 
     /// <summary>Calendar billing month for the first lesson in a rollover block.</summary>

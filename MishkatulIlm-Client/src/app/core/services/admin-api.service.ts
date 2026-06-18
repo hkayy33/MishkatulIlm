@@ -13,13 +13,18 @@ import type {
   CreateLessonSlotBody,
   LessonSlotRow,
   ScheduledLessonRow,
+  UpdateLessonSlotBody,
   WeekOneLessonPick,
 } from '../models/calendar.models';
 import type {
   SchedulingSettings,
   UpdateSchedulingSettingsBody,
 } from '../models/scheduling-settings.models';
-import type { AdminPaymentSubmissionRow } from '../models/payment.models';
+import type { AdminPaymentSubmissionRow, PaymentLessonLineItem } from '../models/payment.models';
+import {
+  normalizeScheduledLessonList,
+  resolveNextScheduledLesson,
+} from '../utils/scheduled-lesson.util';
 
 export interface AdminUserRow {
   userId: string;
@@ -46,6 +51,7 @@ export interface AdminApplicationRow {
   city?: string | null;
   currentLevel?: string | null;
   lessonFrequency?: string | null;
+  preferredLessonDuration?: string | null;
   subjectCodes: string[];
   preferredAvailability: string[];
 }
@@ -66,9 +72,43 @@ export interface AdminStudentRow {
   gender?: string | null;
   currentLevel?: string | null;
   lessonFrequency?: string | null;
+  preferredLessonDuration?: string | null;
   subjectCodes: string[];
   preferredAvailability: string[];
   scheduledLessons: ScheduledLessonRow[];
+}
+
+export interface AdminStudentLessonHistoryRow {
+  slotId: string;
+  startsAtUtc: string;
+  endsAtUtc: string;
+  durationMinutes: number;
+  attendanceStatus: 'attending' | 'not_attending';
+  studentNote?: string | null;
+}
+
+export interface AdminStudentPaymentHistoryRow {
+  id: string;
+  billingYear: number;
+  billingMonth: number;
+  billingPeriodLabel: string;
+  status: 'pending_verification' | 'paid' | 'rejected';
+  amount: number;
+  currency: string;
+  paymentReference: string;
+  submittedAtUtc: string;
+  reviewedAtUtc?: string | null;
+  adminNote?: string | null;
+  lessons: PaymentLessonLineItem[];
+}
+
+export interface AdminStudentDetailRow extends AdminStudentRow {
+  createdAtUtc: string;
+  lastPaymentAtUtc?: string | null;
+  lastPaymentAmount?: number | null;
+  lastPaymentCurrency?: string | null;
+  lessonHistory: AdminStudentLessonHistoryRow[];
+  paymentHistory: AdminStudentPaymentHistoryRow[];
 }
 
 export interface AdminBadgeCounts {
@@ -90,6 +130,7 @@ export interface AdminScheduleChangeRequestRow {
   city?: string | null;
   currentLevel?: string | null;
   lessonFrequency?: string | null;
+  preferredLessonDuration?: string | null;
   subjectCodes: string[];
   preferredAvailability: string[];
 }
@@ -195,12 +236,22 @@ export class AdminApiService {
     return this.http.get<AdminStudentRow[]>(this.base('/students'));
   }
 
+  getStudent(userId: string): Observable<AdminStudentDetailRow> {
+    return this.http
+      .get<AdminStudentDetailRow>(this.base(`/students/${userId}`))
+      .pipe(map((raw) => normalizeAdminStudentDetail(raw)));
+  }
+
   listCalendarSlots(fromUtc: string, toUtc: string): Observable<LessonSlotRow[]> {
     return this.getAvailability(fromUtc, toUtc) as unknown as Observable<LessonSlotRow[]>;
   }
 
   createCalendarSlot(body: CreateLessonSlotBody): Observable<LessonSlotRow> {
     return this.http.post<LessonSlotRow>(this.base('/calendar/slots'), body);
+  }
+
+  updateCalendarSlot(slotId: string, body: UpdateLessonSlotBody): Observable<LessonSlotRow> {
+    return this.http.patch<LessonSlotRow>(this.base(`/calendar/slots/${slotId}`), body);
   }
 
   deleteCalendarSlot(slotId: string): Observable<void> {
@@ -273,9 +324,98 @@ function normalizeAdminPaymentSubmission(raw: AdminPaymentSubmissionRow): AdminP
         startsAtUtc: String(l.startsAtUtc ?? l['StartsAtUtc'] ?? ''),
         endsAtUtc: String(l.endsAtUtc ?? l['EndsAtUtc'] ?? ''),
         durationMinutes: Number(l.durationMinutes ?? l['DurationMinutes'] ?? 0),
-        hourlyRate: Number(l.hourlyRate ?? l['HourlyRate'] ?? 5),
+        lessonRate: Number(l.lessonRate ?? l['LessonRate'] ?? l.hourlyRate ?? l['HourlyRate'] ?? 0),
+        hourlyRate: Number(l.hourlyRate ?? l['HourlyRate'] ?? l.lessonRate ?? l['LessonRate'] ?? 0),
+        rateLabel: String(l.rateLabel ?? l['RateLabel'] ?? ''),
         amount: Number(l.amount ?? l['Amount'] ?? 0),
       };
     }),
   };
+}
+
+function normalizeAdminStudentDetail(raw: AdminStudentDetailRow): AdminStudentDetailRow {
+  const r = raw as AdminStudentDetailRow & Record<string, unknown>;
+  const scheduledLessons = normalizeScheduledLessonList(
+    (raw.scheduledLessons ?? r['ScheduledLessons'] ?? []) as AdminStudentDetailRow['scheduledLessons'],
+  );
+  const lessonHistoryRaw = (raw.lessonHistory ?? r['LessonHistory'] ?? []) as AdminStudentLessonHistoryRow[];
+  const paymentHistoryRaw = (raw.paymentHistory ?? r['PaymentHistory'] ?? []) as AdminStudentPaymentHistoryRow[];
+
+  return {
+    userId: String(raw.userId ?? r['UserId'] ?? ''),
+    email: String(raw.email ?? r['Email'] ?? ''),
+    firstName: String(raw.firstName ?? r['FirstName'] ?? ''),
+    lastName: String(raw.lastName ?? r['LastName'] ?? ''),
+    hasMadePayment: Boolean(raw.hasMadePayment ?? r['HasMadePayment'] ?? false),
+    nextPaymentDueUtc: (raw.nextPaymentDueUtc ?? r['NextPaymentDueUtc'] ?? null) as string | null,
+    nextLesson: resolveNextScheduledLesson(
+      (raw.nextLesson ?? r['NextLesson'] ?? null) as AdminStudentDetailRow['nextLesson'],
+      scheduledLessons,
+    ),
+    phoneNumber: (raw.phoneNumber ?? r['PhoneNumber'] ?? null) as string | null,
+    location: (raw.location ?? r['Location'] ?? null) as string | null,
+    country: (raw.country ?? r['Country'] ?? null) as string | null,
+    city: (raw.city ?? r['City'] ?? null) as string | null,
+    ageRange: (raw.ageRange ?? r['AgeRange'] ?? null) as string | null,
+    gender: (raw.gender ?? r['Gender'] ?? null) as string | null,
+    currentLevel: (raw.currentLevel ?? r['CurrentLevel'] ?? null) as string | null,
+    lessonFrequency: (raw.lessonFrequency ?? r['LessonFrequency'] ?? null) as string | null,
+    preferredLessonDuration: (raw.preferredLessonDuration ?? r['PreferredLessonDuration'] ?? null) as
+      | string
+      | null,
+    subjectCodes: (raw.subjectCodes ?? r['SubjectCodes'] ?? []) as string[],
+    preferredAvailability: (raw.preferredAvailability ?? r['PreferredAvailability'] ?? []) as string[],
+    scheduledLessons,
+    createdAtUtc: String(raw.createdAtUtc ?? r['CreatedAtUtc'] ?? ''),
+    lastPaymentAtUtc: (raw.lastPaymentAtUtc ?? r['LastPaymentAtUtc'] ?? null) as string | null,
+    lastPaymentAmount: (raw.lastPaymentAmount ?? r['LastPaymentAmount'] ?? null) as number | null,
+    lastPaymentCurrency: (raw.lastPaymentCurrency ?? r['LastPaymentCurrency'] ?? null) as string | null,
+    lessonHistory: lessonHistoryRaw.map((lesson) => {
+      const l = lesson as AdminStudentLessonHistoryRow & Record<string, unknown>;
+      return {
+        slotId: String(l.slotId ?? l['SlotId'] ?? ''),
+        startsAtUtc: String(l.startsAtUtc ?? l['StartsAtUtc'] ?? ''),
+        endsAtUtc: String(l.endsAtUtc ?? l['EndsAtUtc'] ?? ''),
+        durationMinutes: Number(l.durationMinutes ?? l['DurationMinutes'] ?? 0),
+        attendanceStatus: (l.attendanceStatus ?? l['AttendanceStatus'] ?? 'attending') as
+          | 'attending'
+          | 'not_attending',
+        studentNote: (l.studentNote ?? l['StudentNote'] ?? null) as string | null,
+      };
+    }),
+    paymentHistory: paymentHistoryRaw.map((payment) => {
+      const p = payment as AdminStudentPaymentHistoryRow & Record<string, unknown>;
+      return {
+        id: String(p.id ?? p['Id'] ?? ''),
+        billingYear: Number(p.billingYear ?? p['BillingYear'] ?? 0),
+        billingMonth: Number(p.billingMonth ?? p['BillingMonth'] ?? 0),
+        billingPeriodLabel: String(p.billingPeriodLabel ?? p['BillingPeriodLabel'] ?? ''),
+        status: (p.status ?? p['Status'] ?? 'pending_verification') as AdminStudentPaymentHistoryRow['status'],
+        amount: Number(p.amount ?? p['Amount'] ?? 0),
+        currency: String(p.currency ?? p['Currency'] ?? 'USD'),
+        paymentReference: String(p.paymentReference ?? p['PaymentReference'] ?? ''),
+        submittedAtUtc: String(p.submittedAtUtc ?? p['SubmittedAtUtc'] ?? ''),
+        reviewedAtUtc: (p.reviewedAtUtc ?? p['ReviewedAtUtc'] ?? null) as string | null,
+        adminNote: (p.adminNote ?? p['AdminNote'] ?? null) as string | null,
+        lessons: normalizePaymentLessonLineItems(p.lessons ?? p['Lessons'] ?? []),
+      };
+    }),
+  };
+}
+
+function normalizePaymentLessonLineItems(raw: unknown): PaymentLessonLineItem[] {
+  const rows = (raw ?? []) as PaymentLessonLineItem[];
+  return rows.map((line) => {
+    const l = line as PaymentLessonLineItem & Record<string, unknown>;
+    return {
+      slotId: String(l.slotId ?? l['SlotId'] ?? ''),
+      startsAtUtc: String(l.startsAtUtc ?? l['StartsAtUtc'] ?? ''),
+      endsAtUtc: String(l.endsAtUtc ?? l['EndsAtUtc'] ?? ''),
+      durationMinutes: Number(l.durationMinutes ?? l['DurationMinutes'] ?? 0),
+      lessonRate: Number(l.lessonRate ?? l['LessonRate'] ?? l.hourlyRate ?? l['HourlyRate'] ?? 0),
+      hourlyRate: Number(l.hourlyRate ?? l['HourlyRate'] ?? l.lessonRate ?? l['LessonRate'] ?? 0),
+      rateLabel: String(l.rateLabel ?? l['RateLabel'] ?? ''),
+      amount: Number(l.amount ?? l['Amount'] ?? 0),
+    };
+  });
 }

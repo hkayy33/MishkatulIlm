@@ -35,9 +35,13 @@ public sealed class SchedulingSettingsService(AppDbContext db)
         row.TutorCountry = country;
         row.TutorCity = city;
         row.TutorTimeZoneId = tz;
-        row.PaymentHourlyRateUsd = request.PaymentHourlyRateUsd > 0
-            ? request.PaymentHourlyRateUsd
-            : LessonBillingService.DefaultHourlyRateUsd;
+        row.PaymentRate45MinUsd = request.PaymentRate45MinUsd > 0
+            ? request.PaymentRate45MinUsd
+            : LessonBillingService.DefaultRate45MinUsd;
+        row.PaymentRate60MinUsd = request.PaymentRate60MinUsd > 0
+            ? request.PaymentRate60MinUsd
+            : LessonBillingService.DefaultRate60MinUsd;
+        row.PaymentHourlyRateUsd = row.PaymentRate60MinUsd;
         row.PaymentAccountName = request.PaymentAccountName.Trim();
         row.PaymentAccountNumber = request.PaymentAccountNumber.Trim();
         row.PaymentSortCode = request.PaymentSortCode.Trim();
@@ -74,7 +78,9 @@ public sealed class SchedulingSettingsService(AppDbContext db)
             TutorCountry = string.Empty,
             TutorCity = string.Empty,
             TutorTimeZoneId = "UTC",
-            PaymentHourlyRateUsd = LessonBillingService.DefaultHourlyRateUsd,
+            PaymentHourlyRateUsd = LessonBillingService.DefaultRate60MinUsd,
+            PaymentRate45MinUsd = LessonBillingService.DefaultRate45MinUsd,
+            PaymentRate60MinUsd = LessonBillingService.DefaultRate60MinUsd,
             PaymentAccountName = PaymentAccountDefaults.AccountName,
             PaymentAccountNumber = PaymentAccountDefaults.AccountNumber,
             PaymentSortCode = PaymentAccountDefaults.SortCode,
@@ -96,6 +102,8 @@ public sealed class SchedulingSettingsService(AppDbContext db)
             TutorCity = row.TutorCity,
             TutorTimeZoneId = row.TutorTimeZoneId,
             PaymentHourlyRateUsd = row.PaymentHourlyRateUsd,
+            PaymentRate45MinUsd = row.PaymentRate45MinUsd,
+            PaymentRate60MinUsd = row.PaymentRate60MinUsd,
             PaymentAccountName = row.PaymentAccountName,
             PaymentAccountNumber = row.PaymentAccountNumber,
             PaymentSortCode = row.PaymentSortCode,

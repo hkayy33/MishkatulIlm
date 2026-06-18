@@ -54,6 +54,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'students/:userId',
+        loadComponent: () =>
+          import('./pages/admin/admin-student-detail/admin-student-detail').then(
+            (m) => m.AdminStudentDetail,
+          ),
+      },
+      {
         path: 'students',
         loadComponent: () =>
           import('./pages/admin/admin-students/admin-students').then((m) => m.AdminStudents),

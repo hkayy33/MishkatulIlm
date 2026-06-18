@@ -1,5 +1,6 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
@@ -10,6 +11,12 @@ import type { PaymentStatement, StudentPaymentHistoryItem } from '../../core/mod
 import { formatSlotRange } from '../../core/utils/datetime-local';
 import { formatSlotRangeInZone } from '../../core/utils/timezone.util';
 import { formatHttpError } from '../../core/utils/http-error.util';
+import {
+  formatBillableLessonDuration,
+  LESSON_RATE_45_MIN_USD,
+  LESSON_RATE_60_MIN_USD,
+  lessonRateLabel,
+} from '../../core/utils/lesson-pricing';
 import { StudentLessonCalendar } from '../../shared/student-lesson-calendar/student-lesson-calendar';
 import { StudentWeekSchedule } from '../../shared/student-week-schedule/student-week-schedule';
 import { startOfWeekMonday } from '../../core/utils/week-schedule.util';
@@ -31,10 +38,13 @@ export class StudentMatchedPortal implements OnInit {
   private readonly studentApi = inject(StudentApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly activeTab = signal<MatchedPortalTab>('summary');
   protected readonly paymentBusy = signal(false);
   protected readonly paymentStatement = signal<PaymentStatement | null>(null);
+  protected readonly lessonRate45MinUsd = LESSON_RATE_45_MIN_USD;
+  protected readonly lessonRate60MinUsd = LESSON_RATE_60_MIN_USD;
   protected readonly paymentStatementLoading = signal(false);
   protected readonly paymentStatementError = signal<string | null>(null);
   protected readonly paymentHistory = signal<StudentPaymentHistoryItem[]>([]);
@@ -108,6 +118,13 @@ export class StudentMatchedPortal implements OnInit {
 
   ngOnInit(): void {
     this.store.reloadPortalForWeek(this.summaryWeekStart());
+    this.store.attendanceChanged
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        if (this.showPaymentDetails()) {
+          this.loadPaymentStatement();
+        }
+      });
   }
 
   protected setTab(tab: MatchedPortalTab): void {
@@ -216,6 +233,16 @@ export class StudentMatchedPortal implements OnInit {
 
   protected formatLessonInZone(startsAtUtc: string, endsAtUtc: string): string {
     return formatSlotRangeInZone(startsAtUtc, endsAtUtc, this.store.timeZoneId());
+  }
+
+  protected formatLessonDuration(minutes: number): string {
+    return formatBillableLessonDuration(minutes);
+  }
+
+  protected formatLessonRate(line: PaymentStatement['lessons'][number], currency: string): string {
+    const label = lessonRateLabel(line.durationMinutes, line.rateLabel);
+    const rate = line.lessonRate || line.hourlyRate;
+    return `${label} — ${new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(rate)}`;
   }
 
   protected formatLessonHours(minutes: number): string {

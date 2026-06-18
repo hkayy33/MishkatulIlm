@@ -22,6 +22,7 @@ public sealed class DevBootstrapController(
     AppDbContext db,
     SupabaseAdminAuthClient supabaseAdmin,
     DevRolloverDemoService rolloverDemo,
+    DevStudentHistoryDemoService studentHistoryDemo,
     ILogger<DevBootstrapController> logger) : ControllerBase
 {
     /// <summary>
@@ -212,6 +213,20 @@ public sealed class DevBootstrapController(
             return NotFound();
 
         var (success, error, payload) = await rolloverDemo.SetupAsync(cancellationToken);
+        if (!success)
+            return BadRequest(new { message = error });
+
+        return Ok(payload);
+    }
+
+    /// <summary>Resets a demo student with ~3 months of past lessons and payment history (dev only).</summary>
+    [HttpPost("student-history-demo/setup")]
+    public async Task<IActionResult> SetupStudentHistoryDemo(CancellationToken cancellationToken)
+    {
+        if (!IsBootstrapAllowed())
+            return NotFound();
+
+        var (success, error, payload) = await studentHistoryDemo.SetupAsync(cancellationToken);
         if (!success)
             return BadRequest(new { message = error });
 

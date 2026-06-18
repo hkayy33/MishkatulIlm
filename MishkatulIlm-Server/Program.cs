@@ -54,6 +54,7 @@ builder.Services.AddScoped<ScheduleProposalService>();
 builder.Services.AddScoped<LessonBillingContextService>();
 builder.Services.AddScoped<LessonRolloverService>();
 builder.Services.AddScoped<DevRolloverDemoService>();
+builder.Services.AddScoped<DevStudentHistoryDemoService>();
 builder.Services.AddScoped<StudentPaymentService>();
 builder.Services.AddScoped<AdminPaymentSubmissionService>();
 builder.Services.AddScoped<StudentAccountDeletionService>();

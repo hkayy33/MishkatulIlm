@@ -22,6 +22,7 @@ public sealed class StudentApplicationSummary
     public string City { get; init; } = string.Empty;
     public string CurrentLevel { get; init; } = string.Empty;
     public string LessonFrequency { get; init; } = string.Empty;
+    public string PreferredLessonDuration { get; init; } = string.Empty;
     public IReadOnlyList<string> SubjectCodes { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> PreferredAvailability { get; init; } = Array.Empty<string>();
 }

@@ -9,6 +9,10 @@ import type { AdminPaymentSubmissionRow } from '../../../core/models/payment.mod
 import { AdminNavBadgeService } from '../../../core/services/admin-nav-badge.service';
 import { formatHttpError } from '../../../core/utils/http-error.util';
 import { formatSlotRange } from '../../../core/utils/datetime-local';
+import {
+  formatBillableLessonDuration,
+  lessonRateLabel,
+} from '../../../core/utils/lesson-pricing';
 
 @Component({
   selector: 'app-admin-payments',
@@ -33,6 +37,19 @@ export class AdminPayments implements OnInit {
   protected readonly expandedId = signal<string | null>(null);
 
   protected readonly formatSlotRange = formatSlotRange;
+
+  protected formatLessonDuration(minutes: number): string {
+    return formatBillableLessonDuration(minutes);
+  }
+
+  protected formatLessonRate(
+    line: AdminPaymentSubmissionRow['lessons'][number],
+    currency: string,
+  ): string {
+    const label = lessonRateLabel(line.durationMinutes, line.rateLabel);
+    const rate = line.lessonRate || line.hourlyRate;
+    return `${label} — ${new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(rate)}`;
+  }
 
   ngOnInit(): void {
     this.loadRows();

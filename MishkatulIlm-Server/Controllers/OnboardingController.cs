@@ -51,6 +51,7 @@ public sealed class OnboardingController(
                 City = profile.City,
                 CurrentLevel = profile.CurrentLevel,
                 LessonFrequency = profile.LessonFrequency,
+                PreferredLessonDuration = profile.PreferredLessonDuration,
                 SubjectCodes = profile.SubjectCodes,
                 PreferredAvailability = profile.PreferredAvailability,
             };
@@ -183,6 +184,9 @@ public sealed class OnboardingController(
         if (!LessonFrequencyRules.TryValidate(request.LessonFrequency, distinct.Count, out var frequencyError))
             return BadRequest(new { message = frequencyError });
 
+        if (!PreferredLessonDurationRules.TryValidate(request.PreferredLessonDuration, out var durationError))
+            return BadRequest(new { message = durationError });
+
         var phoneNumber = request.PhoneNumber.Trim();
         if (phoneNumber.Length is < 7 or > 32)
             return BadRequest(new { message = "Enter a valid phone number (7–32 characters)." });
@@ -241,6 +245,7 @@ public sealed class OnboardingController(
                 PhoneNumber = phoneNumber,
                 CurrentLevel = request.CurrentLevel.Trim(),
                 LessonFrequency = request.LessonFrequency.Trim(),
+                PreferredLessonDuration = request.PreferredLessonDuration.Trim().ToUpperInvariant(),
                 SubjectCodes = distinct,
                 PreferredAvailability = availability,
             };
@@ -255,6 +260,7 @@ public sealed class OnboardingController(
             profile.PhoneNumber = phoneNumber;
             profile.CurrentLevel = request.CurrentLevel.Trim();
             profile.LessonFrequency = request.LessonFrequency.Trim();
+            profile.PreferredLessonDuration = request.PreferredLessonDuration.Trim().ToUpperInvariant();
             profile.SubjectCodes = distinct;
             profile.PreferredAvailability = availability;
         }

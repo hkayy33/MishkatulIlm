@@ -144,7 +144,7 @@ public sealed class StripePaymentRecorder(AppDbContext db, ILogger<StripePayment
             user.LastPaymentCurrency = currency.ToUpperInvariant();
 
         if (user.NextPaymentDueUtc is null || user.NextPaymentDueUtc <= paidAt)
-            user.NextPaymentDueUtc = paidAt.Date.AddMonths(1);
+            user.NextPaymentDueUtc = LessonBillingService.NextPaymentDueAfterPaid(paidAt);
     }
 
     private async Task<AppUser?> ResolveUserAsync(

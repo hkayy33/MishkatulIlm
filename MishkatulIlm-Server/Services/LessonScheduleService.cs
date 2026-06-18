@@ -12,7 +12,8 @@ public static class LessonScheduleService
     public const int DayEndHour = 22;
     public const int GridStepMinutes = 30;
 
-    public static readonly int[] AllowedDurationMinutes = [30, 60, 90, 120];
+    public static readonly int[] AllowedDurationMinutes =
+        Enumerable.Range(2, 7).Select(i => i * 15).ToArray(); // 30–120 in 15-minute steps
 
     private static readonly TimeSpan DayOpen = TimeSpan.FromHours(DayStartHour);
     private static readonly TimeSpan DayClose = TimeSpan.FromHours(DayEndHour);
@@ -20,13 +21,13 @@ public static class LessonScheduleService
     public static bool TryNormalizeDuration(int durationMinutes, out int normalized, out string? error)
     {
         normalized = durationMinutes;
-        if (AllowedDurationMinutes.Contains(durationMinutes))
+        if (durationMinutes is >= 30 and <= 120 && durationMinutes % 15 == 0)
         {
             error = null;
             return true;
         }
 
-        error = "Lesson duration must be 30 minutes or a multiple of 30 up to 2 hours.";
+        error = "Lesson duration must be between 30 and 120 minutes in 15-minute steps.";
         normalized = 0;
         return false;
     }
@@ -70,8 +71,7 @@ public static class LessonScheduleService
         int durationMinutes,
         IReadOnlyList<LessonSlot> booked) =>
         booked.Any(b =>
-            b.StudentUserId is not null
-            && b.StartsAtUtc < SlotEnd(startUtc, durationMinutes)
+            b.StartsAtUtc < SlotEnd(startUtc, durationMinutes)
             && b.EndsAtUtc > startUtc);
 
     public static List<int> GetAvailableDurationsForStart(
@@ -348,30 +348,25 @@ public static class LessonScheduleService
             var matchesPreference = preferredFilter is not { Count: > 0 }
                 || preferredFilter.Any(p => MatchesPreferredWindow(start, p));
 
-            var blocking = booked.FirstOrDefault(b =>
-                b.StudentUserId is not null && b.StartsAtUtc < SlotEnd(start, 30) && b.EndsAtUtc > start);
+            var cellEnd = SlotEnd(start, GridStepMinutes);
 
-            if (blocking is not null)
+            var blocking = booked.FirstOrDefault(b =>
+                b.StudentUserId is not null && b.StartsAtUtc < cellEnd && b.EndsAtUtc > start);
+
+            if (blocking is not null
+                && TryMapOccupiedGridCell(start, cellEnd, blocking, matchesPreference, isAdmin: false, booked, out var studentCell))
             {
-                list.Add(
-                    new AvailabilitySlotDto
-                    {
-                        StartsAtUtc = start,
-                        EndsAtUtc = blocking.EndsAtUtc,
-                        DurationMinutes = (int)(blocking.EndsAtUtc - blocking.StartsAtUtc).TotalMinutes,
-                        AvailableDurationMinutes = [],
-                        IsAvailable = false,
-                        MatchesStudentPreference = matchesPreference,
-                        SlotId = blocking.Id,
-                        StudentUserId = blocking.StudentUserId,
-                        StudentName = blocking.Student is null
-                            ? null
-                            : $"{blocking.Student.FirstName} {blocking.Student.LastName}".Trim(),
-                        StudentCountry = blocking.Student?.Onboarding?.Country,
-                        StudentCity = blocking.Student?.Onboarding?.City,
-                        StudentLessonNote = TrimOrNullNote(blocking.StudentNote),
-                        AttendanceStatus = AttendanceStatusCodes.ToApiValue(blocking.AttendanceStatus),
-                    });
+                list.Add(studentCell);
+                continue;
+            }
+
+            var adminEntry = booked.FirstOrDefault(b =>
+                b.StudentUserId is null && b.StartsAtUtc < cellEnd && b.EndsAtUtc > start);
+
+            if (adminEntry is not null
+                && TryMapOccupiedGridCell(start, cellEnd, adminEntry, matchesPreference, isAdmin: true, booked, out var adminCell))
+            {
+                list.Add(adminCell);
                 continue;
             }
 
@@ -516,6 +511,82 @@ public static class LessonScheduleService
     {
         dow = value;
         return ok;
+    }
+
+    private static bool TryMapOccupiedGridCell(
+        DateTime gridStart,
+        DateTime cellEnd,
+        LessonSlot booking,
+        bool matchesPreference,
+        bool isAdmin,
+        IReadOnlyList<LessonSlot> booked,
+        out AvailabilitySlotDto cell)
+    {
+        cell = null!;
+        var entryStart = DateTime.SpecifyKind(booking.StartsAtUtc, DateTimeKind.Utc);
+        var entryEnd = DateTime.SpecifyKind(booking.EndsAtUtc, DateTimeKind.Utc);
+        var durationMinutes = (int)Math.Round((entryEnd - entryStart).TotalMinutes);
+
+        if (entryEnd <= gridStart || entryStart >= cellEnd)
+            return false;
+
+        var fullyBlocked = entryStart <= gridStart && entryEnd >= cellEnd;
+        if (!fullyBlocked && entryEnd < cellEnd && entryEnd > gridStart)
+        {
+            var freeStart = entryEnd;
+            cell = new AvailabilitySlotDto
+            {
+                StartsAtUtc = gridStart,
+                EndsAtUtc = cellEnd,
+                DurationMinutes = GridStepMinutes,
+                AvailableDurationMinutes = GetAvailableDurationsForStart(freeStart, booked),
+                IsAvailable = true,
+                IsPartiallyBlocked = true,
+                FreeSegmentStartsAtUtc = freeStart,
+                PartialBlockEndsAtUtc = entryEnd,
+                EntryStartsAtUtc = entryStart,
+                EntryEndsAtUtc = entryEnd,
+                MatchesStudentPreference = matchesPreference,
+                SlotId = booking.Id,
+                IsAdminCalendarEntry = isAdmin,
+                Title = isAdmin ? TrimOrNullNote(booking.Title) : null,
+                Description = isAdmin ? TrimOrNullNote(booking.Description) : null,
+                StudentUserId = isAdmin ? null : booking.StudentUserId,
+                StudentName = isAdmin || booking.Student is null
+                    ? null
+                    : $"{booking.Student.FirstName} {booking.Student.LastName}".Trim(),
+                StudentCountry = isAdmin ? null : booking.Student?.Onboarding?.Country,
+                StudentCity = isAdmin ? null : booking.Student?.Onboarding?.City,
+                StudentLessonNote = isAdmin ? null : TrimOrNullNote(booking.StudentNote),
+                AttendanceStatus = isAdmin ? null : AttendanceStatusCodes.ToApiValue(booking.AttendanceStatus),
+            };
+            return true;
+        }
+
+        cell = new AvailabilitySlotDto
+        {
+            StartsAtUtc = gridStart,
+            EndsAtUtc = cellEnd,
+            DurationMinutes = durationMinutes,
+            AvailableDurationMinutes = [],
+            IsAvailable = false,
+            MatchesStudentPreference = matchesPreference,
+            SlotId = booking.Id,
+            EntryStartsAtUtc = entryStart,
+            EntryEndsAtUtc = entryEnd,
+            IsAdminCalendarEntry = isAdmin,
+            Title = isAdmin ? TrimOrNullNote(booking.Title) : null,
+            Description = isAdmin ? TrimOrNullNote(booking.Description) : null,
+            StudentUserId = isAdmin ? null : booking.StudentUserId,
+            StudentName = isAdmin || booking.Student is null
+                ? null
+                : $"{booking.Student.FirstName} {booking.Student.LastName}".Trim(),
+            StudentCountry = isAdmin ? null : booking.Student?.Onboarding?.Country,
+            StudentCity = isAdmin ? null : booking.Student?.Onboarding?.City,
+            StudentLessonNote = isAdmin ? null : TrimOrNullNote(booking.StudentNote),
+            AttendanceStatus = isAdmin ? null : AttendanceStatusCodes.ToApiValue(booking.AttendanceStatus),
+        };
+        return true;
     }
 
     private static string? TrimOrNullNote(string? value)

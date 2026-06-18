@@ -11,5 +11,9 @@ public sealed class LessonSlot
     public string AttendanceStatus { get; set; } = AttendanceStatusCodes.Attending;
     /// <summary>Optional note from the student for this lesson (visible to tutor).</summary>
     public string? StudentNote { get; set; }
+    /// <summary>Admin calendar entry title (unbooked slots only).</summary>
+    public string? Title { get; set; }
+    /// <summary>Admin calendar entry description (unbooked slots only).</summary>
+    public string? Description { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 }

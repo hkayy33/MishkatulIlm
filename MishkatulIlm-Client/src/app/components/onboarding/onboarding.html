@@ -183,6 +183,67 @@
               </p>
             }
           </div>
+          <fieldset
+            class="form-field form-field--duration"
+            [class.form-field--invalid]="isInvalid('preferredLessonDuration')"
+          >
+            <legend>Preferred lesson duration</legend>
+            <div id="preferred-lesson-duration" class="duration-picker-wrap">
+              <div class="duration-picker" role="group" aria-label="Preferred lesson duration">
+                @for (opt of preferredLessonDurationOptions; track opt.value) {
+                  <button
+                    type="button"
+                    class="duration-picker__btn"
+                    [class.duration-picker__btn--active]="selectedPreferredLessonDuration === opt.value"
+                    [attr.aria-pressed]="selectedPreferredLessonDuration === opt.value"
+                    (click)="onPreferredLessonDurationPick(opt.value)"
+                  >
+                    {{ opt.label }}
+                  </button>
+                }
+              </div>
+              <div class="duration-picker__info">
+                <button
+                  type="button"
+                  class="duration-picker__info-btn"
+                  aria-label="Lesson prices"
+                  [attr.aria-expanded]="durationPricesInfoOpen()"
+                  aria-controls="duration-prices-info"
+                  (click)="toggleDurationPricesInfo()"
+                >
+                  <svg
+                    class="duration-picker__info-icon"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.75" />
+                    <circle cx="12" cy="8" r="1.1" fill="currentColor" />
+                    <path
+                      d="M12 11v6"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.75"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                </button>
+                @if (durationPricesInfoOpen()) {
+                  <div
+                    id="duration-prices-info"
+                    class="duration-picker__info-panel"
+                    role="tooltip"
+                  >
+                    <p class="duration-picker__info-title">Lesson prices</p>
+                    <ul class="duration-picker__info-list">
+                      <li>45 min — $5</li>
+                      <li>1 hour — $7</li>
+                    </ul>
+                  </div>
+                }
+              </div>
+            </div>
+          </fieldset>
         </div>
       </section>
 

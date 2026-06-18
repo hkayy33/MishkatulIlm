@@ -12,6 +12,14 @@ export interface AvailabilitySlotRow {
   studentCity?: string | null;
   studentLessonNote?: string | null;
   attendanceStatus?: 'attending' | 'not_attending' | null;
+  isAdminCalendarEntry?: boolean;
+  title?: string | null;
+  description?: string | null;
+  isPartiallyBlocked?: boolean;
+  freeSegmentStartsAtUtc?: string | null;
+  partialBlockEndsAtUtc?: string | null;
+  entryStartsAtUtc?: string | null;
+  entryEndsAtUtc?: string | null;
 }
 
 export interface WeekOneLessonPick {
@@ -39,6 +47,8 @@ export interface LessonSlotRow {
   isBooked: boolean;
   studentUserId?: string | null;
   studentName?: string | null;
+  title?: string | null;
+  description?: string | null;
 }
 
 export interface ScheduledLessonRow {
@@ -51,4 +61,13 @@ export interface ScheduledLessonRow {
 export interface CreateLessonSlotBody {
   startsAtUtc: string;
   endsAtUtc: string;
+  title: string;
+  description?: string | null;
+}
+
+export interface UpdateLessonSlotBody {
+  startsAtUtc?: string;
+  endsAtUtc?: string;
+  title?: string;
+  description?: string | null;
 }

@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { finalize, forkJoin } from 'rxjs';
+import { finalize, forkJoin, Subject } from 'rxjs';
 import { monthsTouchingWeek, startOfWeekMonday } from '../utils/week-schedule.util';
 import type {
   StudentLessonRow,
@@ -21,6 +21,9 @@ export class StudentPortalStore {
   readonly updatingSlotId = signal<string | null>(null);
   readonly actionMessage = signal<string | null>(null);
   readonly actionError = signal<string | null>(null);
+
+  /** Emits after a lesson attendance update is saved. */
+  readonly attendanceChanged = new Subject<void>();
 
   private viewMonth = new Date();
 
@@ -155,6 +158,7 @@ export class StudentPortalStore {
             lessons,
             portal: { ...data.portal, monthSummary: summary, nextLesson },
           });
+          this.attendanceChanged.next();
         },
         error: (err: unknown) => {
           this.actionError.set(formatHttpError(err, 'Could not update attendance.'));

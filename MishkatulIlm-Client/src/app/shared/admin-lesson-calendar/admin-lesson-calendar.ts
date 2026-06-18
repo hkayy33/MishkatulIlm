@@ -6,39 +6,71 @@ import { addMinutesToIso, formatSlotRange } from '../../core/utils/datetime-loca
 import {
   durationLabel,
   durationsFromStart,
+  durationsFromManageStart,
   mergeDayAvailability,
   normalizeAvailabilityRows,
   normalizeSlotStartIso,
   SCHEDULE_DURATION_OPTIONS,
   SCHEDULE_GRID_STEP_MINUTES,
+  FREE_TRIAL_DURATION_MINUTES,
+  FREE_TRIAL_TITLE,
   calendarDayKeyInZone,
   utcCivilDayKeyFromCalendarDate,
+  addUtcMinutesIso,
 } from '../../core/utils/schedule-grid';
 import { parseLessonAttendanceStatus } from '../../core/utils/attendance.util';
-import { formatSlotRangeInZone, timeZoneOffsetLabel } from '../../core/utils/timezone.util';
+import { formatSlotRangeInZone, formatTimeInZone, timeZoneOffsetLabel } from '../../core/utils/timezone.util';
 import {
   calendarWeekStartKeyInZone,
   dayKeyForLocalCalendarDate,
 } from '../../core/utils/week-schedule.util';
 
-export type SlotVisualState =
+export const SCHEDULE_SUB_STEP_MINUTES = 15;
+
+export type SlotOccupancyState =
   | 'open'
   | 'booked'
   | 'booked-student'
   | 'outside-preference'
-  | 'selected-start'
-  | 'selected-range'
-  | 'confirmed';
+  | 'confirmed'
+  | 'admin-entry';
+
+export type SlotSelectionState = 'selected-start' | 'selected-range';
+
+export type SlotRowKind = 'grid-30' | 'extension-15';
 
 export interface DaySlotView {
   startsAtUtc: string;
   endsAtUtc: string;
+  rowKind: SlotRowKind;
   tutorTimeLabel: string;
   studentTimeLabel: string | null;
-  state: SlotVisualState;
+  occupancyState: SlotOccupancyState;
+  selectionState: SlotSelectionState | null;
   studentName?: string | null;
   attendanceStatus?: 'attending' | 'not_attending' | null;
   releaseKey?: string | null;
+  slotId?: string | null;
+  title?: string | null;
+  description?: string | null;
+  freeSegmentStartsAtUtc?: string | null;
+  entryStartsAtUtc?: string | null;
+  entryEndsAtUtc?: string | null;
+}
+
+export interface AdminCalendarSlotPick {
+  slotId: string;
+  startsAtUtc: string;
+  endsAtUtc: string;
+  title: string | null;
+  description: string | null;
+}
+
+export interface AdminCalendarSlotCreate {
+  startsAtUtc: string;
+  durationMinutes: number;
+  title: string;
+  description: string | null;
 }
 
 export interface DayMonthSummary {
@@ -46,6 +78,19 @@ export interface DayMonthSummary {
   booked: number;
   hasPicks: boolean;
 }
+
+export type DayTimelineItem =
+  | { kind: 'slot'; trackId: string; slot: DaySlotView }
+  | {
+      kind: 'unified-block';
+      trackId: string;
+      slot: DaySlotView;
+      timeLabel: string;
+      studentTimeLabel: string | null;
+      occupancyState: SlotOccupancyState;
+      selectionState: SlotSelectionState | null;
+      statusLabel: string;
+    };
 
 @Component({
   selector: 'app-admin-lesson-calendar',
@@ -58,12 +103,16 @@ export class AdminLessonCalendar {
   readonly availability = input<AvailabilitySlotRow[]>([]);
   readonly loading = input(false);
   readonly pickMode = input(false);
+  /** When true, admin can add calendar entries and open existing ones. */
+  readonly manageMode = input(false);
   readonly requiredSelections = input(1);
   /** When set, caps how many start-week lessons can be added (resolve flow uses a high limit). */
   readonly selectionLimit = input<number | null>(null);
   readonly selectedLessons = model<WeekOneLessonPick[]>([]);
   readonly selectionError = output<string | null>();
   readonly monthChanged = output<Date>();
+  readonly adminSlotSelected = output<AdminCalendarSlotPick>();
+  readonly createSlotRequested = output<AdminCalendarSlotCreate>();
   /** IANA time zone for the tutor (admin). */
   readonly tutorTimeZoneId = input('UTC');
   readonly tutorDisplayName = input('Tutor');
@@ -84,7 +133,10 @@ export class AdminLessonCalendar {
   );
   protected readonly selectedDay = signal<Date | null>(null);
   protected readonly draftStartUtc = signal<string | null>(null);
-  protected readonly draftDurationMinutes = signal<number>(30);
+  protected readonly draftDurationMinutes = signal<number | null>(null);
+  protected readonly draftTitle = signal('');
+  protected readonly draftDescription = signal('');
+  protected readonly draftIsFreeTrial = signal(false);
 
   protected readonly monthLabel = computed(() => {
     const d = this.viewMonth();
@@ -159,6 +211,56 @@ export class AdminLessonCalendar {
     );
   });
 
+  protected readonly mergedDaySlots = computed(() => {
+    const day = this.selectedDay();
+    if (!day) return [];
+    const cellKey = dayKeyForLocalCalendarDate(day, this.tutorTimeZoneId());
+    const apiSlots = this.slotsByDayKey().get(cellKey) ?? [];
+    return mergeDayAvailability(
+      day.getFullYear(),
+      day.getMonth(),
+      day.getDate(),
+      apiSlots,
+    );
+  });
+
+  protected readonly mergedEffectiveDaySlots = computed((): AvailabilitySlotRow[] => {
+    const raw = this.mergedDaySlots();
+    const studentId = this.releaseableStudentUserId();
+    const released = this.releasedBookingKeys();
+    if (!studentId || released.size === 0) {
+      return raw;
+    }
+
+    const pass1 = raw.map((slot) => {
+      if (!this.isReleasableStudentBooking(slot) || !released.has(this.bookingReleaseKey(slot))) {
+        return slot;
+      }
+      return {
+        ...slot,
+        isAvailable: true,
+        studentUserId: null,
+        studentName: null,
+        slotId: null,
+        attendanceStatus: null,
+        studentLessonNote: null,
+        availableDurationMinutes: [...SCHEDULE_DURATION_OPTIONS],
+      };
+    });
+
+    return pass1.map((slot) => {
+      if (!slot.isAvailable) {
+        return slot;
+      }
+      const durations = durationsFromStart(slot.startsAtUtc, pass1);
+      return {
+        ...slot,
+        availableDurationMinutes:
+          durations.length > 0 ? durations : (slot.availableDurationMinutes ?? []),
+      };
+    });
+  });
+
   protected readonly effectiveDaySlots = computed((): AvailabilitySlotRow[] => {
     const raw = this.selectedDaySlots();
     const studentId = this.releaseableStudentUserId();
@@ -199,55 +301,214 @@ export class AdminLessonCalendar {
   protected readonly daySlotViews = computed((): DaySlotView[] => {
     const draftStart = this.draftStartUtc();
     const draftDuration = this.draftDurationMinutes();
-    const draftSteps = draftStart ? draftDuration / SCHEDULE_GRID_STEP_MINUTES : 0;
 
     const tutorTz = this.tutorTimeZoneId();
     const studentTz = this.studentTimeZoneId();
     const effectiveByStart = new Map(
-      this.effectiveDaySlots().map((s) => [normalizeSlotStartIso(s.startsAtUtc), s]),
+      this.mergedEffectiveDaySlots().map((s) => [normalizeSlotStartIso(s.startsAtUtc), s]),
     );
 
-    return this.selectedDaySlots().map((rawSlot) => {
+    const rows: DaySlotView[] = [];
+
+    for (const rawSlot of this.mergedDaySlots()) {
       const effective =
         effectiveByStart.get(normalizeSlotStartIso(rawSlot.startsAtUtc)) ?? rawSlot;
-      return {
-        startsAtUtc: rawSlot.startsAtUtc,
-        endsAtUtc: rawSlot.endsAtUtc,
-        tutorTimeLabel: formatSlotRangeInZone(rawSlot.startsAtUtc, rawSlot.endsAtUtc, tutorTz),
-        studentTimeLabel: studentTz
-          ? formatSlotRangeInZone(rawSlot.startsAtUtc, rawSlot.endsAtUtc, studentTz)
-          : null,
-        state: this.slotVisualState(rawSlot, effective, draftStart, draftSteps),
-        studentName: rawSlot.studentName,
-        attendanceStatus: rawSlot.studentUserId
-          ? parseLessonAttendanceStatus(rawSlot.attendanceStatus)
-          : null,
-        releaseKey: this.isReleasableStudentBooking(rawSlot)
-          ? this.bookingReleaseKey(rawSlot)
-          : null,
-      };
-    });
+
+      if (effective.isPartiallyBlocked && effective.freeSegmentStartsAtUtc) {
+        const freeSlot: AvailabilitySlotRow = {
+          ...effective,
+          isAvailable: true,
+          isPartiallyBlocked: false,
+          isAdminCalendarEntry: false,
+          slotId: null,
+          studentUserId: null,
+          studentName: null,
+          title: null,
+          description: null,
+          entryStartsAtUtc: null,
+          entryEndsAtUtc: null,
+          partialBlockEndsAtUtc: null,
+          freeSegmentStartsAtUtc: null,
+        };
+        rows.push(
+          this.buildSlotView({
+            startsAtUtc: effective.freeSegmentStartsAtUtc,
+            endsAtUtc: effective.endsAtUtc,
+            rowKind: 'extension-15',
+            rawSlot: freeSlot,
+            effectiveSlot: freeSlot,
+            draftStart,
+            draftDuration,
+            tutorTz,
+            studentTz,
+            occupancyOverride: 'open',
+          }),
+        );
+        continue;
+      }
+
+      const draftSplit = this.draftGridCellSplit(
+        rawSlot.startsAtUtc,
+        rawSlot.endsAtUtc,
+        draftStart,
+        draftDuration,
+        effective.isAvailable,
+      );
+      if (draftSplit) {
+        for (const segment of draftSplit) {
+          const segmentSlot: AvailabilitySlotRow =
+            segment.kind === 'open'
+              ? {
+                  ...effective,
+                  isAvailable: true,
+                  isPartiallyBlocked: false,
+                  isAdminCalendarEntry: false,
+                  slotId: null,
+                  title: null,
+                  description: null,
+                }
+              : effective;
+          rows.push(
+            this.buildSlotView({
+              startsAtUtc: segment.startUtc,
+              endsAtUtc: segment.endUtc,
+              rowKind: 'extension-15',
+              rawSlot: segmentSlot,
+              effectiveSlot: segmentSlot,
+              draftStart,
+              draftDuration,
+              tutorTz,
+              studentTz,
+              occupancyOverride: segment.kind === 'open' ? 'open' : undefined,
+            }),
+          );
+        }
+        continue;
+      }
+
+      rows.push(
+        this.buildSlotView({
+          startsAtUtc: rawSlot.startsAtUtc,
+          endsAtUtc: rawSlot.endsAtUtc,
+          rowKind: 'grid-30',
+          rawSlot,
+          effectiveSlot: effective,
+          draftStart,
+          draftDuration,
+          tutorTz,
+          studentTz,
+        }),
+      );
+
+      const bookedExtension = this.bookedExtensionInterval(effective);
+      if (bookedExtension) {
+        rows.push(
+          this.buildSlotView({
+            startsAtUtc: bookedExtension.startUtc,
+            endsAtUtc: bookedExtension.endUtc,
+            rowKind: 'extension-15',
+            rawSlot,
+            effectiveSlot: effective,
+            draftStart,
+            draftDuration,
+            tutorTz,
+            studentTz,
+            occupancyOverride: effective.isAdminCalendarEntry ? 'admin-entry' : 'booked',
+          }),
+        );
+        continue;
+      }
+
+      const draftExtension = this.draftExtensionInterval(
+        rawSlot.endsAtUtc,
+        draftStart,
+        draftDuration,
+        effective.isAvailable,
+      );
+      if (draftExtension) {
+        rows.push(
+          this.buildSlotView({
+            startsAtUtc: draftExtension.startUtc,
+            endsAtUtc: draftExtension.endUtc,
+            rowKind: 'extension-15',
+            rawSlot,
+            effectiveSlot: effective,
+            draftStart,
+            draftDuration,
+            tutorTz,
+            studentTz,
+          }),
+        );
+      }
+    }
+
+    return rows;
+  });
+
+  protected readonly dayTimelineItems = computed((): DayTimelineItem[] => {
+    const views = this.daySlotViews();
+    const items: DayTimelineItem[] = [];
+    let index = 0;
+
+    while (index < views.length) {
+      const blockSlots: DaySlotView[] = [views[index]];
+      while (
+        index + blockSlots.length < views.length &&
+        this.shouldUnifyBlock(blockSlots[blockSlots.length - 1], views[index + blockSlots.length])
+      ) {
+        blockSlots.push(views[index + blockSlots.length]);
+      }
+
+      if (blockSlots.length > 1) {
+        items.push(this.buildUnifiedBlockItem(blockSlots));
+        index += blockSlots.length;
+        continue;
+      }
+
+      const slot = views[index];
+      items.push({ kind: 'slot', trackId: `${slot.rowKind}|${slot.startsAtUtc}`, slot });
+      index++;
+    }
+
+    return items;
   });
 
   protected readonly draftDurationChoices = computed(() => {
     const start = this.draftStartUtc();
     if (!start) return [];
-    return durationsFromStart(start, this.effectiveDaySlots());
+    if (this.manageMode() && !this.pickMode()) {
+      return durationsFromManageStart(start, this.mergedEffectiveDaySlots());
+    }
+    return durationsFromStart(start, this.mergedEffectiveDaySlots());
   });
 
   protected readonly canConfirmDraft = computed(() => {
     const start = this.draftStartUtc();
     if (!start) return false;
     const duration = this.draftDurationMinutes();
-    return this.draftDurationChoices().includes(duration);
+    if (!duration || !this.draftDurationChoices().includes(duration)) return false;
+    if (this.manageMode() && !this.pickMode() && !this.draftIsFreeTrial() && !this.draftTitle().trim()) {
+      return false;
+    }
+    return true;
   });
 
   protected readonly draftSummaryLabel = computed(() => {
     const start = this.draftStartUtc();
     if (!start) return '';
     const duration = this.draftDurationMinutes();
+    const tutorTz = this.tutorTimeZoneId();
+    if (!duration) {
+      const day = new Intl.DateTimeFormat('en-GB', {
+        timeZone: tutorTz,
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      }).format(new Date(start));
+      return `${day}, ${formatTimeInZone(start, tutorTz)} — choose duration`;
+    }
     const end = addMinutesToIso(start, duration);
-    const tutor = formatSlotRangeInZone(start, end, this.tutorTimeZoneId());
+    const tutor = formatSlotRangeInZone(start, end, tutorTz);
     const studentTz = this.studentTimeZoneId();
     if (!studentTz) {
       return `${tutor} (${durationLabel(duration)})`;
@@ -336,6 +597,21 @@ export class AdminLessonCalendar {
     this.selectionError.emit(null);
   }
 
+  protected canSelectFreeTrial(): boolean {
+    return this.draftDurationChoices().includes(FREE_TRIAL_DURATION_MINUTES);
+  }
+
+  protected selectFreeTrialPreset(): void {
+    if (!this.canSelectFreeTrial()) {
+      this.selectionError.emit('This time cannot fit a 30-minute free trial.');
+      return;
+    }
+    this.draftIsFreeTrial.set(true);
+    this.draftDurationMinutes.set(FREE_TRIAL_DURATION_MINUTES);
+    this.draftTitle.set(FREE_TRIAL_TITLE);
+    this.selectionError.emit(null);
+  }
+
   protected formatLesson(lesson: WeekOneLessonPick): string {
     const end = addMinutesToIso(lesson.startsAtUtc, lesson.durationMinutes);
     const tutor = formatSlotRangeInZone(
@@ -352,20 +628,33 @@ export class AdminLessonCalendar {
   }
 
   protected isSlotClickable(slot: DaySlotView): boolean {
+    const occ = slot.occupancyState;
+    const sel = slot.selectionState;
+
+    if (this.manageMode()) {
+      if (occ === 'booked') return false;
+      if (occ === 'admin-entry') return true;
+      return (
+        occ === 'open' ||
+        occ === 'outside-preference' ||
+        sel === 'selected-start' ||
+        sel === 'selected-range'
+      );
+    }
+
     if (!this.pickMode()) return false;
-    if (slot.state === 'booked') {
+    if (occ === 'booked') {
       return false;
     }
-    if (slot.state === 'booked-student') {
+    if (occ === 'booked-student') {
       return true;
     }
-    if (slot.state === 'confirmed') {
+    if (occ === 'confirmed') {
       return true;
     }
     if (
       this.picksRemaining() <= 0 &&
-      slot.state !== 'selected-start' &&
-      slot.state !== 'selected-range'
+      !sel
     ) {
       return false;
     }
@@ -379,20 +668,55 @@ export class AdminLessonCalendar {
       }
     }
     return (
-      slot.state === 'open' ||
-      slot.state === 'outside-preference' ||
-      slot.state === 'selected-start' ||
-      slot.state === 'selected-range'
+      occ === 'open' ||
+      occ === 'outside-preference' ||
+      sel === 'selected-start' ||
+      sel === 'selected-range'
     );
   }
 
-  protected onSlotClick(slot: DaySlotView): void {
-    if (slot.state === 'booked-student' && slot.releaseKey) {
+  protected isTimelineItemClickable(item: DayTimelineItem): boolean {
+    if (item.kind === 'unified-block') {
+      return this.isSlotClickable(item.slot);
+    }
+    return this.isSlotClickable(item.slot);
+  }
+
+  protected slotStatusLabel(slot: DaySlotView): string {
+    if (slot.selectionState) {
+      return slot.selectionState === 'selected-start' ? 'Start' : 'Selected';
+    }
+    if (slot.rowKind === 'extension-15' && slot.occupancyState === 'admin-entry') {
+      return '';
+    }
+    switch (slot.occupancyState) {
+      case 'booked':
+        return this.bookedSlotLabel(slot);
+      case 'booked-student':
+        return `${this.bookedSlotLabel(slot)} · click to free`;
+      case 'outside-preference':
+        return 'Outside preference';
+      case 'confirmed':
+        return 'In schedule';
+      case 'admin-entry':
+        return slot.title || 'Calendar entry';
+      default:
+        return 'Available';
+    }
+  }
+
+  protected onSlotClick(slot: DaySlotView, _event: MouseEvent): void {
+    if (this.manageMode() && slot.occupancyState === 'admin-entry' && slot.slotId) {
+      this.emitAdminSlotSelected(slot);
+      return;
+    }
+
+    if (slot.occupancyState === 'booked-student' && slot.releaseKey) {
       this.toggleBookingRelease(slot.releaseKey);
       return;
     }
 
-    if (slot.state === 'confirmed') {
+    if (slot.occupancyState === 'confirmed') {
       const lesson = this.findLessonCoveringSlot(slot.startsAtUtc);
       if (lesson) {
         this.removeLesson(lesson);
@@ -400,23 +724,36 @@ export class AdminLessonCalendar {
       return;
     }
 
-    if (!this.isSlotClickable(slot) && slot.state !== 'selected-start' && slot.state !== 'selected-range') {
+    if (!this.isSlotClickable(slot) && !slot.selectionState) {
       return;
     }
 
-    if (this.draftStartUtc() === slot.startsAtUtc) {
+    if (this.manageMode() && !this.pickMode()) {
+      const draft = this.draftStartUtc();
+      if (draft && normalizeSlotStartIso(draft) === normalizeSlotStartIso(slot.startsAtUtc)) {
+        this.clearDraft();
+        return;
+      }
+
+      this.beginDraftAt(slot.startsAtUtc);
+      return;
+    }
+
+    const draft = this.draftStartUtc();
+    if (draft && normalizeSlotStartIso(draft) === normalizeSlotStartIso(slot.startsAtUtc)) {
       this.clearDraft();
       return;
     }
 
-    this.draftStartUtc.set(slot.startsAtUtc);
-    const choices = durationsFromStart(slot.startsAtUtc, this.effectiveDaySlots());
-    this.draftDurationMinutes.set(choices[0] ?? 30);
-    this.selectionError.emit(null);
+    this.beginDraftAt(slot.startsAtUtc);
   }
 
   protected onDurationPick(minutes: number): void {
     if (!this.draftDurationChoices().includes(minutes)) return;
+    this.draftIsFreeTrial.set(false);
+    if (this.draftTitle() === FREE_TRIAL_TITLE) {
+      this.draftTitle.set('');
+    }
     this.draftDurationMinutes.set(minutes);
     this.selectionError.emit(null);
   }
@@ -429,10 +766,30 @@ export class AdminLessonCalendar {
       this.selectionError.emit('Select a start time for the lesson.');
       return;
     }
+    if (!durationMinutes) {
+      this.selectionError.emit('Choose a duration for this lesson.');
+      return;
+    }
     if (!this.canConfirmDraft()) {
+      if (this.manageMode() && !this.draftTitle().trim()) {
+        this.selectionError.emit('Enter a title for this calendar entry.');
+        return;
+      }
       this.selectionError.emit('That duration is not available for the selected start time.');
       return;
     }
+
+    if (this.manageMode() && !this.pickMode()) {
+      this.createSlotRequested.emit({
+        startsAtUtc,
+        durationMinutes,
+        title: this.draftTitle().trim(),
+        description: this.draftDescription().trim() || null,
+      });
+      this.clearDraft();
+      return;
+    }
+
     if (this.picksRemaining() <= 0) {
       this.selectionError.emit('You have selected all required lessons for this week.');
       return;
@@ -463,9 +820,16 @@ export class AdminLessonCalendar {
   }
 
   protected clearDraft(): void {
-    this.draftStartUtc.set(null);
-    this.draftDurationMinutes.set(30);
+    this.clearDraftFields();
+    this.draftIsFreeTrial.set(false);
     this.selectionError.emit(null);
+  }
+
+  private clearDraftFields(): void {
+    this.draftStartUtc.set(null);
+    this.draftDurationMinutes.set(null);
+    this.draftTitle.set('');
+    this.draftDescription.set('');
   }
 
   protected removeLesson(lesson: WeekOneLessonPick): void {
@@ -475,31 +839,319 @@ export class AdminLessonCalendar {
     this.selectionError.emit(null);
   }
 
-  private slotVisualState(
+  private buildUnifiedBlockItem(slots: DaySlotView[]): DayTimelineItem {
+    const first = slots[0];
+    const last = slots[slots.length - 1];
+    const selectionState = first.selectionState ?? last.selectionState;
+    const rangeStart = selectionState
+      ? first.startsAtUtc
+      : (first.entryStartsAtUtc ?? first.startsAtUtc);
+    const rangeEnd = selectionState
+      ? last.endsAtUtc
+      : (last.entryEndsAtUtc ?? last.endsAtUtc);
+    const tutorTz = this.tutorTimeZoneId();
+    const studentTz = this.studentTimeZoneId();
+
+    return {
+      kind: 'unified-block',
+      trackId: `unified|${first.slotId ?? rangeStart}|${rangeEnd}`,
+      slot: first,
+      timeLabel: formatSlotRangeInZone(rangeStart, rangeEnd, tutorTz),
+      studentTimeLabel: studentTz
+        ? formatSlotRangeInZone(rangeStart, rangeEnd, studentTz)
+        : null,
+      occupancyState: first.occupancyState,
+      selectionState,
+      statusLabel: this.unifiedBlockStatusLabel(first, selectionState),
+    };
+  }
+
+  private unifiedBlockStatusLabel(
+    gridSlot: DaySlotView,
+    selectionState: SlotSelectionState | null,
+  ): string {
+    if (selectionState) {
+      return selectionState === 'selected-start' ? 'Start' : 'Selected';
+    }
+    if (gridSlot.occupancyState === 'admin-entry') {
+      return gridSlot.title || 'Calendar entry';
+    }
+    if (gridSlot.occupancyState === 'booked') {
+      return this.bookedSlotLabel(gridSlot);
+    }
+    return '';
+  }
+
+  private shouldUnifyBlock(current: DaySlotView, next: DaySlotView): boolean {
+    if (normalizeSlotStartIso(current.endsAtUtc) !== normalizeSlotStartIso(next.startsAtUtc)) {
+      return false;
+    }
+
+    const bookedOccupancy =
+      current.occupancyState === 'admin-entry' || current.occupancyState === 'booked';
+    if (
+      bookedOccupancy &&
+      current.occupancyState === next.occupancyState &&
+      current.slotId &&
+      current.slotId === next.slotId
+    ) {
+      return true;
+    }
+
+    if (
+      current.occupancyState === 'open' &&
+      next.occupancyState === 'open' &&
+      current.selectionState &&
+      next.selectionState
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private draftGridCellSplit(
+    cellStartUtc: string,
+    cellEndUtc: string,
+    draftStart: string | null,
+    draftDurationMinutes: number | null,
+    isAvailable: boolean,
+  ): { startUtc: string; endUtc: string; kind: 'selected' | 'open' }[] | null {
+    if (!draftStart || !draftDurationMinutes || !isAvailable) {
+      return null;
+    }
+
+    const cellStartMs = new Date(cellStartUtc).getTime();
+    const cellEndMs = new Date(cellEndUtc).getTime();
+    const draftStartMs = new Date(draftStart).getTime();
+    const draftEndMs = draftStartMs + draftDurationMinutes * 60 * 1000;
+
+    if (draftEndMs <= cellStartMs || draftStartMs >= cellEndMs) {
+      return null;
+    }
+
+    const overlapStartMs = Math.max(cellStartMs, draftStartMs);
+    const overlapEndMs = Math.min(cellEndMs, draftEndMs);
+
+    if (overlapStartMs <= cellStartMs && overlapEndMs >= cellEndMs) {
+      return null;
+    }
+
+    const segments: { startUtc: string; endUtc: string; kind: 'selected' | 'open' }[] = [];
+
+    if (overlapStartMs > cellStartMs) {
+      segments.push({
+        startUtc: normalizeSlotStartIso(cellStartUtc),
+        endUtc: normalizeSlotStartIso(new Date(overlapStartMs).toISOString()),
+        kind: 'open',
+      });
+    }
+
+    if (overlapEndMs > overlapStartMs) {
+      segments.push({
+        startUtc: normalizeSlotStartIso(new Date(overlapStartMs).toISOString()),
+        endUtc: normalizeSlotStartIso(new Date(overlapEndMs).toISOString()),
+        kind: 'selected',
+      });
+    }
+
+    if (overlapEndMs < cellEndMs) {
+      segments.push({
+        startUtc: normalizeSlotStartIso(new Date(overlapEndMs).toISOString()),
+        endUtc: normalizeSlotStartIso(cellEndUtc),
+        kind: 'open',
+      });
+    }
+
+    return segments.length > 1 ? segments : null;
+  }
+
+  private buildSlotView(args: {
+    startsAtUtc: string;
+    endsAtUtc: string;
+    rowKind: SlotRowKind;
+    rawSlot: AvailabilitySlotRow;
+    effectiveSlot: AvailabilitySlotRow;
+    draftStart: string | null;
+    draftDuration: number | null;
+    tutorTz: string;
+    studentTz: string | null;
+    occupancyOverride?: SlotOccupancyState;
+  }): DaySlotView {
+    const {
+      startsAtUtc,
+      endsAtUtc,
+      rowKind,
+      rawSlot,
+      effectiveSlot,
+      draftStart,
+      draftDuration,
+      tutorTz,
+      studentTz,
+      occupancyOverride,
+    } = args;
+
+    const occupancy =
+      occupancyOverride ?? this.slotOccupancyState(rawSlot, effectiveSlot, startsAtUtc);
+
+    return {
+      startsAtUtc,
+      endsAtUtc,
+      rowKind,
+      tutorTimeLabel: formatSlotRangeInZone(startsAtUtc, endsAtUtc, tutorTz),
+      studentTimeLabel: studentTz
+        ? formatSlotRangeInZone(startsAtUtc, endsAtUtc, studentTz)
+        : null,
+      occupancyState: occupancy,
+      selectionState: this.slotSelectionStateForInterval(
+        startsAtUtc,
+        endsAtUtc,
+        effectiveSlot,
+        occupancy,
+        draftStart,
+        draftDuration,
+      ),
+      studentName: rawSlot.studentName,
+      attendanceStatus: rawSlot.studentUserId
+        ? parseLessonAttendanceStatus(rawSlot.attendanceStatus)
+        : null,
+      releaseKey: this.isReleasableStudentBooking(rawSlot)
+        ? this.bookingReleaseKey(rawSlot)
+        : null,
+      slotId: rawSlot.slotId ?? null,
+      title: rawSlot.title ?? null,
+      description: rawSlot.description ?? null,
+      freeSegmentStartsAtUtc: rawSlot.freeSegmentStartsAtUtc ?? null,
+      entryStartsAtUtc: rawSlot.entryStartsAtUtc ?? null,
+      entryEndsAtUtc: rawSlot.entryEndsAtUtc ?? null,
+    };
+  }
+
+  private bookedExtensionInterval(
+    effective: AvailabilitySlotRow,
+  ): { startUtc: string; endUtc: string } | null {
+    if (effective.isPartiallyBlocked || effective.isAvailable) {
+      return null;
+    }
+    const entryEnd = effective.entryEndsAtUtc;
+    if (!entryEnd) {
+      return null;
+    }
+    const cellEndMs = new Date(effective.endsAtUtc).getTime();
+    const entryEndMs = new Date(entryEnd).getTime();
+    const tailEndMs = cellEndMs + SCHEDULE_SUB_STEP_MINUTES * 60 * 1000;
+    if (entryEndMs <= cellEndMs || entryEndMs > tailEndMs) {
+      return null;
+    }
+    return {
+      startUtc: effective.endsAtUtc,
+      endUtc: normalizeSlotStartIso(entryEnd),
+    };
+  }
+
+  private draftExtensionInterval(
+    cellEndUtc: string,
+    draftStart: string | null,
+    draftDurationMinutes: number | null,
+    isAvailable: boolean,
+  ): { startUtc: string; endUtc: string } | null {
+    if (!draftStart || !draftDurationMinutes || !isAvailable) {
+      return null;
+    }
+    const cellEndMs = new Date(cellEndUtc).getTime();
+    const draftStartMs = new Date(draftStart).getTime();
+    const draftEndMs = draftStartMs + draftDurationMinutes * 60 * 1000;
+    const tailEndMs = cellEndMs + SCHEDULE_SUB_STEP_MINUTES * 60 * 1000;
+    if (draftEndMs <= cellEndMs || draftEndMs > tailEndMs || draftStartMs >= tailEndMs) {
+      return null;
+    }
+    return {
+      startUtc: cellEndUtc,
+      endUtc: addUtcMinutesIso(cellEndUtc, SCHEDULE_SUB_STEP_MINUTES),
+    };
+  }
+
+  private slotOccupancyState(
     rawSlot: AvailabilitySlotRow,
     effectiveSlot: AvailabilitySlotRow,
-    draftStart: string | null,
-    draftSteps: number,
-  ): SlotVisualState {
+    startsAtUtc: string,
+  ): SlotOccupancyState {
     if (this.isReleasableStudentBooking(rawSlot) && !this.isBookingReleased(rawSlot)) {
       return 'booked-student';
     }
+    if (effectiveSlot.isAdminCalendarEntry) return 'admin-entry';
     if (!effectiveSlot.isAvailable) return 'booked';
-
-    const startMs = new Date(effectiveSlot.startsAtUtc).getTime();
-    if (draftStart) {
-      const draftStartMs = new Date(draftStart).getTime();
-      const draftEndMs = draftStartMs + draftSteps * SCHEDULE_GRID_STEP_MINUTES * 60 * 1000;
-      if (startMs >= draftStartMs && startMs < draftEndMs) {
-        return normalizeSlotStartIso(effectiveSlot.startsAtUtc) === normalizeSlotStartIso(draftStart)
-          ? 'selected-start'
-          : 'selected-range';
-      }
+    if (
+      this.isCoveredByConfirmedLesson(startsAtUtc) ||
+      this.isCoveredByConfirmedLesson(effectiveSlot.startsAtUtc)
+    ) {
+      return 'confirmed';
     }
-
-    if (this.isCoveredByConfirmedLesson(effectiveSlot.startsAtUtc)) return 'confirmed';
     if (effectiveSlot.matchesStudentPreference === false) return 'outside-preference';
     return 'open';
+  }
+
+  private slotSelectionStateForInterval(
+    intervalStartUtc: string,
+    intervalEndUtc: string,
+    effectiveSlot: AvailabilitySlotRow,
+    occupancy: SlotOccupancyState,
+    draftStart: string | null,
+    draftDurationMinutes: number | null,
+  ): SlotSelectionState | null {
+    if (!draftStart) {
+      return null;
+    }
+    if (occupancy === 'booked' || occupancy === 'admin-entry' || occupancy === 'booked-student') {
+      return null;
+    }
+
+    if (!draftDurationMinutes || draftDurationMinutes <= 0) {
+      if (normalizeSlotStartIso(intervalStartUtc) === normalizeSlotStartIso(draftStart)) {
+        return 'selected-start';
+      }
+      return null;
+    }
+
+    const intervalStartMs = new Date(intervalStartUtc).getTime();
+    const intervalEndMs = new Date(intervalEndUtc).getTime();
+    const draftStartMs = new Date(draftStart).getTime();
+    const draftEndMs = draftStartMs + draftDurationMinutes * 60 * 1000;
+
+    if (draftEndMs <= intervalStartMs || draftStartMs >= intervalEndMs) {
+      return null;
+    }
+    if (draftStartMs > intervalStartMs || draftEndMs < intervalEndMs) {
+      return null;
+    }
+
+    void effectiveSlot;
+    if (normalizeSlotStartIso(intervalStartUtc) === normalizeSlotStartIso(draftStart)) {
+      return 'selected-start';
+    }
+    return 'selected-range';
+  }
+
+  private beginDraftAt(startUtc: string): void {
+    this.draftIsFreeTrial.set(false);
+    this.draftStartUtc.set(startUtc);
+    this.draftDurationMinutes.set(null);
+    if (this.manageMode() && !this.pickMode()) {
+      this.draftTitle.set('');
+      this.draftDescription.set('');
+    }
+    this.selectionError.emit(null);
+  }
+
+  private emitAdminSlotSelected(slot: DaySlotView): void {
+    if (!slot.slotId) return;
+    this.adminSlotSelected.emit({
+      slotId: slot.slotId,
+      startsAtUtc: slot.entryStartsAtUtc ?? slot.startsAtUtc,
+      endsAtUtc: slot.entryEndsAtUtc ?? slot.endsAtUtc,
+      title: slot.title ?? null,
+      description: slot.description ?? null,
+    });
   }
 
   private isReleasableStudentBooking(slot: AvailabilitySlotRow): boolean {

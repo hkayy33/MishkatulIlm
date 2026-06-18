@@ -24,6 +24,8 @@ export type LessonFrequencyCode =
   | 'FOUR-PLUS-WEEK'
   | 'FLEXIBLE';
 
+export type PreferredLessonDurationCode = '' | 'MIN-45' | 'MIN-60';
+
 export type SubjectCode =
   | 'QURAN-RECITATION'
   | 'QURAN-MEMORISATION'
@@ -74,6 +76,7 @@ export interface SaveOnboardingRequest {
   phoneNumber: string;
   currentLevel: string;
   lessonFrequency: string;
+  preferredLessonDuration: string;
   subjectCodes: string[];
   preferredAvailability: string[];
 }

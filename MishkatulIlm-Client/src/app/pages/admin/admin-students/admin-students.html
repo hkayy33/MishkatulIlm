@@ -90,7 +90,11 @@
         <tbody>
           @for (s of filteredStudents(); track s.userId) {
             <tr class="student-row" [class.student-row--expanded]="isExpanded(s.userId)">
-              <td>{{ s.firstName }} {{ s.lastName }}</td>
+              <td>
+                <a class="student-name-link" [routerLink]="['/admin/students', s.userId]">
+                  {{ s.firstName }} {{ s.lastName }}
+                </a>
+              </td>
               <td>
                 <span
                   class="payment-badge"

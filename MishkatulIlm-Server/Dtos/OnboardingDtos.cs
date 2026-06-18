@@ -31,6 +31,9 @@ public sealed class SaveOnboardingRequest
     [Required, MaxLength(64)]
     public string LessonFrequency { get; set; } = string.Empty;
 
+    [Required, MaxLength(64)]
+    public string PreferredLessonDuration { get; set; } = string.Empty;
+
     [Required]
     public List<string> SubjectCodes { get; set; } = new();
 

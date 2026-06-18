@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { labelLevelCode, labelSubjectCode } from '../../../core/utils/onboarding-labels';
 import { recurringLessonPatterns } from '../../../core/utils/recurring-lesson-label';
 import { AdminApiService, type AdminStudentRow } from '../../../core/services/admin-api.service';
@@ -18,7 +19,7 @@ export type StudentPaymentFilter = 'all' | 'unpaid';
 @Component({
   selector: 'app-admin-students',
   standalone: true,
-  imports: [FormsModule, DatePipe],
+  imports: [FormsModule, DatePipe, RouterLink],
   templateUrl: './admin-students.html',
   styleUrl: './admin-students.scss',
 })
@@ -212,6 +213,7 @@ function normalizeStudentRow(raw: AdminStudentRow): AdminStudentRow {
     Gender?: string | null;
     CurrentLevel?: string | null;
     LessonFrequency?: string | null;
+    PreferredLessonDuration?: string | null;
     SubjectCodes?: string[];
     PreferredAvailability?: string[];
     ScheduledLessons?: AdminStudentRow['scheduledLessons'];
@@ -241,6 +243,7 @@ function normalizeStudentRow(raw: AdminStudentRow): AdminStudentRow {
     gender: raw.gender ?? r.Gender ?? null,
     currentLevel: raw.currentLevel ?? r.CurrentLevel ?? null,
     lessonFrequency: raw.lessonFrequency ?? r.LessonFrequency ?? null,
+    preferredLessonDuration: raw.preferredLessonDuration ?? r.PreferredLessonDuration ?? null,
     subjectCodes: raw.subjectCodes ?? r.SubjectCodes ?? [],
     preferredAvailability: raw.preferredAvailability ?? r.PreferredAvailability ?? [],
     scheduledLessons,

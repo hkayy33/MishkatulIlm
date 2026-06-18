@@ -10,6 +10,10 @@ import {
   timeZoneShortName,
 } from '../../../core/utils/timezone.util';
 import {
+  LESSON_RATE_45_MIN_USD,
+  LESSON_RATE_60_MIN_USD,
+} from '../../../core/utils/lesson-pricing';
+import {
   SearchableSelect,
   type SearchableSelectOption,
 } from '../../../shared/searchable-select/searchable-select';
@@ -48,7 +52,8 @@ export class AdminDetails implements OnInit {
   protected allCities: SearchableSelectOption[] = [];
   private pendingCityName = '';
 
-  protected paymentHourlyRateUsd = 5;
+  protected paymentRate45MinUsd = LESSON_RATE_45_MIN_USD;
+  protected paymentRate60MinUsd = LESSON_RATE_60_MIN_USD;
   protected paymentAccountName = '';
   protected paymentAccountNumber = '';
   protected paymentSortCode = '';
@@ -80,7 +85,8 @@ export class AdminDetails implements OnInit {
       this.tutorDisplayName = row.tutorDisplayName;
       this.selectedCountryName.set(row.tutorCountry);
       this.pendingCityName = row.tutorCity;
-      this.paymentHourlyRateUsd = row.paymentHourlyRateUsd;
+      this.paymentRate45MinUsd = row.paymentRate45MinUsd;
+      this.paymentRate60MinUsd = row.paymentRate60MinUsd;
       this.paymentAccountName = row.paymentAccountName;
       this.paymentAccountNumber = row.paymentAccountNumber;
       this.paymentSortCode = row.paymentSortCode;
@@ -148,7 +154,9 @@ export class AdminDetails implements OnInit {
         tutorCountry: country,
         tutorCity: city,
         tutorTimeZoneId,
-        paymentHourlyRateUsd: this.paymentHourlyRateUsd,
+        paymentHourlyRateUsd: this.paymentRate60MinUsd,
+        paymentRate45MinUsd: this.paymentRate45MinUsd,
+        paymentRate60MinUsd: this.paymentRate60MinUsd,
         paymentAccountName: this.paymentAccountName.trim(),
         paymentAccountNumber: this.paymentAccountNumber.trim(),
         paymentSortCode: this.paymentSortCode.trim(),

@@ -41,6 +41,7 @@ public sealed class AdminApplicationListItem
     public string? City { get; init; }
     public string? CurrentLevel { get; init; }
     public string? LessonFrequency { get; init; }
+    public string? PreferredLessonDuration { get; init; }
     public IReadOnlyList<string> SubjectCodes { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> PreferredAvailability { get; init; } = Array.Empty<string>();
 }
@@ -68,9 +69,67 @@ public sealed class AdminStudentListItem
     public string? Gender { get; init; }
     public string? CurrentLevel { get; init; }
     public string? LessonFrequency { get; init; }
+    public string? PreferredLessonDuration { get; init; }
     public IReadOnlyList<string> SubjectCodes { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> PreferredAvailability { get; init; } = Array.Empty<string>();
     public IReadOnlyList<ScheduledLessonDto> ScheduledLessons { get; init; } = Array.Empty<ScheduledLessonDto>();
+}
+
+public sealed class AdminStudentLessonHistoryItemDto
+{
+    public Guid SlotId { get; init; }
+    public DateTime StartsAtUtc { get; init; }
+    public DateTime EndsAtUtc { get; init; }
+    public int DurationMinutes { get; init; }
+    /// <summary>attending | not_attending</summary>
+    public string AttendanceStatus { get; init; } = "attending";
+    public string? StudentNote { get; init; }
+}
+
+public sealed class AdminStudentPaymentHistoryItemDto
+{
+    public Guid Id { get; init; }
+    public int BillingYear { get; init; }
+    public int BillingMonth { get; init; }
+    public string BillingPeriodLabel { get; init; } = string.Empty;
+    public string Status { get; init; } = string.Empty;
+    public decimal Amount { get; init; }
+    public string Currency { get; init; } = "USD";
+    public string PaymentReference { get; init; } = string.Empty;
+    public DateTime SubmittedAtUtc { get; init; }
+    public DateTime? ReviewedAtUtc { get; init; }
+    public string? AdminNote { get; init; }
+    public IReadOnlyList<PaymentLessonLineItemDto> Lessons { get; init; } = Array.Empty<PaymentLessonLineItemDto>();
+}
+
+public sealed class AdminStudentDetailDto
+{
+    public Guid UserId { get; init; }
+    public string Email { get; init; } = string.Empty;
+    public string FirstName { get; init; } = string.Empty;
+    public string LastName { get; init; } = string.Empty;
+    public bool HasMadePayment { get; init; }
+    public DateTime? NextPaymentDueUtc { get; init; }
+    public DateTime CreatedAtUtc { get; init; }
+    public DateTime? LastPaymentAtUtc { get; init; }
+    public decimal? LastPaymentAmount { get; init; }
+    public string? LastPaymentCurrency { get; init; }
+    public string? PhoneNumber { get; init; }
+    public string? Location { get; init; }
+    public string? Country { get; init; }
+    public string? City { get; init; }
+    public string? AgeRange { get; init; }
+    public string? Gender { get; init; }
+    public string? CurrentLevel { get; init; }
+    public string? LessonFrequency { get; init; }
+    public string? PreferredLessonDuration { get; init; }
+    public IReadOnlyList<string> SubjectCodes { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> PreferredAvailability { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<ScheduledLessonDto> ScheduledLessons { get; init; } = Array.Empty<ScheduledLessonDto>();
+    public IReadOnlyList<AdminStudentLessonHistoryItemDto> LessonHistory { get; init; } =
+        Array.Empty<AdminStudentLessonHistoryItemDto>();
+    public IReadOnlyList<AdminStudentPaymentHistoryItemDto> PaymentHistory { get; init; } =
+        Array.Empty<AdminStudentPaymentHistoryItemDto>();
 }
 
 public sealed class AdminBadgeCountsDto
@@ -94,6 +153,7 @@ public sealed class AdminScheduleChangeRequestListItem
     public string? City { get; init; }
     public string? CurrentLevel { get; init; }
     public string? LessonFrequency { get; init; }
+    public string? PreferredLessonDuration { get; init; }
     public IReadOnlyList<string> SubjectCodes { get; init; } = Array.Empty<string>();
     public IReadOnlyList<string> PreferredAvailability { get; init; } = Array.Empty<string>();
 }

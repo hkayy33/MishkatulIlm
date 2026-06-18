@@ -71,8 +71,20 @@ public sealed class AdminCalendarController(AppDbContext db) : ControllerBase
         if (request.EndsAtUtc <= request.StartsAtUtc)
             return BadRequest(new { message = "End time must be after start time." });
 
+        var title = request.Title?.Trim();
+        if (string.IsNullOrEmpty(title))
+            return BadRequest(new { message = "Title is required." });
+
+        var description = TrimOrNull(request.Description);
+
         var start = DateTime.SpecifyKind(request.StartsAtUtc, DateTimeKind.Utc);
         var end = DateTime.SpecifyKind(request.EndsAtUtc, DateTimeKind.Utc);
+        var durationMinutes = (int)Math.Round((end - start).TotalMinutes);
+        if (!LessonScheduleService.TryNormalizeDuration(durationMinutes, out _, out var durationError))
+            return BadRequest(new { message = durationError });
+
+        if (!LessonScheduleService.FitsDayWindow(start, durationMinutes))
+            return BadRequest(new { message = "Slot must fit between 8:00 and 22:00 UTC." });
 
         var booked = await db.LessonSlots.AsNoTracking()
             .Include(s => s.Student!)
@@ -83,24 +95,16 @@ public sealed class AdminCalendarController(AppDbContext db) : ControllerBase
         if (booked.Any(s => s.StudentUserId is not null))
             return Conflict(new { message = "That time is already booked by a student." });
 
-        var existing = booked.FirstOrDefault();
-        if (existing is not null)
-        {
-            return Ok(
-                new LessonSlotDto
-                {
-                    SlotId = existing.Id,
-                    StartsAtUtc = existing.StartsAtUtc,
-                    EndsAtUtc = existing.EndsAtUtc,
-                    IsBooked = false,
-                });
-        }
+        if (booked.Any(s => s.StudentUserId is null))
+            return Conflict(new { message = "That time overlaps another calendar entry." });
 
         var slot = new LessonSlot
         {
             Id = Guid.NewGuid(),
             StartsAtUtc = start,
             EndsAtUtc = end,
+            Title = title,
+            Description = description,
             CreatedAtUtc = DateTime.UtcNow,
         };
         db.LessonSlots.Add(slot);
@@ -108,13 +112,68 @@ public sealed class AdminCalendarController(AppDbContext db) : ControllerBase
 
         return Created(
             $"/api/admin/calendar/slots/{slot.Id}",
-            new LessonSlotDto
-            {
-                SlotId = slot.Id,
-                StartsAtUtc = slot.StartsAtUtc,
-                EndsAtUtc = slot.EndsAtUtc,
-                IsBooked = false,
-            });
+            ToLessonSlotDto(slot));
+    }
+
+    [HttpPatch("slots/{slotId:guid}")]
+    public async Task<IActionResult> UpdateSlot(
+        Guid slotId,
+        [FromBody] UpdateLessonSlotRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!await IsCurrentUserAdminAsync(cancellationToken))
+            return Forbid();
+
+        var slot = await db.LessonSlots.FirstOrDefaultAsync(s => s.Id == slotId, cancellationToken);
+        if (slot is null)
+            return NotFound();
+
+        if (slot.StudentUserId is not null)
+            return Conflict(new { message = "Cannot edit a booked lesson from the calendar." });
+
+        var start = request.StartsAtUtc is { } requestedStart
+            ? DateTime.SpecifyKind(requestedStart, DateTimeKind.Utc)
+            : slot.StartsAtUtc;
+        var end = request.EndsAtUtc is { } requestedEnd
+            ? DateTime.SpecifyKind(requestedEnd, DateTimeKind.Utc)
+            : slot.EndsAtUtc;
+
+        if (end <= start)
+            return BadRequest(new { message = "End time must be after start time." });
+
+        var durationMinutes = (int)Math.Round((end - start).TotalMinutes);
+        if (!LessonScheduleService.TryNormalizeDuration(durationMinutes, out _, out var durationError))
+            return BadRequest(new { message = durationError });
+
+        if (!LessonScheduleService.FitsDayWindow(start, durationMinutes))
+            return BadRequest(new { message = "Slot must fit between 8:00 and 22:00 UTC." });
+
+        if (request.Title is not null)
+        {
+            var title = request.Title.Trim();
+            if (string.IsNullOrEmpty(title))
+                return BadRequest(new { message = "Title is required." });
+            slot.Title = title;
+        }
+
+        if (request.Description is not null)
+            slot.Description = TrimOrNull(request.Description);
+
+        var overlapping = await db.LessonSlots.AsNoTracking()
+            .Where(s => s.Id != slotId && s.StartsAtUtc < end && s.EndsAtUtc > start)
+            .ToListAsync(cancellationToken);
+
+        if (overlapping.Any(s => s.StudentUserId is not null))
+            return Conflict(new { message = "That time is already booked by a student." });
+
+        if (overlapping.Any(s => s.StudentUserId is null))
+            return Conflict(new { message = "That time overlaps another calendar entry." });
+
+        slot.StartsAtUtc = start;
+        slot.EndsAtUtc = end;
+        await db.SaveChangesAsync(cancellationToken);
+
+        return Ok(ToLessonSlotDto(slot));
     }
 
     [HttpDelete("slots/{slotId:guid}")]
@@ -190,5 +249,23 @@ public sealed class AdminCalendarController(AppDbContext db) : ControllerBase
             return false;
 
         return await db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.IsAdmin, cancellationToken);
+    }
+
+    private static LessonSlotDto ToLessonSlotDto(LessonSlot slot) =>
+        new()
+        {
+            SlotId = slot.Id,
+            StartsAtUtc = slot.StartsAtUtc,
+            EndsAtUtc = slot.EndsAtUtc,
+            IsBooked = slot.StudentUserId is not null,
+            StudentUserId = slot.StudentUserId,
+            Title = TrimOrNull(slot.Title),
+            Description = TrimOrNull(slot.Description),
+        };
+
+    private static string? TrimOrNull(string? value)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed;
     }
 }

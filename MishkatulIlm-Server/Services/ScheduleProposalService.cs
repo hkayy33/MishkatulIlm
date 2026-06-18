@@ -128,6 +128,8 @@ public sealed class ScheduleProposalService(AppDbContext db)
                 conflict.EndsAtUtc = end;
                 conflict.AttendanceStatus = AttendanceStatusCodes.Attending;
                 conflict.StudentNote = null;
+                conflict.Title = null;
+                conflict.Description = null;
                 booked.Add(conflict);
                 continue;
             }

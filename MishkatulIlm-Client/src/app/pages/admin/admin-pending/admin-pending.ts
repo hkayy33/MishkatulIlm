@@ -12,6 +12,7 @@ import {
   labelFrequencyCode,
   labelGenderCode,
   labelLevelCode,
+  labelPreferredLessonDurationCode,
   labelSubjectCode,
 } from '../../../core/utils/onboarding-labels';
 import { formatSlotRange, monthUtcRange } from '../../../core/utils/datetime-local';
@@ -62,6 +63,7 @@ export class AdminPending {
   protected readonly labelGenderCode = labelGenderCode;
   protected readonly labelAgeRangeCode = labelAgeRangeCode;
   protected readonly labelFrequencyCode = labelFrequencyCode;
+  protected readonly labelPreferredLessonDurationCode = labelPreferredLessonDurationCode;
   protected readonly formatAvailability = formatAvailabilityCodes;
   protected readonly formatSlotRange = formatSlotRange;
   protected readonly selectionHint = selectionHint;

@@ -67,15 +67,27 @@
 
       <h2 class="details-section-title">Payment account</h2>
       <p class="admin-muted details-section-lead">
-        Shown to students when they pay for lessons. Hourly rate is used to calculate monthly totals ($5/hr default).
+        Shown to students when they pay for lessons. Lesson totals use $5 per 45-minute lesson and
+        $7 per hour by default.
       </p>
 
       <label class="details-field">
-        <span>Hourly rate (USD)</span>
+        <span>45-minute lesson rate (USD)</span>
         <input
           type="number"
-          name="paymentHourlyRateUsd"
-          [(ngModel)]="paymentHourlyRateUsd"
+          name="paymentRate45MinUsd"
+          [(ngModel)]="paymentRate45MinUsd"
+          min="1"
+          step="0.01"
+        />
+      </label>
+
+      <label class="details-field">
+        <span>1-hour lesson rate (USD)</span>
+        <input
+          type="number"
+          name="paymentRate60MinUsd"
+          [(ngModel)]="paymentRate60MinUsd"
           min="1"
           step="0.01"
         />

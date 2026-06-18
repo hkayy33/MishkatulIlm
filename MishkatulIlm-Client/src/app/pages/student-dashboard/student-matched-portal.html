@@ -338,7 +338,10 @@
 
       <div class="matched-page">
         <h1 class="matched-page-title">Payments</h1>
-        <p class="matched-page-lead">Monthly payment for your scheduled lessons at $5 per hour.</p>
+        <p class="matched-page-lead">
+          Lessons are billed at ${{ paymentStatement()?.rate45MinUsd ?? lessonRate45MinUsd }} per
+          45-minute lesson or ${{ paymentStatement()?.rate60MinUsd ?? lessonRate60MinUsd }} per hour.
+        </p>
 
         @if (nextBlockBookingIssue(); as bookingIssue) {
           <div class="matched-payment-status matched-payment-status--pending" role="alert">
@@ -444,8 +447,8 @@
                     @for (line of statement.lessons; track line.slotId) {
                       <tr>
                         <td>{{ formatLessonInZone(line.startsAtUtc, line.endsAtUtc) }}</td>
-                        <td>{{ formatLessonHours(line.durationMinutes) }} hr</td>
-                        <td>{{ line.hourlyRate | currency: statement.currency : 'symbol' : '1.0-2' }}/hr</td>
+                        <td>{{ formatLessonDuration(line.durationMinutes) }}</td>
+                        <td>{{ formatLessonRate(line, statement.currency) }}</td>
                         <td>{{ line.amount | currency: statement.currency : 'symbol' : '1.0-2' }}</td>
                       </tr>
                     }

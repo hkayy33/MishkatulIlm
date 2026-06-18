@@ -4,6 +4,8 @@ export interface SchedulingSettings {
   tutorCity: string;
   tutorTimeZoneId: string;
   paymentHourlyRateUsd: number;
+  paymentRate45MinUsd: number;
+  paymentRate60MinUsd: number;
   paymentAccountName: string;
   paymentAccountNumber: string;
   paymentSortCode: string;
@@ -17,6 +19,8 @@ export interface UpdateSchedulingSettingsBody {
   tutorCity: string;
   tutorTimeZoneId: string;
   paymentHourlyRateUsd: number;
+  paymentRate45MinUsd: number;
+  paymentRate60MinUsd: number;
   paymentAccountName: string;
   paymentAccountNumber: string;
   paymentSortCode: string;

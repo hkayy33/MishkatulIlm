@@ -12,6 +12,7 @@ public sealed class StudentOnboardingProfile
     public string PhoneNumber { get; set; } = string.Empty;
     public string CurrentLevel { get; set; } = string.Empty;
     public string LessonFrequency { get; set; } = string.Empty;
+    public string PreferredLessonDuration { get; set; } = string.Empty;
 
     /// <summary>Stored as JSON array in PostgreSQL (jsonb).</summary>
     public List<string> SubjectCodes { get; set; } = new();

@@ -32,6 +32,7 @@ export interface StudentApplicationSummary {
   city?: string;
   currentLevel: string;
   lessonFrequency: string;
+  preferredLessonDuration?: string;
   subjectCodes: string[];
   preferredAvailability: string[];
 }

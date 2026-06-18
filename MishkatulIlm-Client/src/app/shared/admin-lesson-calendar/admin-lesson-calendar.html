@@ -20,12 +20,12 @@
               type="button"
               class="cal-cell cal-cell--day"
               [class.cal-cell--selected]="selectedDay()?.toDateString() === cell.date.toDateString()"
-              [class.cal-cell--has-picks]="summary.hasPicks"
+              [class.cal-cell--has-picks]="pickMode() && summary.hasPicks"
               role="gridcell"
               (click)="selectDay(cell.date)"
             >
               <span class="cal-daynum">{{ cell.date.getDate() }}</span>
-              @if (summary.hasPicks) {
+              @if (pickMode() && summary.hasPicks) {
                 <span class="cal-slot-count cal-slot-count--picked">Scheduled</span>
               } @else if (summary.available > 0) {
                 <span class="cal-slot-count cal-slot-count--avail">{{ summary.available }} avail</span>
@@ -56,75 +56,141 @@
           student's existing lessons to free those times for booking. Click an added lesson again to
           remove it. Grey = other students; striped = outside preferences (still selectable).
         </p>
+      } @else if (manageMode()) {
+        <p class="cal-side-hint">
+          Click an available time to add an entry. Use Free trial at the bottom for a quick 30-minute
+          slot. Click an existing entry to view or edit it. Grey rows are student lessons.
+        </p>
       }
 
       <ul class="slot-timeline" role="list">
-        @for (slot of daySlotViews(); track slot.startsAtUtc) {
-          <li role="listitem">
-            <button
-              type="button"
-              class="slot-row"
-              [class.slot-row--open]="slot.state === 'open'"
-              [class.slot-row--booked]="slot.state === 'booked'"
-              [class.slot-row--booked-student]="slot.state === 'booked-student'"
-              [class.slot-row--outside]="slot.state === 'outside-preference'"
-              [class.slot-row--selected-start]="slot.state === 'selected-start'"
-              [class.slot-row--selected-range]="slot.state === 'selected-range'"
-              [class.slot-row--confirmed]="slot.state === 'confirmed'"
-              [disabled]="!pickMode() || !isSlotClickable(slot)"
-              (click)="onSlotClick(slot)"
+        @for (item of dayTimelineItems(); track item.trackId) {
+          @if (item.kind === 'unified-block') {
+            <li class="slot-unified-block" role="listitem">
+              <button
+                type="button"
+                class="slot-unified-block__button"
+                [class.slot-unified-block__button--admin]="item.occupancyState === 'admin-entry'"
+                [class.slot-unified-block__button--booked]="item.occupancyState === 'booked'"
+                [class.slot-unified-block__button--selected-start]="item.selectionState === 'selected-start'"
+                [class.slot-unified-block__button--selected-range]="item.selectionState === 'selected-range'"
+                [disabled]="!(pickMode() || manageMode()) || !isTimelineItemClickable(item)"
+                (click)="onSlotClick(item.slot, $event)"
+              >
+                <span class="slot-unified-block__time">
+                  <span class="slot-row__time">{{ item.timeLabel }}</span>
+                  @if (item.studentTimeLabel) {
+                    <span class="slot-row__student-time">Student: {{ item.studentTimeLabel }}</span>
+                  }
+                </span>
+                @if (item.statusLabel) {
+                  <span class="slot-unified-block__status">{{ item.statusLabel }}</span>
+                }
+              </button>
+            </li>
+          } @else {
+            @let slot = item.slot;
+            <li
+              role="listitem"
+              [class.slot-timeline__item--extension]="slot.rowKind === 'extension-15'"
             >
-              <span class="slot-row__times">
-                <span class="slot-row__time">{{ slot.tutorTimeLabel }}</span>
-                @if (slot.studentTimeLabel) {
-                  <span class="slot-row__student-time">Student: {{ slot.studentTimeLabel }}</span>
-                }
-              </span>
-              <span class="slot-row__status">
-                @switch (slot.state) {
-                  @case ('booked') {
-                    {{ bookedSlotLabel(slot) }}
+              <button
+                type="button"
+                class="slot-row"
+                [class.slot-row--extension-15]="slot.rowKind === 'extension-15'"
+                [class.slot-row--open]="slot.occupancyState === 'open'"
+                [class.slot-row--booked]="slot.occupancyState === 'booked'"
+                [class.slot-row--booked-student]="slot.occupancyState === 'booked-student'"
+                [class.slot-row--outside]="slot.occupancyState === 'outside-preference'"
+                [class.slot-row--confirmed]="slot.occupancyState === 'confirmed'"
+                [class.slot-row--admin]="slot.occupancyState === 'admin-entry'"
+                [class.slot-row--selected-start]="slot.selectionState === 'selected-start'"
+                [class.slot-row--selected-range]="slot.selectionState === 'selected-range'"
+                [disabled]="!(pickMode() || manageMode()) || !isSlotClickable(slot)"
+                (click)="onSlotClick(slot, $event)"
+              >
+                <span class="slot-row__times">
+                  <span class="slot-row__time">{{ slot.tutorTimeLabel }}</span>
+                  @if (slot.studentTimeLabel) {
+                    <span class="slot-row__student-time">Student: {{ slot.studentTimeLabel }}</span>
                   }
-                  @case ('booked-student') {
-                    {{ bookedSlotLabel(slot) }} · click to free
-                  }
-                  @case ('outside-preference') {
-                    Outside preference
-                  }
-                  @case ('selected-start') {
-                    Start
-                  }
-                  @case ('selected-range') {
-                    Selected
-                  }
-                  @case ('confirmed') {
-                    In schedule
-                  }
-                  @default {
-                    Available
-                  }
-                }
-              </span>
-            </button>
-          </li>
+                </span>
+                <span class="slot-row__status">{{ slotStatusLabel(slot) }}</span>
+              </button>
+            </li>
+          }
         }
       </ul>
 
-      @if (pickMode() && draftStartUtc()) {
+      @if ((pickMode() || manageMode()) && draftStartUtc()) {
         <div class="slot-draft-panel">
           <p class="slot-draft-panel__summary">
             <strong>{{ draftSummaryLabel() }}</strong>
           </p>
-          <div class="slot-duration-picker" role="group" aria-label="Lesson duration">
-            @for (mins of durationOptions; track mins) {
+          @if (manageMode() && !pickMode()) {
+            @if (draftIsFreeTrial()) {
+              <div class="slot-draft-fields">
+                <label class="slot-draft-field">
+                  <span>Description (optional)</span>
+                  <textarea
+                    rows="3"
+                    maxlength="2000"
+                    [value]="draftDescription()"
+                    (input)="draftDescription.set($any($event.target).value)"
+                    placeholder="e.g. Student name or notes"
+                  ></textarea>
+                </label>
+              </div>
+            } @else {
+              <div class="slot-draft-fields">
+                <label class="slot-draft-field">
+                  <span>Title</span>
+                  <input
+                    type="text"
+                    maxlength="200"
+                    [value]="draftTitle()"
+                    (input)="draftTitle.set($any($event.target).value)"
+                    placeholder="e.g. Office hours"
+                  />
+                </label>
+                <label class="slot-draft-field">
+                  <span>Description (optional)</span>
+                  <textarea
+                    rows="3"
+                    maxlength="2000"
+                    [value]="draftDescription()"
+                    (input)="draftDescription.set($any($event.target).value)"
+                    placeholder="Notes for this time block"
+                  ></textarea>
+                </label>
+              </div>
+            }
+          }
+          <div class="slot-duration-group">
+            @if (!draftIsFreeTrial()) {
+              <div class="slot-duration-picker" role="group" aria-label="Lesson duration">
+                @for (mins of durationOptions; track mins) {
+                  <button
+                    type="button"
+                    class="slot-duration-btn"
+                    [class.slot-duration-btn--active]="draftDurationMinutes() === mins"
+                    [disabled]="!draftDurationChoices().includes(mins)"
+                    (click)="onDurationPick(mins)"
+                  >
+                    {{ durationLabel(mins) }}
+                  </button>
+                }
+              </div>
+            }
+            @if (manageMode() && !pickMode()) {
               <button
                 type="button"
-                class="slot-duration-btn"
-                [class.slot-duration-btn--active]="draftDurationMinutes() === mins"
-                [disabled]="!draftDurationChoices().includes(mins)"
-                (click)="onDurationPick(mins)"
+                class="slot-free-trial-btn"
+                [class.slot-free-trial-btn--active]="draftIsFreeTrial()"
+                [disabled]="!canSelectFreeTrial()"
+                (click)="selectFreeTrialPreset()"
               >
-                {{ durationLabel(mins) }}
+                Free trial (30 min)
               </button>
             }
           </div>
@@ -138,7 +204,7 @@
               [disabled]="!canConfirmDraft()"
               (click)="confirmDraftLesson()"
             >
-              Add lesson
+              {{ manageMode() && !pickMode() ? (draftIsFreeTrial() ? 'Add free trial' : 'Add to calendar') : 'Add lesson' }}
             </button>
           </div>
         </div>

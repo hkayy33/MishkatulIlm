@@ -2,7 +2,7 @@
 
 | Component | Platform | URL example |
 |-----------|----------|-------------|
-| Angular app | **Vercel** | `https://your-app.vercel.app` |
+| Angular app | **Vercel** (custom domain) | `https://www.alusooliyyah.com` |
 | .NET API | **Fly.io** | `https://mishkatulilm-api.fly.dev` |
 | Database & auth | **Supabase** | Postgres + Auth |
 
@@ -14,9 +14,10 @@
 2. **Database** → Settings → Connection string (URI). Use this for `ConnectionStrings__DefaultConnection` on Fly (include password; `SSL Mode=Require`).
 3. **Settings → API** → copy **Project URL** and **anon public** key (Vercel) and **service_role** key (Fly only).
 4. **Authentication → URL configuration**:
-   - **Site URL**: `https://your-app.vercel.app`
+   - **Site URL**: `https://www.alusooliyyah.com`
    - **Redirect URLs**:  
-     `https://your-app.vercel.app/auth/callback`  
+     `https://www.alusooliyyah.com/auth/callback`  
+     `https://alusooliyyah.com/auth/callback`  
      `http://localhost:4200/auth/callback` (local dev)
 
 5. **Authentication → Email Templates → Confirm signup**:
@@ -33,10 +34,12 @@
 6. **Production checklist**
    - [ ] Fly `ConnectionStrings__DefaultConnection` → `db.kpvfrbgpbmlxkqqibpjp.supabase.co` (same project as auth)
    - [ ] Fly `Supabase__Url` → `https://kpvfrbgpbmlxkqqibpjp.supabase.co` (no `/rest/v1`)
-   - [ ] Fly `Cors__AllowedOrigins__0` → `https://al-usooliyyah.vercel.app`
+   - [ ] Fly `Cors__AllowedOrigins__0` → `https://www.alusooliyyah.com`
+   - [ ] Fly `Cors__AllowedOrigins__1` → `https://alusooliyyah.com` (apex redirect)
+   - [ ] Fly `Stripe__ClientAppUrl` → `https://www.alusooliyyah.com`
    - [ ] Vercel `API_BASE_URL` → `https://mishkatulilm-api.fly.dev`
    - [ ] Vercel `SUPABASE_URL` + `SUPABASE_ANON_KEY` for project `kpvfrbgpbmlxkqqibpjp`
-   - [ ] Vercel `AUTH_REDIRECT_ORIGIN` → `https://al-usooliyyah.vercel.app`
+   - [ ] Vercel `AUTH_REDIRECT_ORIGIN` → `https://www.alusooliyyah.com`
    - [ ] Email template uses `{{ .ConfirmationURL }}` (not a custom `token_hash` link)
    - [ ] Test: register in browser → open email link **in that same browser** → lands on `/onboarding`
 
@@ -79,17 +82,16 @@ fly secrets set \
   Stripe__SecretKey="sk_live_..." \
   Stripe__WebhookSecret="whsec_..." \
   Stripe__ProductId="prod_..." \
-  Stripe__ClientAppUrl="https://your-app.vercel.app" \
-  Cors__AllowedOrigins__0="https://your-app.vercel.app"
+  Stripe__ClientAppUrl="https://www.alusooliyyah.com" \
+  Cors__AllowedOrigins__0="https://www.alusooliyyah.com" \
+  Cors__AllowedOrigins__1="https://alusooliyyah.com"
 ```
 
-For Vercel preview deployments, add preview origins:
+For Vercel preview deployments, keep the preview URL as an extra origin (optional):
 
 ```bash
-fly secrets set Cors__AllowedOrigins__1="https://your-app-*.vercel.app"
+fly secrets set Cors__AllowedOrigins__2="https://al-usooliyyah.vercel.app"
 ```
-
-Note: Fly may not support wildcards in CORS; add specific preview URLs or use a single production origin.
 
 Check health:
 
@@ -124,6 +126,7 @@ Use the signing secret as `Stripe__WebhookSecret`.
 | `API_BASE_URL` | `https://mishkatulilm-api.fly.dev` |
 | `SUPABASE_URL` | `https://YOUR_PROJECT.supabase.co` |
 | `SUPABASE_ANON_KEY` | anon key from Supabase |
+| `AUTH_REDIRECT_ORIGIN` | `https://www.alusooliyyah.com` |
 
 Redeploy after changing env vars (they are baked in at build time).
 
@@ -134,6 +137,7 @@ cd MishkatulIlm-Client
 export API_BASE_URL=https://mishkatulilm-api.fly.dev
 export SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 export SUPABASE_ANON_KEY=your_anon_key
+export AUTH_REDIRECT_ORIGIN=https://www.alusooliyyah.com
 npm run build:deploy
 npx serve dist/MishkatulIlm-Client/browser
 ```

@@ -95,6 +95,7 @@ public sealed class DevRolloverDemoService(
             {
                 UserId = user.Id,
                 LessonFrequency = "ONCE-WEEK",
+                PreferredLessonDuration = PreferredLessonDurationRules.Min60,
                 Country = "United Kingdom",
                 City = "London",
             };
@@ -103,6 +104,7 @@ public sealed class DevRolloverDemoService(
         else
         {
             user.Onboarding.LessonFrequency = "ONCE-WEEK";
+            user.Onboarding.PreferredLessonDuration = PreferredLessonDurationRules.Min60;
         }
 
         var submissions = await db.PaymentSubmissions

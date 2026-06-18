@@ -5,6 +5,10 @@ import type {
   UpdateSchedulingSettingsBody,
 } from '../models/scheduling-settings.models';
 import { formatHttpError } from '../utils/http-error.util';
+import {
+  LESSON_RATE_45_MIN_USD,
+  LESSON_RATE_60_MIN_USD,
+} from '../utils/lesson-pricing';
 import { AdminApiService } from './admin-api.service';
 
 @Injectable({ providedIn: 'root' })
@@ -33,7 +37,9 @@ export class SchedulingSettingsService {
         tutorCountry: '',
         tutorCity: '',
         tutorTimeZoneId: 'UTC',
-        paymentHourlyRateUsd: 5,
+        paymentHourlyRateUsd: LESSON_RATE_60_MIN_USD,
+        paymentRate45MinUsd: LESSON_RATE_45_MIN_USD,
+        paymentRate60MinUsd: LESSON_RATE_60_MIN_USD,
         paymentAccountName: '',
         paymentAccountNumber: '',
         paymentSortCode: '',
@@ -65,6 +71,8 @@ function normalizeSettings(raw: SchedulingSettings): SchedulingSettings {
     TutorCity?: string;
     TutorTimeZoneId?: string;
     PaymentHourlyRateUsd?: number;
+    PaymentRate45MinUsd?: number;
+    PaymentRate60MinUsd?: number;
     PaymentAccountName?: string;
     PaymentAccountNumber?: string;
     PaymentSortCode?: string;
@@ -76,7 +84,12 @@ function normalizeSettings(raw: SchedulingSettings): SchedulingSettings {
     tutorCountry: r.tutorCountry ?? r.TutorCountry ?? '',
     tutorCity: r.tutorCity ?? r.TutorCity ?? '',
     tutorTimeZoneId: r.tutorTimeZoneId ?? r.TutorTimeZoneId ?? 'UTC',
-    paymentHourlyRateUsd: r.paymentHourlyRateUsd ?? r.PaymentHourlyRateUsd ?? 5,
+    paymentHourlyRateUsd:
+      r.paymentHourlyRateUsd ?? r.PaymentHourlyRateUsd ?? LESSON_RATE_60_MIN_USD,
+    paymentRate45MinUsd:
+      r.paymentRate45MinUsd ?? r.PaymentRate45MinUsd ?? LESSON_RATE_45_MIN_USD,
+    paymentRate60MinUsd:
+      r.paymentRate60MinUsd ?? r.PaymentRate60MinUsd ?? LESSON_RATE_60_MIN_USD,
     paymentAccountName: r.paymentAccountName ?? r.PaymentAccountName ?? '',
     paymentAccountNumber: r.paymentAccountNumber ?? r.PaymentAccountNumber ?? '',
     paymentSortCode: r.paymentSortCode ?? r.PaymentSortCode ?? '',

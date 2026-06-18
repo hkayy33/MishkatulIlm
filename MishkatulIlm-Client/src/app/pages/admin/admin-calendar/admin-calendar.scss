@@ -239,6 +239,118 @@
   cursor: pointer;
 }
 
+.cal-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(28, 27, 24, 0.45);
+}
+
+.cal-modal {
+  width: 100%;
+  max-width: 28rem;
+  max-height: 85vh;
+  overflow: auto;
+  background: #fffef9;
+  border-radius: 12px;
+  padding: 1.35rem;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+
+  h2 {
+    margin: 0 0 0.35rem;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.2rem;
+  }
+
+  &__time {
+    margin: 0 0 1rem;
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 0.9rem;
+    color: #5c584f;
+  }
+
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    margin-bottom: 1.25rem;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 0.85rem;
+
+    > span {
+      font-weight: 600;
+      color: #5c584f;
+    }
+
+    input,
+    textarea,
+    select {
+      padding: 0.45rem 0.55rem;
+      border: 1px solid rgba(28, 27, 24, 0.18);
+      border-radius: 6px;
+      font: inherit;
+      resize: vertical;
+    }
+  }
+
+  &__durations {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  &__actions-right {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+  }
+}
+
+.slot-duration-btn {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.4rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid rgba(28, 27, 24, 0.18);
+  background: #fff;
+  cursor: pointer;
+
+  &--active {
+    background: #8b7355;
+    border-color: #8b7355;
+    color: #fff;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.admin-btn--danger {
+  color: #8a2b2b;
+  border-color: rgba(139, 44, 44, 0.35);
+}
+
 @media (max-width: 900px) {
   .cal-layout {
     grid-template-columns: 1fr;

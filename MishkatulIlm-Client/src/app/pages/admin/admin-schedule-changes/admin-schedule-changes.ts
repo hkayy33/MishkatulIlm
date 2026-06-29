@@ -12,6 +12,7 @@ import {
   labelFrequencyCode,
   labelGenderCode,
   labelLevelCode,
+  labelPreferredLessonDurationCode,
   labelSubjectCode,
 } from '../../../core/utils/onboarding-labels';
 import { formatSlotRange, monthUtcRange } from '../../../core/utils/datetime-local';
@@ -64,6 +65,7 @@ export class AdminScheduleChanges implements OnInit {
   protected readonly labelGenderCode = labelGenderCode;
   protected readonly labelAgeRangeCode = labelAgeRangeCode;
   protected readonly labelFrequencyCode = labelFrequencyCode;
+  protected readonly labelPreferredLessonDurationCode = labelPreferredLessonDurationCode;
   protected readonly formatAvailability = formatAvailabilityCodes;
   protected readonly formatSlotRange = formatSlotRange;
   protected readonly bookingPeriodLabel = bookingPeriodLabel;
@@ -283,6 +285,7 @@ function normalizeRow(
     city: raw.city ?? null,
     currentLevel: raw.currentLevel ?? null,
     lessonFrequency: raw.lessonFrequency ?? null,
+    preferredLessonDuration: raw.preferredLessonDuration ?? null,
     subjectCodes: raw.subjectCodes ?? raw.SubjectCodes ?? [],
     preferredAvailability: raw.preferredAvailability ?? raw.PreferredAvailability ?? [],
   };

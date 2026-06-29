@@ -4,7 +4,10 @@ using MishkatulIlm_Server.Dtos;
 
 namespace MishkatulIlm_Server.Services;
 
-public sealed class StudentPaymentService(AppDbContext db, SchedulingSettingsService schedulingSettings)
+public sealed class StudentPaymentService(
+    AppDbContext db,
+    SchedulingSettingsService schedulingSettings,
+    LessonBillingContextService billingContext)
 {
     public async Task<PaymentStatementDto?> GetStatementAsync(
         Guid userId,
@@ -16,32 +19,20 @@ public sealed class StudentPaymentService(AppDbContext db, SchedulingSettingsSer
             return null;
 
         var utcNow = DateTime.UtcNow;
-        var (billingYear, billingMonth) = LessonBillingService.ResolveBillingMonth(user, utcNow);
-        var (monthStart, monthEnd) = LessonBillingService.MonthRangeUtc(billingYear, billingMonth);
-
-        var lessons = await db.LessonSlots.AsNoTracking()
-            .Where(s => s.StudentUserId == userId && s.StartsAtUtc >= monthStart && s.StartsAtUtc < monthEnd)
-            .OrderBy(s => s.StartsAtUtc)
-            .ToListAsync(cancellationToken);
+        var billing = await billingContext.ResolveAsync(user, utcNow, cancellationToken);
+        var lessons = await billingContext.LoadBillableLessonsAsync(billing, userId, cancellationToken);
 
         var currentSubmission = await db.PaymentSubmissions.AsNoTracking()
-            .Where(s => s.StudentUserId == userId && s.BillingYear == billingYear && s.BillingMonth == billingMonth)
+            .Where(s => s.StudentUserId == userId && s.BillingYear == billing.BillingYear && s.BillingMonth == billing.BillingMonth)
             .OrderByDescending(s => s.SubmittedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var summary = StudentPaymentSummaryBuilder.Build(user, currentSubmission, utcNow);
+        var summary = StudentPaymentSummaryBuilder.Build(user, currentSubmission, utcNow, billing);
         if (!summary.ShowPaymentDetails)
             return null;
 
         var settings = await schedulingSettings.GetEntityAsync(cancellationToken);
-        return LessonBillingService.BuildStatement(
-            user,
-            lessons,
-            settings,
-            billingYear,
-            billingMonth,
-            currentSubmission,
-            utcNow);
+        return BuildStatement(user, lessons, settings, billing, currentSubmission, utcNow);
     }
 
     public async Task<PaymentSubmission?> GetCurrentSubmissionAsync(
@@ -54,9 +45,9 @@ public sealed class StudentPaymentService(AppDbContext db, SchedulingSettingsSer
             return null;
 
         var utcNow = DateTime.UtcNow;
-        var (billingYear, billingMonth) = LessonBillingService.ResolveBillingMonth(user, utcNow);
+        var billing = await billingContext.ResolveAsync(user, utcNow, cancellationToken);
         return await db.PaymentSubmissions
-            .Where(s => s.StudentUserId == userId && s.BillingYear == billingYear && s.BillingMonth == billingMonth)
+            .Where(s => s.StudentUserId == userId && s.BillingYear == billing.BillingYear && s.BillingMonth == billing.BillingMonth)
             .OrderByDescending(s => s.SubmittedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
     }
@@ -73,9 +64,9 @@ public sealed class StudentPaymentService(AppDbContext db, SchedulingSettingsSer
             return (false, "Payments are available after you accept your lesson schedule.", null);
 
         var utcNow = DateTime.UtcNow;
-        var (billingYear, billingMonth) = LessonBillingService.ResolveBillingMonth(user, utcNow);
+        var billing = await billingContext.ResolveAsync(user, utcNow, cancellationToken);
         var existing = await db.PaymentSubmissions
-            .Where(s => s.StudentUserId == userId && s.BillingYear == billingYear && s.BillingMonth == billingMonth)
+            .Where(s => s.StudentUserId == userId && s.BillingYear == billing.BillingYear && s.BillingMonth == billing.BillingMonth)
             .OrderByDescending(s => s.SubmittedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -85,25 +76,15 @@ public sealed class StudentPaymentService(AppDbContext db, SchedulingSettingsSer
         if (existing?.Status == PaymentSubmissionStatusCodes.PendingVerification)
             return (false, "Your payment is already pending verification.", null);
 
-        var (monthStart, monthEnd) = LessonBillingService.MonthRangeUtc(billingYear, billingMonth);
-        var lessons = await db.LessonSlots.AsNoTracking()
-            .Where(s => s.StudentUserId == userId && s.StartsAtUtc >= monthStart && s.StartsAtUtc < monthEnd)
-            .ToListAsync(cancellationToken);
+        var lessons = await billingContext.LoadBillableLessonsAsync(billing, userId, cancellationToken);
 
         var settings = await schedulingSettings.GetEntityAsync(cancellationToken);
-        var statement = LessonBillingService.BuildStatement(
-            user,
-            lessons,
-            settings,
-            billingYear,
-            billingMonth,
-            existing,
-            utcNow);
+        var statement = BuildStatement(user, lessons, settings, billing, existing, utcNow);
 
         if (statement.TotalAmount <= 0)
             return (false, "There are no billable lessons for this billing period.", null);
 
-        var summary = StudentPaymentSummaryBuilder.Build(user, existing, utcNow);
+        var summary = StudentPaymentSummaryBuilder.Build(user, existing, utcNow, billing);
         if (!summary.CanSubmitPayment)
             return (false, "Payment submission is not available right now.", null);
 
@@ -111,8 +92,8 @@ public sealed class StudentPaymentService(AppDbContext db, SchedulingSettingsSer
         {
             Id = Guid.NewGuid(),
             StudentUserId = userId,
-            BillingYear = billingYear,
-            BillingMonth = billingMonth,
+            BillingYear = billing.BillingYear,
+            BillingMonth = billing.BillingMonth,
             Status = PaymentSubmissionStatusCodes.PendingVerification,
             Amount = statement.TotalAmount,
             Currency = statement.Currency,
@@ -146,5 +127,33 @@ public sealed class StudentPaymentService(AppDbContext db, SchedulingSettingsSer
             SubmittedAtUtc = s.SubmittedAtUtc,
             ReviewedAtUtc = s.ReviewedAtUtc,
         }).ToList();
+    }
+
+    private static PaymentStatementDto BuildStatement(
+        AppUser user,
+        IReadOnlyList<LessonSlot> lessons,
+        SchedulingSettings settings,
+        BillingResolution billing,
+        PaymentSubmission? currentSubmission,
+        DateTime utcNow)
+    {
+        string? labelOverride = null;
+        var billEntireList = false;
+        if (billing.IsRolloverBlock && billing.PlannedRollover is { Count: > 0 })
+        {
+            labelOverride = LessonBillingService.FormatRolloverBillingPeriod(billing.PlannedRollover);
+            billEntireList = true;
+        }
+
+        return LessonBillingService.BuildStatement(
+            user,
+            lessons,
+            settings,
+            billing.BillingYear,
+            billing.BillingMonth,
+            currentSubmission,
+            utcNow,
+            labelOverride,
+            billEntireList);
     }
 }

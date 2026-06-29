@@ -50,3 +50,97 @@
     }
   }
 }
+
+.details-section-title {
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.35rem;
+}
+
+.details-section-lead {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+}
+
+.details-password-section {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(28, 27, 24, 0.12);
+  max-width: 28rem;
+}
+
+.details-password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  position: relative;
+
+  .password-form__decoy {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+.password-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.88rem;
+
+  label {
+    font-weight: 600;
+    color: #5c584f;
+  }
+
+  &__input-wrap {
+    position: relative;
+  }
+
+  input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.5rem 2.6rem 0.5rem 0.6rem;
+    border: 1px solid rgba(28, 27, 24, 0.18);
+    border-radius: 6px;
+    font: inherit;
+  }
+
+  &__toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.35rem;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #6f6a62;
+    cursor: pointer;
+
+    &:hover {
+      color: #3a3834;
+      background: rgba(28, 27, 24, 0.06);
+    }
+
+    &:focus-visible {
+      outline: 2px solid rgba(47, 90, 63, 0.45);
+      outline-offset: 1px;
+    }
+
+    svg {
+      width: 1.1rem;
+      height: 1.1rem;
+    }
+  }
+}

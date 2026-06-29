@@ -15,6 +15,7 @@ import {
   formatAvailabilityCodes,
   labelFrequencyCode,
   labelLevelCode,
+  labelPreferredLessonDurationCode,
   labelSubjectCode,
 } from '../../core/utils/onboarding-labels';
 import { recurringLessonPatterns } from '../../core/utils/recurring-lesson-label';
@@ -49,6 +50,7 @@ export class StudentDashboard {
   protected readonly labelSubjectCode = labelSubjectCode;
   protected readonly labelLevelCode = labelLevelCode;
   protected readonly labelFrequencyCode = labelFrequencyCode;
+  protected readonly labelPreferredLessonDurationCode = labelPreferredLessonDurationCode;
   protected readonly formatAvailabilityCodes = formatAvailabilityCodes;
   protected readonly isMatched = computed(() => {
     const status = this.application()?.status;

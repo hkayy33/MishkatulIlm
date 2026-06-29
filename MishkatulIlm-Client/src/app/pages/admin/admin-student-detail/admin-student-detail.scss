@@ -1,0 +1,161 @@
+@use '../admin-page.shared';
+
+.admin-back {
+  margin: 0 0 1rem;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.9rem;
+
+  a {
+    color: #2f5a3f;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.student-detail-header {
+  margin-bottom: 1.25rem;
+
+  .admin-lead a {
+    color: #2f5a3f;
+  }
+
+  &__sep {
+    margin: 0 0.35rem;
+    color: #8a857c;
+  }
+}
+
+.student-profile-card {
+  margin-bottom: 1rem;
+}
+
+.student-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1.25rem;
+  margin: 0;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.9rem;
+
+  @media (min-width: 720px) {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  dt {
+    margin: 0 0 0.15rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6a6760;
+  }
+
+  dd {
+    margin: 0;
+    color: #1c1b18;
+  }
+
+  &__wide {
+    grid-column: 1 / -1;
+  }
+
+  &--payment {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
+.lesson-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+
+  li + li {
+    margin-top: 0.25rem;
+  }
+}
+
+.payment-badge {
+  display: inline-block;
+  font-family: 'Source Sans 3', system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+
+  &--yes {
+    background: rgba(47, 122, 79, 0.15);
+    color: #1f5f3a;
+  }
+
+  &--no {
+    background: rgba(139, 44, 44, 0.12);
+    color: #8b2c2c;
+  }
+}
+
+.nowrap {
+  white-space: nowrap;
+  font-size: 0.88rem;
+}
+
+.payment-ref {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+.status-pill {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  white-space: nowrap;
+
+  &--paid {
+    background: rgba(47, 122, 79, 0.15);
+    color: #1f5f3a;
+  }
+
+  &--awaiting {
+    background: rgba(197, 157, 95, 0.2);
+    color: #6b4f1f;
+  }
+
+  &--rejected {
+    background: rgba(139, 44, 44, 0.12);
+    color: #8b2c2c;
+  }
+}
+
+.payment-note-row td {
+  padding-top: 0;
+  padding-bottom: 0.85rem;
+  font-size: 0.85rem;
+  color: #5c584f;
+  border-top: none;
+}
+
+.payment-note-label {
+  font-weight: 600;
+  color: #3a3834;
+}
+
+.payment-lessons-covered {
+  min-width: 12rem;
+  max-width: 18rem;
+  font-size: 0.85rem;
+  vertical-align: top;
+}
+
+.payment-lesson-duration {
+  color: #6a6760;
+}
+
+.admin-card + .admin-card {
+  margin-top: 1rem;
+}

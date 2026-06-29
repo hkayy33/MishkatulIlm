@@ -1,7 +1,8 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { StudentApiService } from '../../core/services/student-api.service';
@@ -10,6 +11,12 @@ import type { PaymentStatement, StudentPaymentHistoryItem } from '../../core/mod
 import { formatSlotRange } from '../../core/utils/datetime-local';
 import { formatSlotRangeInZone } from '../../core/utils/timezone.util';
 import { formatHttpError } from '../../core/utils/http-error.util';
+import {
+  formatBillableLessonDuration,
+  LESSON_RATE_45_MIN_USD,
+  LESSON_RATE_60_MIN_USD,
+  lessonRateLabel,
+} from '../../core/utils/lesson-pricing';
 import { StudentLessonCalendar } from '../../shared/student-lesson-calendar/student-lesson-calendar';
 import { StudentWeekSchedule } from '../../shared/student-week-schedule/student-week-schedule';
 import { startOfWeekMonday } from '../../core/utils/week-schedule.util';
@@ -31,10 +38,14 @@ export class StudentMatchedPortal implements OnInit {
   private readonly studentApi = inject(StudentApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly activeTab = signal<MatchedPortalTab>('summary');
   protected readonly paymentBusy = signal(false);
   protected readonly paymentStatement = signal<PaymentStatement | null>(null);
+  protected readonly lessonRate45MinUsd = LESSON_RATE_45_MIN_USD;
+  protected readonly lessonRate60MinUsd = LESSON_RATE_60_MIN_USD;
   protected readonly paymentStatementLoading = signal(false);
   protected readonly paymentStatementError = signal<string | null>(null);
   protected readonly paymentHistory = signal<StudentPaymentHistoryItem[]>([]);
@@ -44,6 +55,10 @@ export class StudentMatchedPortal implements OnInit {
   protected readonly scheduleChangeNote = signal('');
   protected readonly showDeleteConfirm = signal(false);
   protected readonly deleteConfirmText = signal('');
+  protected readonly oldPassword = signal('');
+  protected readonly newPassword = signal('');
+  protected readonly showOldPassword = signal(false);
+  protected readonly showNewPassword = signal(false);
   protected readonly actionBusy = signal(false);
   protected readonly summaryWeekStart = signal(startOfWeekMonday(new Date()));
   protected readonly dismissedUpdateKeys = signal<ReadonlySet<string>>(readDismissedUpdateKeys());
@@ -84,6 +99,12 @@ export class StudentMatchedPortal implements OnInit {
   protected readonly showPaymentDetails = computed(
     () => this.payment()?.showPaymentDetails ?? false,
   );
+  protected readonly awaitingNextBlockPayment = computed(
+    () => this.payment()?.awaitingNextBlockPayment ?? false,
+  );
+  protected readonly nextBlockBookingIssue = computed(
+    () => this.store.portalData()?.portal?.nextBlockBookingIssue ?? null,
+  );
 
   protected readonly scheduleChangeUpdate = computed(() => {
     const update = this.store.portalData()?.portal?.scheduleChangeUpdate ?? null;
@@ -98,6 +119,73 @@ export class StudentMatchedPortal implements OnInit {
 
   ngOnInit(): void {
     this.store.reloadPortalForWeek(this.summaryWeekStart());
+    this.store.attendanceChanged
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        if (this.showPaymentDetails()) {
+          this.loadPaymentStatement();
+        }
+      });
+    this.handleFlutterwaveReturn();
+  }
+
+  private handleFlutterwaveReturn(): void {
+    const query = this.route.snapshot.queryParamMap;
+    if (query.get('payment') !== 'flutterwave') return;
+
+    const reference = query.get('reference') ?? query.get('tx_ref');
+    if (!reference) return;
+
+    const transactionId =
+      query.get('transaction_id') ??
+      query.get('transactionId') ??
+      query.get('charge_id') ??
+      query.get('id');
+    const status = (query.get('status') ?? '').toLowerCase();
+    if (status === 'cancelled' || status === 'canceled' || status === 'failed') {
+      this.store.actionError.set('Payment was not completed. You can try again when ready.');
+      this.clearFlutterwaveQueryParams();
+      return;
+    }
+
+    this.activeTab.set('payments');
+    this.paymentBusy.set(true);
+    this.studentApi
+      .verifyFlutterwavePayment(reference, transactionId)
+      .pipe(finalize(() => this.paymentBusy.set(false)))
+      .subscribe({
+        next: (res) => {
+          this.store.actionMessage.set(res.message);
+          this.store.reloadPortal(undefined, () => {
+            this.loadPaymentStatement();
+            this.loadPaymentHistory();
+          });
+          this.clearFlutterwaveQueryParams();
+        },
+        error: (err: unknown) => {
+          this.store.actionError.set(formatHttpError(err, 'Could not confirm your payment yet.'));
+          this.setTab('payments');
+          this.clearFlutterwaveQueryParams();
+        },
+      });
+  }
+
+  private clearFlutterwaveQueryParams(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        payment: null,
+        reference: null,
+        tx_ref: null,
+        transaction_id: null,
+        transactionId: null,
+        charge_id: null,
+        id: null,
+        status: null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   protected setTab(tab: MatchedPortalTab): void {
@@ -106,6 +194,9 @@ export class StudentMatchedPortal implements OnInit {
       this.store.reloadPortalForWeek(this.summaryWeekStart());
     } else if (tab === 'lessons' || tab === 'account') {
       this.store.reloadPortal();
+      if (tab === 'account') {
+        this.resetPasswordResetForm();
+      }
     } else if (tab === 'payments') {
       this.paymentStatement.set(null);
       this.paymentStatementError.set(null);
@@ -205,6 +296,16 @@ export class StudentMatchedPortal implements OnInit {
     return formatSlotRangeInZone(startsAtUtc, endsAtUtc, this.store.timeZoneId());
   }
 
+  protected formatLessonDuration(minutes: number): string {
+    return formatBillableLessonDuration(minutes);
+  }
+
+  protected formatLessonRate(line: PaymentStatement['lessons'][number], currency: string): string {
+    const label = lessonRateLabel(line.durationMinutes, line.rateLabel);
+    const rate = line.lessonRate || line.hourlyRate;
+    return `${label} — ${new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(rate)}`;
+  }
+
   protected formatLessonHours(minutes: number): string {
     const hours = minutes / 60;
     return Number.isInteger(hours) ? String(hours) : hours.toFixed(2);
@@ -285,22 +386,103 @@ export class StudentMatchedPortal implements OnInit {
   }
 
   protected submitPayment(): void {
-    if (this.paymentBusy() || !this.canSubmitPayment()) return;
+    if (this.paymentBusy() || (!this.canSubmitPayment() && !this.pendingVerification())) return;
 
     this.paymentBusy.set(true);
     this.store.actionError.set(null);
     this.studentApi
-      .submitPayment()
+      .createFlutterwaveCheckout()
       .pipe(finalize(() => this.paymentBusy.set(false)))
       .subscribe({
         next: (res) => {
-          this.store.actionMessage.set(res.message);
-          this.store.reloadPortal();
-          this.loadPaymentStatement();
-          this.loadPaymentHistory();
+          const checkoutUrl = res.checkoutUrl || (res as { link?: string }).link;
+          if (!checkoutUrl) {
+            this.store.actionError.set('Could not open the payment page. Please try again.');
+            return;
+          }
+          window.location.href = checkoutUrl;
         },
         error: (err: unknown) => {
-          this.store.actionError.set(formatHttpError(err, 'Could not submit payment.'));
+          this.store.actionError.set(formatHttpError(err, 'Could not start payment.'));
+        },
+      });
+  }
+
+  private currentPasswordFieldFocused = false;
+
+  protected resetPasswordResetForm(): void {
+    this.currentPasswordFieldFocused = false;
+    this.oldPassword.set('');
+    this.newPassword.set('');
+    this.showOldPassword.set(false);
+    this.showNewPassword.set(false);
+    this.guardAgainstPasswordAutofill();
+    for (const delay of [50, 250]) {
+      setTimeout(() => {
+        if (this.activeTab() !== 'account' || this.currentPasswordFieldFocused) return;
+        this.guardAgainstPasswordAutofill();
+      }, delay);
+    }
+  }
+
+  protected enableCurrentPasswordInput(event: Event): void {
+    (event.target as HTMLInputElement).removeAttribute('readonly');
+  }
+
+  protected onCurrentPasswordFocus(event: Event): void {
+    this.currentPasswordFieldFocused = true;
+    this.enableCurrentPasswordInput(event);
+  }
+
+  private guardAgainstPasswordAutofill(): void {
+    if (this.currentPasswordFieldFocused) return;
+    this.oldPassword.set('');
+    this.newPassword.set('');
+  }
+
+  protected submitPasswordReset(event: Event): void {
+    event.preventDefault();
+
+    const current = this.oldPassword();
+    const next = this.newPassword().trim();
+
+    if (current.length < 8) {
+      this.store.actionError.set('Enter your current password.');
+      return;
+    }
+    if (next.length < 8) {
+      this.store.actionError.set('New password must be at least 8 characters.');
+      return;
+    }
+    if (current === next) {
+      this.store.actionError.set('Choose a new password that is different from your current one.');
+      return;
+    }
+    if (!this.auth.supabaseConfigured()) {
+      this.store.actionError.set('Password changes are not available right now.');
+      return;
+    }
+
+    this.actionBusy.set(true);
+    this.store.actionError.set(null);
+    this.auth
+      .changePassword(current, next)
+      .pipe(finalize(() => this.actionBusy.set(false)))
+      .subscribe({
+        next: () => {
+          this.store.actionMessage.set('Your password has been updated.');
+          this.oldPassword.set('');
+          this.newPassword.set('');
+          this.showOldPassword.set(false);
+          this.showNewPassword.set(false);
+        },
+        error: (err: Error & { message?: string }) => {
+          const msg = err?.message ?? '';
+          if (/invalid login credentials/i.test(msg)) {
+            this.store.actionError.set('Your current password is incorrect.');
+            return;
+          }
+          this.store.actionError.set(msg || 'Could not update your password. Try again.');
         },
       });
   }

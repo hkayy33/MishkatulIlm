@@ -26,9 +26,12 @@ import {
   hasAuthCallbackParams,
   isAuthCallbackRoute,
   isPkceEmailToken,
+  markPasswordRecoveryPending,
   parseAuthCallbackError,
   PENDING_SIGNUP_EMAIL_KEY,
   PENDING_PKCE_VERIFIER_KEY,
+  clearPasswordRecoveryPending,
+  isPasswordRecoveryPending,
   redirectToAuthCallbackIfNeeded,
   restorePkceVerifierBackup,
 } from '../supabase/auth-redirect';
@@ -107,7 +110,7 @@ export class AuthService {
       if (session && authLanding && !pendingCode) {
         this.authRedirectHandled = true;
         const newSignup = href.includes('token_hash=');
-        void this.finishAuthenticatedRedirect(newSignup);
+        void this.finishSessionRedirect(href, newSignup);
       }
     };
 
@@ -386,7 +389,7 @@ export class AuthService {
     if (redirectToAuthCallbackIfNeeded(href)) return;
 
     if (this.isAuthenticated() && (hasAuthCallbackParams(href) || onCallback)) {
-      await this.finishAuthenticatedRedirect(newSignup);
+      await this.finishSessionRedirect(href, newSignup);
       return;
     }
 
@@ -397,14 +400,14 @@ export class AuthService {
 
     if (onCallback) {
       if (this.isAuthenticated()) {
-        await this.finishAuthenticatedRedirect(newSignup);
+        await this.finishSessionRedirect(href, newSignup);
         return;
       }
 
       const recovered = await this.tryRecoverSessionFromCallback(this.getClient());
       if (recovered) {
         this.zone.run(() => this.applySession(recovered));
-        await this.finishAuthenticatedRedirect(newSignup);
+        await this.finishSessionRedirect(href, newSignup);
         return;
       }
 
@@ -437,18 +440,18 @@ export class AuthService {
     }
 
     if (this.isAuthenticated() && (pendingAuthCallback || onCallback)) {
-      await this.finishAuthenticatedRedirect(newSignup);
+      await this.finishSessionRedirect(href, newSignup);
       return;
     }
 
     if (this.authRedirectHandled) {
       if (this.isAuthenticated() && (pendingAuthCallback || onCallback)) {
-        await this.finishAuthenticatedRedirect(newSignup);
+        await this.finishSessionRedirect(href, newSignup);
       } else if (onCallback && !this.isAuthenticated()) {
         const recovered = await this.tryRecoverSessionFromCallback(this.getClient());
         if (recovered) {
           this.zone.run(() => this.applySession(recovered));
-          await this.finishAuthenticatedRedirect(newSignup);
+          await this.finishSessionRedirect(href, newSignup);
           return;
         }
         await this.navigateAfterFailedAuthCallback(href);
@@ -458,7 +461,7 @@ export class AuthService {
 
     if (!pendingAuthCallback) {
       if (onCallback && this.isAuthenticated()) {
-        await this.finishAuthenticatedRedirect(newSignup);
+        await this.finishSessionRedirect(href, newSignup);
       }
       return;
     }
@@ -470,13 +473,24 @@ export class AuthService {
     const pkceCode = getAuthCallbackCode(href);
     const hasPkceCode = !!pkceCode;
     const redirectAsNewSignup =
-      emailOtp?.type === 'signup' ||
-      emailOtp?.type === 'email' ||
-      (hasPkceCode && !emailOtp);
+      !isPasswordRecoveryPending() &&
+      !this.isPasswordRecoveryCallback(href) &&
+      (emailOtp?.type === 'signup' ||
+        emailOtp?.type === 'email' ||
+        (hasPkceCode && !emailOtp));
 
-    // PKCE tokens in token_hash must go through Supabase verify (confirms email + returns ?code=).
-    if (emailOtp && isPkceEmailToken(emailOtp.tokenHash)) {
-      const verifyUrl = buildSupabasePkceVerifyUrl(emailOtp.tokenHash);
+    if (emailOtp?.type === 'recovery') {
+      markPasswordRecoveryPending();
+    }
+
+    // PKCE signup tokens must hit Supabase /verify first. Recovery PKCE tokens are verified in-app
+    // (bouncing to /verify only returns ?code= without a usable verifier in this browser).
+    if (emailOtp && isPkceEmailToken(emailOtp.tokenHash) && emailOtp.type !== 'recovery') {
+      const verifyUrl = buildSupabasePkceVerifyUrl(
+        emailOtp.tokenHash,
+        undefined,
+        emailOtp.type,
+      );
       if (verifyUrl) {
         this.authRedirectHandled = true;
         globalThis.location.assign(verifyUrl);
@@ -534,7 +548,7 @@ export class AuthService {
       });
 
       if (session) {
-        await this.finishAuthenticatedRedirect(redirectAsNewSignup);
+        await this.finishSessionRedirect(href, redirectAsNewSignup);
       } else {
         await this.navigateAfterFailedAuthCallback(href);
       }
@@ -545,7 +559,7 @@ export class AuthService {
       } = await client.auth.getSession();
       if (recovered) {
         this.zone.run(() => this.applySession(recovered));
-        await this.finishAuthenticatedRedirect(redirectAsNewSignup);
+        await this.finishSessionRedirect(href, redirectAsNewSignup);
         return;
       }
       await this.navigateAfterFailedAuthCallback(href);
@@ -569,8 +583,12 @@ export class AuthService {
       return;
     }
 
-    // Supabase returned ?code= (email confirmed) but PKCE exchange did not produce a session.
+    // Supabase returned ?code= but PKCE exchange did not produce a session.
     if (code || onCallback) {
+      if (isPasswordRecoveryPending()) {
+        await this.router.navigateByUrl('/forgot-password?authError=recovery', { replaceUrl: true });
+        return;
+      }
       await this.router.navigateByUrl('/login?confirmed=1', { replaceUrl: true });
       return;
     }
@@ -593,6 +611,31 @@ export class AuthService {
     this.stripAuthCallbackParamsFromUrl();
     void firstValueFrom(this.syncServerProfile().pipe(catchError(() => of(void 0))));
     void firstValueFrom(this.refreshServerProfile().pipe(catchError(() => of(void 0))));
+  }
+
+  private async finishSessionRedirect(href: string, newSignup: boolean): Promise<void> {
+    if (this.isPasswordRecoveryCallback(href)) {
+      clearPasswordRecoveryPending();
+      this.stripAuthCallbackParamsFromUrl();
+      clearAuthCallbackSnapshot();
+      await this.router.navigateByUrl('/reset-password', { replaceUrl: true });
+      return;
+    }
+    await this.finishAuthenticatedRedirect(newSignup);
+  }
+
+  private isPasswordRecoveryCallback(href: string): boolean {
+    if (isPasswordRecoveryPending()) return true;
+    if (!href) return false;
+    try {
+      const url = new URL(href);
+      if (url.searchParams.get('type')?.trim() === 'recovery') return true;
+      const hash = url.hash.replace(/^#/, '');
+      if (!hash) return false;
+      return new URLSearchParams(hash).get('type')?.trim() === 'recovery';
+    } catch {
+      return href.includes('type=recovery');
+    }
   }
 
   /** Remove ?code= / hash tokens from the address bar after a successful auth redirect. */
@@ -730,7 +773,13 @@ export class AuthService {
     type: EmailOtpType,
   ): Promise<{ session: Session | null; confirmed: boolean }> {
     const types: EmailOtpType[] =
-      type === 'email' ? ['email', 'signup'] : type === 'signup' ? ['email', 'signup'] : [type, 'email'];
+      type === 'recovery'
+        ? ['recovery']
+        : type === 'email'
+          ? ['email', 'signup']
+          : type === 'signup'
+            ? ['email', 'signup']
+            : [type, 'email'];
 
     for (const otpType of types) {
       const { data, error } = await client.auth.verifyOtp({
@@ -889,13 +938,61 @@ export class AuthService {
         password: body.password,
       }),
     ).pipe(
-      tap(({ data, error }) => {
-        if (error) throw error;
+      switchMap(({ data, error }) => {
+        if (error) return throwError(() => error);
         this.applySession(data.session);
         this.clearPendingSignupEmail();
+        return of(void 0);
       }),
       switchMap(() => this.syncServerProfile()),
       switchMap(() => this.refreshServerProfile().pipe(catchError(() => of(void 0)))),
+    );
+  }
+
+  changePassword(oldPassword: string, newPassword: string): Observable<void> {
+    const email = this._user()?.email?.trim();
+    if (!email) {
+      return throwError(() => new Error('You must be signed in to change your password.'));
+    }
+
+    return from(
+      this.getClient().auth.signInWithPassword({ email, password: oldPassword }),
+    ).pipe(
+      switchMap(({ error }) => {
+        if (error) return throwError(() => error);
+        return from(this.getClient().auth.updateUser({ password: newPassword }));
+      }),
+      switchMap(({ error }) => {
+        if (error) return throwError(() => error);
+        return of(void 0);
+      }),
+    );
+  }
+
+  requestPasswordReset(email: string): Observable<void> {
+    return from(
+      this.getClient().auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: getAuthEmailRedirectUrl(),
+      }),
+    ).pipe(
+      tap(({ error }) => {
+        if (error || !isPlatformBrowser(this.platformId)) return;
+        markPasswordRecoveryPending();
+        backupPkceVerifierFromSignup();
+        globalThis.setTimeout?.(() => backupPkceVerifierFromSignup(), 150);
+      }),
+      map(({ error }) => {
+        if (error) throw error;
+      }),
+    );
+  }
+
+  setPassword(newPassword: string): Observable<void> {
+    return from(this.getClient().auth.updateUser({ password: newPassword })).pipe(
+      switchMap(({ error }) => {
+        if (error) return throwError(() => error);
+        return of(void 0);
+      }),
     );
   }
 

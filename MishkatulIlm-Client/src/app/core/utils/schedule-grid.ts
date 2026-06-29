@@ -5,7 +5,10 @@ import { parseLessonAttendanceStatus } from './attendance.util';
 export const SCHEDULE_DAY_START_HOUR_UTC = 8;
 export const SCHEDULE_DAY_END_HOUR_UTC = 22;
 export const SCHEDULE_GRID_STEP_MINUTES = 30;
-export const SCHEDULE_DURATION_OPTIONS = [30, 60, 90, 120] as const;
+export const SCHEDULE_DURATION_OPTIONS = [30, 45, 60, 90, 120] as const;
+
+export const FREE_TRIAL_DURATION_MINUTES = 30;
+export const FREE_TRIAL_TITLE = 'Free trial';
 
 export function utcCivilDayKey(year: number, monthIndex: number, day: number): string {
   const m = String(monthIndex + 1).padStart(2, '0');
@@ -100,6 +103,14 @@ export function normalizeAvailabilityRows(
       StudentName?: string | null;
       AttendanceStatus?: string | null;
       StudentLessonNote?: string | null;
+      IsAdminCalendarEntry?: boolean;
+      Title?: string | null;
+      Description?: string | null;
+      IsPartiallyBlocked?: boolean;
+      FreeSegmentStartsAtUtc?: string | null;
+      PartialBlockEndsAtUtc?: string | null;
+      EntryStartsAtUtc?: string | null;
+      EntryEndsAtUtc?: string | null;
     };
     const startsAtUtc = normalizeSlotStartIso(String(row.startsAtUtc ?? raw.StartsAtUtc ?? ''));
     const endsRaw = row.endsAtUtc ?? raw.EndsAtUtc;
@@ -118,6 +129,25 @@ export function normalizeAvailabilityRows(
     const noteRaw = row.studentLessonNote ?? raw.StudentLessonNote ?? null;
     const studentLessonNote =
       typeof noteRaw === 'string' && noteRaw.trim().length > 0 ? noteRaw.trim() : null;
+    const isAdminCalendarEntry = Boolean(
+      row.isAdminCalendarEntry ?? raw.IsAdminCalendarEntry ?? false,
+    );
+    const titleRaw = row.title ?? raw.Title ?? null;
+    const descriptionRaw = row.description ?? raw.Description ?? null;
+    const title = typeof titleRaw === 'string' && titleRaw.trim().length > 0 ? titleRaw.trim() : null;
+    const description =
+      typeof descriptionRaw === 'string' && descriptionRaw.trim().length > 0
+        ? descriptionRaw.trim()
+        : null;
+    const isPartiallyBlocked = Boolean(row.isPartiallyBlocked ?? raw.IsPartiallyBlocked ?? false);
+    const freeRaw = row.freeSegmentStartsAtUtc ?? raw.FreeSegmentStartsAtUtc ?? null;
+    const partialEndRaw = row.partialBlockEndsAtUtc ?? raw.PartialBlockEndsAtUtc ?? null;
+    const entryStartRaw = row.entryStartsAtUtc ?? raw.EntryStartsAtUtc ?? null;
+    const entryEndRaw = row.entryEndsAtUtc ?? raw.EntryEndsAtUtc ?? null;
+    const freeSegmentStartsAtUtc = freeRaw ? normalizeSlotStartIso(String(freeRaw)) : null;
+    const partialBlockEndsAtUtc = partialEndRaw ? normalizeSlotStartIso(String(partialEndRaw)) : null;
+    const entryStartsAtUtc = entryStartRaw ? normalizeSlotStartIso(String(entryStartRaw)) : null;
+    const entryEndsAtUtc = entryEndRaw ? normalizeSlotStartIso(String(entryEndRaw)) : null;
 
     return {
       ...row,
@@ -131,6 +161,14 @@ export function normalizeAvailabilityRows(
       studentName: row.studentName ?? raw.StudentName ?? null,
       attendanceStatus: studentUserId ? parseLessonAttendanceStatus(attendanceRaw) : null,
       studentLessonNote: studentUserId ? studentLessonNote : null,
+      isAdminCalendarEntry,
+      title,
+      description,
+      isPartiallyBlocked,
+      freeSegmentStartsAtUtc,
+      partialBlockEndsAtUtc,
+      entryStartsAtUtc,
+      entryEndsAtUtc,
     };
   });
 }
@@ -151,10 +189,87 @@ export function formatUtcSlotRange(startsAtUtc: string, endsAtUtc: string): stri
 
 export function durationLabel(minutes: number): string {
   if (minutes === 30) return '30 min';
+  if (minutes === 45) return '45 min';
   if (minutes === 60) return '1 hour';
   if (minutes === 90) return '1 hr 30 min';
   if (minutes === 120) return '2 hours';
   return `${minutes} min`;
+}
+
+function collectBlockingIntervals(
+  daySlots: AvailabilitySlotRow[],
+): { startMs: number; endMs: number }[] {
+  const intervals: { startMs: number; endMs: number }[] = [];
+  const seenEntryKeys = new Set<string>();
+
+  for (const slot of daySlots) {
+    if (slot.isPartiallyBlocked && slot.partialBlockEndsAtUtc) {
+      intervals.push({
+        startMs: new Date(slot.startsAtUtc).getTime(),
+        endMs: new Date(slot.partialBlockEndsAtUtc).getTime(),
+      });
+      continue;
+    }
+
+    if (slot.isAvailable) {
+      continue;
+    }
+
+    if (slot.entryStartsAtUtc && slot.entryEndsAtUtc) {
+      const key = slot.slotId ?? `${slot.entryStartsAtUtc}|${slot.entryEndsAtUtc}`;
+      if (seenEntryKeys.has(key)) {
+        continue;
+      }
+      seenEntryKeys.add(key);
+      intervals.push({
+        startMs: new Date(slot.entryStartsAtUtc).getTime(),
+        endMs: new Date(slot.entryEndsAtUtc).getTime(),
+      });
+      continue;
+    }
+
+    intervals.push({
+      startMs: new Date(slot.startsAtUtc).getTime(),
+      endMs: new Date(slot.endsAtUtc).getTime(),
+    });
+  }
+
+  return intervals;
+}
+
+function intervalsOverlap(startMs: number, endMs: number, blockStartMs: number, blockEndMs: number): boolean {
+  return startMs < blockEndMs && endMs > blockStartMs;
+}
+
+/** Whether a duration fits without overlapping blocked intervals (supports mid-cell starts). */
+export function canFitDurationOccupancy(
+  startUtc: string,
+  durationMinutes: number,
+  daySlots: AvailabilitySlotRow[],
+): boolean {
+  const startMs = new Date(startUtc).getTime();
+  const endMs = startMs + durationMinutes * 60 * 1000;
+  const endHour = new Date(endMs).getUTCHours() + new Date(endMs).getUTCMinutes() / 60;
+  if (endHour > SCHEDULE_DAY_END_HOUR_UTC) {
+    return false;
+  }
+
+  for (const interval of collectBlockingIntervals(daySlots)) {
+    if (intervalsOverlap(startMs, endMs, interval.startMs, interval.endMs)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function durationsFromManageStart(
+  startUtc: string,
+  daySlots: AvailabilitySlotRow[],
+): number[] {
+  return SCHEDULE_DURATION_OPTIONS.filter((duration) =>
+    canFitDurationOccupancy(startUtc, duration, daySlots),
+  );
 }
 
 /** Durations that fit from this start using merged day slots (30-min steps). */
@@ -176,20 +291,32 @@ export function canFitDuration(
   durationMinutes: number,
   daySlots: AvailabilitySlotRow[],
 ): boolean {
-  const steps = durationMinutes / SCHEDULE_GRID_STEP_MINUTES;
-  const startMs = new Date(startUtc).getTime();
-  for (let i = 0; i < steps; i++) {
-    const stepStart = addUtcMinutesIso(startUtc, i * SCHEDULE_GRID_STEP_MINUTES);
-    const slot = daySlots.find((s) => normalizeSlotStartIso(s.startsAtUtc) === stepStart);
-    if (!slot?.isAvailable) {
-      return false;
-    }
+  if (!canFitDurationOccupancy(startUtc, durationMinutes, daySlots)) {
+    return false;
+  }
+
+  const normalizedStart = normalizeSlotStartIso(startUtc);
+  const slot = daySlots.find((s) => normalizeSlotStartIso(s.startsAtUtc) === normalizedStart);
+  if (slot?.isAvailable && !slot.isPartiallyBlocked) {
     const slotAllowed = slot.availableDurationMinutes ?? [];
     if (slotAllowed.length > 0 && !slotAllowed.includes(durationMinutes)) {
       return false;
     }
+    return true;
   }
-  const endMs = startMs + durationMinutes * 60 * 1000;
-  const endHour = new Date(endMs).getUTCHours() + new Date(endMs).getUTCMinutes() / 60;
-  return endHour <= SCHEDULE_DAY_END_HOUR_UTC;
+
+  const partialRow = daySlots.find(
+    (s) =>
+      s.isPartiallyBlocked &&
+      s.freeSegmentStartsAtUtc &&
+      normalizeSlotStartIso(s.freeSegmentStartsAtUtc) === normalizedStart,
+  );
+  if (partialRow) {
+    const allowed = partialRow.availableDurationMinutes ?? [];
+    if (allowed.length > 0 && !allowed.includes(durationMinutes)) {
+      return false;
+    }
+  }
+
+  return true;
 }

@@ -5,7 +5,9 @@ export interface PaymentLessonLineItem {
   startsAtUtc: string;
   endsAtUtc: string;
   durationMinutes: number;
+  lessonRate: number;
   hourlyRate: number;
+  rateLabel: string;
   amount: number;
 }
 
@@ -18,6 +20,8 @@ export interface PaymentStatement {
   paymentDueUtc: string | null;
   showPaymentReminder: boolean;
   daysUntilDue: number | null;
+  rate45MinUsd: number;
+  rate60MinUsd: number;
   hourlyRate: number;
   currency: string;
   totalAmount: number;

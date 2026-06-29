@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { finalize, forkJoin } from 'rxjs';
+import { finalize, forkJoin, Subject } from 'rxjs';
 import { monthsTouchingWeek, startOfWeekMonday } from '../utils/week-schedule.util';
 import type {
   StudentLessonRow,
@@ -21,6 +21,9 @@ export class StudentPortalStore {
   readonly updatingSlotId = signal<string | null>(null);
   readonly actionMessage = signal<string | null>(null);
   readonly actionError = signal<string | null>(null);
+
+  /** Emits after a lesson attendance update is saved. */
+  readonly attendanceChanged = new Subject<void>();
 
   private viewMonth = new Date();
 
@@ -155,6 +158,7 @@ export class StudentPortalStore {
             lessons,
             portal: { ...data.portal, monthSummary: summary, nextLesson },
           });
+          this.attendanceChanged.next();
         },
         error: (err: unknown) => {
           this.actionError.set(formatHttpError(err, 'Could not update attendance.'));
@@ -172,6 +176,7 @@ function normalizePortalResponse(raw: StudentPortalResponse): StudentPortalRespo
   };
   const portalRaw = raw.portal ?? r.Portal ?? ({} as StudentPortalResponse['portal'] & {
     NextLesson?: StudentLessonRow;
+    NextBlockBookingIssue?: string | null;
   });
   const lessons = (raw.lessons ?? r.Lessons ?? [])
     .map((l) => normalizeLessonRow(l))
@@ -192,6 +197,10 @@ function normalizePortalResponse(raw: StudentPortalResponse): StudentPortalRespo
       portalRaw.scheduleChangeUpdate ??
         (portalRaw as { ScheduleChangeUpdate?: StudentScheduleChangeUpdate | null }).ScheduleChangeUpdate,
     ),
+    nextBlockBookingIssue:
+      portalRaw.nextBlockBookingIssue ??
+      (portalRaw as { NextBlockBookingIssue?: string | null }).NextBlockBookingIssue ??
+      null,
   };
 
   return {
@@ -294,6 +303,7 @@ function normalizePaymentSummary(
     CanSubmitPayment?: boolean;
     CurrentPeriodPaid?: boolean;
     ShowPaymentDetails?: boolean;
+    AwaitingNextBlockPayment?: boolean;
   };
 
   if (!paymentRaw) {
@@ -310,6 +320,7 @@ function normalizePaymentSummary(
       canSubmitPayment: true,
       currentPeriodPaid: false,
       showPaymentDetails: true,
+      awaitingNextBlockPayment: false,
     };
   }
 
@@ -328,5 +339,7 @@ function normalizePaymentSummary(
     canSubmitPayment: paymentRaw.canSubmitPayment ?? p.CanSubmitPayment ?? false,
     currentPeriodPaid: paymentRaw.currentPeriodPaid ?? p.CurrentPeriodPaid ?? false,
     showPaymentDetails: paymentRaw.showPaymentDetails ?? p.ShowPaymentDetails ?? false,
+    awaitingNextBlockPayment:
+      paymentRaw.awaitingNextBlockPayment ?? p.AwaitingNextBlockPayment ?? false,
   };
 }

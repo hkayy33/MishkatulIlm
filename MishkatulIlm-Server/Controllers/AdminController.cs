@@ -113,6 +113,7 @@ public sealed class AdminController(
                     City = onboarding?.City,
                     CurrentLevel = onboarding?.CurrentLevel,
                     LessonFrequency = onboarding?.LessonFrequency,
+                    PreferredLessonDuration = onboarding?.PreferredLessonDuration,
                     SubjectCodes = onboarding?.SubjectCodes ?? [],
                     PreferredAvailability = onboarding?.PreferredAvailability ?? [],
                 };
@@ -456,6 +457,7 @@ public sealed class AdminController(
                     Gender = onboarding?.Gender,
                     CurrentLevel = onboarding?.CurrentLevel,
                     LessonFrequency = onboarding?.LessonFrequency,
+                    PreferredLessonDuration = onboarding?.PreferredLessonDuration,
                     SubjectCodes = onboarding?.SubjectCodes ?? [],
                     PreferredAvailability = onboarding?.PreferredAvailability ?? [],
                     ScheduledLessons = studentLessons,
@@ -464,6 +466,129 @@ public sealed class AdminController(
             .ToList();
 
         return Ok(rows);
+    }
+
+    [HttpGet("students/{userId:guid}")]
+    public async Task<IActionResult> GetStudent(Guid userId, CancellationToken cancellationToken)
+    {
+        if (!await IsCurrentUserAdminAsync(cancellationToken))
+            return Forbid();
+
+        var user = await db.Users
+            .AsNoTracking()
+            .Include(u => u.Onboarding)
+            .FirstOrDefaultAsync(u => u.Id == userId && !u.IsAdmin, cancellationToken);
+
+        if (user is null)
+            return NotFound(new { message = "Student not found." });
+
+        if (user.ApplicationStatus != ApplicationStatusCodes.Active)
+            return NotFound(new { message = "Student is not active." });
+
+        var lessons = await db.LessonSlots.AsNoTracking()
+            .Where(s => s.StudentUserId == userId)
+            .OrderByDescending(s => s.StartsAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var scheduledLessons = lessons
+            .OrderBy(s => s.StartsAtUtc)
+            .Select(s => new ScheduledLessonDto
+            {
+                SlotId = s.Id,
+                StartsAtUtc = s.StartsAtUtc,
+                EndsAtUtc = s.EndsAtUtc,
+            })
+            .ToList();
+
+        var lessonHistory = lessons
+            .Select(s => new AdminStudentLessonHistoryItemDto
+            {
+                SlotId = s.Id,
+                StartsAtUtc = s.StartsAtUtc,
+                EndsAtUtc = s.EndsAtUtc,
+                DurationMinutes = (int)(s.EndsAtUtc - s.StartsAtUtc).TotalMinutes,
+                AttendanceStatus = AttendanceStatusCodes.ToApiValue(s.AttendanceStatus),
+                StudentNote = string.IsNullOrWhiteSpace(s.StudentNote) ? null : s.StudentNote.Trim(),
+            })
+            .ToList();
+
+        var paymentRows = await db.PaymentSubmissions.AsNoTracking()
+            .Where(s => s.StudentUserId == userId)
+            .OrderByDescending(s => s.SubmittedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var settings = await db.SchedulingSettings.AsNoTracking().FirstAsync(cancellationToken);
+        var utcNow = DateTime.UtcNow;
+        var paymentHistory = new List<AdminStudentPaymentHistoryItemDto>();
+
+        foreach (var row in paymentRows)
+        {
+            var (monthStart, monthEnd) = LessonBillingService.MonthRangeUtc(row.BillingYear, row.BillingMonth);
+            var monthLessons = lessons
+                .Where(l => l.StartsAtUtc >= monthStart && l.StartsAtUtc < monthEnd)
+                .Where(l => LessonBillingService.IsBillableAttendance(l.AttendanceStatus))
+                .OrderBy(l => l.StartsAtUtc)
+                .ToList();
+
+            var statement = LessonBillingService.BuildStatement(
+                user,
+                monthLessons,
+                settings,
+                row.BillingYear,
+                row.BillingMonth,
+                row,
+                utcNow);
+
+            paymentHistory.Add(
+                new AdminStudentPaymentHistoryItemDto
+                {
+                    Id = row.Id,
+                    BillingYear = row.BillingYear,
+                    BillingMonth = row.BillingMonth,
+                    BillingPeriodLabel = LessonBillingService.FormatBillingPeriod(row.BillingYear, row.BillingMonth),
+                    Status = row.Status,
+                    Amount = row.Amount,
+                    Currency = row.Currency,
+                    PaymentReference = row.PaymentReference,
+                    SubmittedAtUtc = row.SubmittedAtUtc,
+                    ReviewedAtUtc = row.ReviewedAtUtc,
+                    AdminNote = string.IsNullOrWhiteSpace(row.AdminNote) ? null : row.AdminNote.Trim(),
+                    Lessons = statement.Lessons,
+                });
+        }
+
+        var onboarding = user.Onboarding;
+        var detail = new AdminStudentDetailDto
+        {
+            UserId = user.Id,
+            Email = user.Email,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            HasMadePayment = user.LastPaymentAtUtc is not null,
+            NextPaymentDueUtc = user.LastPaymentAtUtc is not null ? user.NextPaymentDueUtc : null,
+            CreatedAtUtc = user.CreatedAtUtc,
+            LastPaymentAtUtc = user.LastPaymentAtUtc,
+            LastPaymentAmount = user.LastPaymentAmount,
+            LastPaymentCurrency = user.LastPaymentCurrency,
+            PhoneNumber = string.IsNullOrWhiteSpace(onboarding?.PhoneNumber)
+                ? null
+                : onboarding.PhoneNumber,
+            Location = FormatStudentLocation(onboarding),
+            Country = TrimOrNull(onboarding?.Country),
+            City = TrimOrNull(onboarding?.City),
+            AgeRange = onboarding?.AgeRange,
+            Gender = onboarding?.Gender,
+            CurrentLevel = onboarding?.CurrentLevel,
+            LessonFrequency = onboarding?.LessonFrequency,
+            PreferredLessonDuration = onboarding?.PreferredLessonDuration,
+            SubjectCodes = onboarding?.SubjectCodes ?? [],
+            PreferredAvailability = onboarding?.PreferredAvailability ?? [],
+            ScheduledLessons = scheduledLessons,
+            LessonHistory = lessonHistory,
+            PaymentHistory = paymentHistory,
+        };
+
+        return Ok(detail);
     }
 
     [HttpPost("users")]
@@ -569,6 +694,7 @@ public sealed class AdminController(
                 City = u.Onboarding?.City,
                 CurrentLevel = u.Onboarding?.CurrentLevel,
                 LessonFrequency = u.Onboarding?.LessonFrequency,
+                PreferredLessonDuration = u.Onboarding?.PreferredLessonDuration,
                 SubjectCodes = u.Onboarding?.SubjectCodes ?? [],
                 PreferredAvailability = u.Onboarding?.PreferredAvailability ?? [],
             };

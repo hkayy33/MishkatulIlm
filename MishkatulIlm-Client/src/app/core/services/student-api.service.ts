@@ -66,6 +66,30 @@ export class StudentApiService {
     );
   }
 
+  createFlutterwaveCheckout(): Observable<{
+    checkoutUrl: string;
+    reference: string;
+    submissionId: string;
+    status: string;
+  }> {
+    return this.http.post<{
+      checkoutUrl: string;
+      reference: string;
+      submissionId: string;
+      status: string;
+    }>(`${this.apiBaseUrl}/api/student/flutterwave-checkout`, {});
+  }
+
+  verifyFlutterwavePayment(
+    reference: string,
+    transactionId?: string | null,
+  ): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiBaseUrl}/api/student/flutterwave-verify`, {
+      reference,
+      transactionId: transactionId ?? null,
+    });
+  }
+
   getPaymentHistory(): Observable<StudentPaymentHistoryItem[]> {
     return this.http.get<unknown>(`${this.apiBaseUrl}/api/student/payment-history`).pipe(
       map((rows) => {
@@ -101,7 +125,9 @@ function normalizePaymentStatement(raw: PaymentStatement): PaymentStatement {
     paymentDueUtc: (r.paymentDueUtc ?? r['PaymentDueUtc'] ?? null) as string | null,
     showPaymentReminder: Boolean(r.showPaymentReminder ?? r['ShowPaymentReminder'] ?? false),
     daysUntilDue: (r.daysUntilDue ?? r['DaysUntilDue'] ?? null) as number | null,
-    hourlyRate: Number(r.hourlyRate ?? r['HourlyRate'] ?? 5),
+    rate45MinUsd: Number(r.rate45MinUsd ?? r['Rate45MinUsd'] ?? 5),
+    rate60MinUsd: Number(r.rate60MinUsd ?? r['Rate60MinUsd'] ?? 7),
+    hourlyRate: Number(r.hourlyRate ?? r['HourlyRate'] ?? 7),
     currency: String(r.currency ?? r['Currency'] ?? 'USD'),
     totalAmount: Number(r.totalAmount ?? r['TotalAmount'] ?? 0),
     accountName: String(r.accountName ?? r['AccountName'] ?? ''),
@@ -117,7 +143,9 @@ function normalizePaymentStatement(raw: PaymentStatement): PaymentStatement {
       startsAtUtc: String(line.startsAtUtc ?? line['StartsAtUtc'] ?? ''),
       endsAtUtc: String(line.endsAtUtc ?? line['EndsAtUtc'] ?? ''),
       durationMinutes: Number(line.durationMinutes ?? line['DurationMinutes'] ?? 0),
-      hourlyRate: Number(line.hourlyRate ?? line['HourlyRate'] ?? 5),
+      lessonRate: Number(line.lessonRate ?? line['LessonRate'] ?? line.hourlyRate ?? line['HourlyRate'] ?? 0),
+      hourlyRate: Number(line.hourlyRate ?? line['HourlyRate'] ?? line.lessonRate ?? line['LessonRate'] ?? 0),
+      rateLabel: String(line.rateLabel ?? line['RateLabel'] ?? ''),
       amount: Number(line.amount ?? line['Amount'] ?? 0),
     })),
   };

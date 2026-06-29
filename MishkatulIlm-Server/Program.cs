@@ -6,12 +6,14 @@ using MishkatulIlm_Server.Authentication;
 using MishkatulIlm_Server.Data;
 using MishkatulIlm_Server.Options;
 using MishkatulIlm_Server.Services;
+using MishkatulIlm_Server.Services.Flutterwave;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<AdminOptions>(builder.Configuration.GetSection(AdminOptions.SectionName));
 builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
+builder.Services.Configure<FlutterwaveOptions>(builder.Configuration.GetSection(FlutterwaveOptions.SectionName));
 builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection(CorsOptions.SectionName));
 
 builder.Services.AddControllers();
@@ -44,12 +46,23 @@ builder.Services.AddHttpClient(nameof(SupabaseJwtKeyProvider), client =>
 });
 builder.Services.AddSingleton<SupabaseJwtKeyProvider>();
 builder.Services.AddHostedService<SupabaseJwksRefreshWorker>();
+builder.Services.AddHostedService<LessonRolloverWorker>();
 builder.Services.AddSingleton<IPostConfigureOptions<JwtBearerOptions>, ConfigureSupabaseJwtBearerOptions>();
 
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<SupabaseAdminAuthClient>();
+builder.Services.AddHttpClient(nameof(FlutterwaveApiClient), client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
+builder.Services.AddSingleton<FlutterwaveApiClient>();
+builder.Services.AddScoped<FlutterwavePaymentService>();
 builder.Services.AddScoped<SchedulingSettingsService>();
 builder.Services.AddScoped<ScheduleProposalService>();
+builder.Services.AddScoped<LessonBillingContextService>();
+builder.Services.AddScoped<LessonRolloverService>();
+builder.Services.AddScoped<DevRolloverDemoService>();
+builder.Services.AddScoped<DevStudentHistoryDemoService>();
 builder.Services.AddScoped<StudentPaymentService>();
 builder.Services.AddScoped<AdminPaymentSubmissionService>();
 builder.Services.AddScoped<StudentAccountDeletionService>();
@@ -208,7 +221,8 @@ static string[] BuildCorsOrigins(IConfiguration configuration)
         origins.Add(NormalizeOrigin(origin));
     }
 
-    var clientAppUrl = configuration["Stripe:ClientAppUrl"];
+    var clientAppUrl = configuration["Flutterwave:ClientAppUrl"]
+        ?? configuration["Stripe:ClientAppUrl"];
     if (!string.IsNullOrWhiteSpace(clientAppUrl))
         origins.Add(NormalizeOrigin(clientAppUrl));
 

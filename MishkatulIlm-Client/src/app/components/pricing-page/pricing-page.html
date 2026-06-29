@@ -4,24 +4,49 @@
       <p class="pricing-eyebrow">Simple, transparent rates</p>
       <h1 id="pricing-title">Pricing</h1>
       <p class="pricing-intro">
-        One-on-one lessons at $5 per hour. Choose the weekly schedule that fits you — monthly totals
-        are based on four weeks of study.
+        One-on-one lessons at ${{ rate45MinUsd }} per 45-minute lesson or ${{ rate60MinUsd }} per hour.
+        Monthly totals below are based on four weeks of study.
       </p>
     </header>
 
-    <ul class="pricing-grid" aria-label="Monthly lesson pricing">
-      @for (plan of plans; track plan.hoursPerWeek) {
-        <li class="pricing-card">
-          <p class="pricing-card__hours">
-            {{ plan.hoursPerWeek }} hour{{ plan.hoursPerWeek === 1 ? '' : 's' }} / week
-          </p>
-          <p class="pricing-card__price">
-            <span class="pricing-card__amount">${{ plan.monthlyPrice }}</span>
-            <span class="pricing-card__period">/ month</span>
-          </p>
-          <p class="pricing-card__note">≈ 4 weeks of lessons</p>
-        </li>
-      }
-    </ul>
+    <section class="pricing-section" aria-labelledby="pricing-45-title">
+      <h2 id="pricing-45-title" class="pricing-section__title">
+        45-minute lessons — ${{ rate45MinUsd }} each
+      </h2>
+      <ul class="pricing-grid" aria-label="Monthly pricing for 45-minute lessons">
+        @for (plan of fortyFiveMinutePlans; track plan.lessonsPerWeek) {
+          <li class="pricing-card">
+            <p class="pricing-card__hours">
+              {{ plan.lessonsPerWeek }} lesson{{ plan.lessonsPerWeek === 1 ? '' : 's' }} / week
+            </p>
+            <p class="pricing-card__price">
+              <span class="pricing-card__amount">${{ plan.monthlyPrice }}</span>
+              <span class="pricing-card__period">/ month</span>
+            </p>
+            <p class="pricing-card__note">≈ 4 weeks of lessons</p>
+          </li>
+        }
+      </ul>
+    </section>
+
+    <section class="pricing-section" aria-labelledby="pricing-60-title">
+      <h2 id="pricing-60-title" class="pricing-section__title">
+        1-hour lessons — ${{ rate60MinUsd }} each
+      </h2>
+      <ul class="pricing-grid" aria-label="Monthly pricing for 1-hour lessons">
+        @for (plan of sixtyMinutePlans; track plan.lessonsPerWeek) {
+          <li class="pricing-card pricing-card--hour">
+            <p class="pricing-card__hours">
+              {{ plan.lessonsPerWeek }} lesson{{ plan.lessonsPerWeek === 1 ? '' : 's' }} / week
+            </p>
+            <p class="pricing-card__price">
+              <span class="pricing-card__amount">${{ plan.monthlyPrice }}</span>
+              <span class="pricing-card__period">/ month</span>
+            </p>
+            <p class="pricing-card__note">≈ 4 weeks of lessons</p>
+          </li>
+        }
+      </ul>
+    </section>
   </div>
 </article>

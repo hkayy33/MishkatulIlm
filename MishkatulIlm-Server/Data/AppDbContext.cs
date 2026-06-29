@@ -30,6 +30,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.StripeSubscriptionId).HasMaxLength(255);
             entity.Property(e => e.StripeSubscriptionStatus).HasMaxLength(32);
             entity.Property(e => e.LastStripeInvoiceId).HasMaxLength(255);
+            entity.Property(e => e.FlutterwaveCustomerId).HasMaxLength(64);
             entity.Property(e => e.MessageToTutor).HasMaxLength(2000);
             entity.Property(e => e.ApplicationDeclineMessage).HasMaxLength(2000);
             entity.HasOne(e => e.Onboarding)
@@ -48,6 +49,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.PhoneNumber).HasMaxLength(32).IsRequired();
             entity.Property(e => e.CurrentLevel).HasMaxLength(64).IsRequired();
             entity.Property(e => e.LessonFrequency).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.PreferredLessonDuration).HasMaxLength(64).IsRequired();
             entity.Property(e => e.SubjectCodes).HasColumnType("jsonb").IsRequired();
             entity.Property(e => e.PreferredAvailability).HasColumnType("jsonb").IsRequired();
         });
@@ -64,6 +66,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.SetNull);
             entity.Property(e => e.AttendanceStatus).HasMaxLength(16).IsRequired();
             entity.Property(e => e.StudentNote).HasMaxLength(2000);
+            entity.Property(e => e.Title).HasMaxLength(200);
+            entity.Property(e => e.Description).HasMaxLength(2000);
         });
 
         modelBuilder.Entity<ScheduleChangeRequest>(entity =>
@@ -89,6 +93,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.TutorCity).HasMaxLength(120).IsRequired();
             entity.Property(e => e.TutorTimeZoneId).HasMaxLength(64).IsRequired();
             entity.Property(e => e.PaymentHourlyRateUsd).HasPrecision(8, 2);
+            entity.Property(e => e.PaymentRate45MinUsd).HasPrecision(8, 2);
+            entity.Property(e => e.PaymentRate60MinUsd).HasPrecision(8, 2);
             entity.Property(e => e.PaymentAccountName).HasMaxLength(200).IsRequired();
             entity.Property(e => e.PaymentAccountNumber).HasMaxLength(64).IsRequired();
             entity.Property(e => e.PaymentSortCode).HasMaxLength(32).IsRequired();
@@ -107,6 +113,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.Currency).HasMaxLength(8).IsRequired();
             entity.Property(e => e.PaymentReference).HasMaxLength(120).IsRequired();
             entity.Property(e => e.AdminNote).HasMaxLength(2000);
+            entity.Property(e => e.FlutterwaveCheckoutSessionId).HasMaxLength(64);
+            entity.Property(e => e.FlutterwaveTransactionId).HasMaxLength(64);
             entity.HasOne(e => e.Student)
                 .WithMany()
                 .HasForeignKey(e => e.StudentUserId)

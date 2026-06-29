@@ -57,6 +57,10 @@ namespace MishkatulIlm_Server.Data.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
+                    b.Property<string>("FlutterwaveCustomerId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<bool>("IsAdmin")
                         .HasColumnType("boolean");
 
@@ -134,6 +138,10 @@ namespace MishkatulIlm_Server.Data.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<DateTime>("EndsAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -146,6 +154,10 @@ namespace MishkatulIlm_Server.Data.Migrations
 
                     b.Property<Guid?>("StudentUserId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.HasKey("Id");
 
@@ -180,6 +192,14 @@ namespace MishkatulIlm_Server.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)");
+
+                    b.Property<string>("FlutterwaveCheckoutSessionId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("FlutterwaveTransactionId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("PaymentReference")
                         .IsRequired()
@@ -315,6 +335,14 @@ namespace MishkatulIlm_Server.Data.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
+                    b.Property<decimal>("PaymentRate45MinUsd")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<decimal>("PaymentRate60MinUsd")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)");
+
                     b.Property<string>("PaymentSortCode")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -391,6 +419,11 @@ namespace MishkatulIlm_Server.Data.Migrations
                     b.PrimitiveCollection<List<string>>("PreferredAvailability")
                         .IsRequired()
                         .HasColumnType("jsonb");
+
+                    b.Property<string>("PreferredLessonDuration")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.PrimitiveCollection<List<string>>("SubjectCodes")
                         .IsRequired()

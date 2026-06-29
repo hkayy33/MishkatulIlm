@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MishkatulIlm-Server.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6a032d22bf8ce7d2af239b2fdeb6fde3ca2705e1")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e3dccfd00d5cb1cdccee9788f56c199bbd9d535e")]
 [assembly: System.Reflection.AssemblyProductAttribute("MishkatulIlm-Server.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MishkatulIlm-Server.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

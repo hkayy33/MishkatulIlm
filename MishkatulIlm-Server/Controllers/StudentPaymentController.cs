@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MishkatulIlm_Server.Authentication;
 using MishkatulIlm_Server.Data;
+using MishkatulIlm_Server.Dtos;
 using MishkatulIlm_Server.Services;
+using MishkatulIlm_Server.Services.Flutterwave;
 
 namespace MishkatulIlm_Server.Controllers;
 
@@ -12,7 +14,8 @@ namespace MishkatulIlm_Server.Controllers;
 [Route("api/student")]
 public sealed class StudentPaymentController(
     AppDbContext db,
-    StudentPaymentService paymentService) : ControllerBase
+    StudentPaymentService paymentService,
+    LessonBillingContextService billingContext) : ControllerBase
 {
     [HttpGet("payment-statement")]
     public async Task<IActionResult> GetPaymentStatement(CancellationToken cancellationToken)
@@ -35,7 +38,8 @@ public sealed class StudentPaymentController(
         if (statement is null)
         {
             var submission = await paymentService.GetCurrentSubmissionAsync(userId, cancellationToken);
-            var summary = StudentPaymentSummaryBuilder.Build(user, submission, DateTime.UtcNow);
+            var billing = await billingContext.ResolveAsync(user, DateTime.UtcNow, cancellationToken);
+            var summary = StudentPaymentSummaryBuilder.Build(user, submission, DateTime.UtcNow, billing);
             if (!summary.ShowPaymentDetails)
             {
                 var dueMessage = summary.NextPaymentDueUtc is null
@@ -67,6 +71,52 @@ public sealed class StudentPaymentController(
             submissionId = submission!.Id,
             status = submission.Status,
         });
+    }
+
+    [HttpPost("flutterwave-checkout")]
+    public async Task<IActionResult> CreateFlutterwaveCheckout(
+        FlutterwavePaymentService flutterwavePayments,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetSupabaseUserId(out var userId))
+            return Unauthorized();
+
+        var (success, error, checkoutUrl, submission) =
+            await flutterwavePayments.InitiateCheckoutAsync(
+                userId,
+                Request.Headers.Origin.FirstOrDefault(),
+                cancellationToken);
+        if (!success)
+            return BadRequest(new { message = error });
+
+        return Ok(new
+        {
+            checkoutUrl,
+            link = checkoutUrl,
+            reference = submission!.PaymentReference,
+            submissionId = submission.Id,
+            status = submission.Status,
+        });
+    }
+
+    [HttpPost("flutterwave-verify")]
+    public async Task<IActionResult> VerifyFlutterwavePayment(
+        [FromBody] VerifyFlutterwavePaymentRequest request,
+        FlutterwavePaymentService flutterwavePayments,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetSupabaseUserId(out var userId))
+            return Unauthorized();
+
+        var (success, error, message) = await flutterwavePayments.TryCompleteByReferenceAsync(
+            userId,
+            request.Reference,
+            request.TransactionId,
+            cancellationToken);
+        if (!success)
+            return BadRequest(new { message = error });
+
+        return Ok(new { message });
     }
 
     [HttpGet("payment-history")]

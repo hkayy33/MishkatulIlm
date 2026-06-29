@@ -41,6 +41,11 @@ const FREQUENCY_LABELS: Record<string, string> = {
   FLEXIBLE: 'Flexible (to be agreed)',
 };
 
+const PREFERRED_LESSON_DURATION_LABELS: Record<string, string> = {
+  'MIN-45': '45 minutes',
+  'MIN-60': '1 hour',
+};
+
 export function labelSubjectCode(code: string): string {
   return SUBJECT_LABELS[code] ?? code.replace(/-/g, ' ').toLowerCase();
 }
@@ -59,6 +64,10 @@ export function labelAgeRangeCode(code: string): string {
 
 export function labelFrequencyCode(code: string): string {
   return FREQUENCY_LABELS[code] ?? code;
+}
+
+export function labelPreferredLessonDurationCode(code: string): string {
+  return PREFERRED_LESSON_DURATION_LABELS[code] ?? code;
 }
 
 export function formatAvailabilityCodes(codes: string[]): string {

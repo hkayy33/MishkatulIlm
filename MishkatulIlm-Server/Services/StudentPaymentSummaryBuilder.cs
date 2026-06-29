@@ -8,9 +8,12 @@ public static class StudentPaymentSummaryBuilder
     public static StudentPaymentSummaryDto Build(
         AppUser user,
         PaymentSubmission? currentSubmission,
-        DateTime utcNow)
+        DateTime utcNow,
+        BillingResolution? billing = null)
     {
-        var (billingYear, billingMonth) = LessonBillingService.ResolveBillingMonth(user, utcNow);
+        var (billingYear, billingMonth) = billing is null
+            ? LessonBillingService.ResolveBillingMonth(user, utcNow)
+            : (billing.BillingYear, billing.BillingMonth);
         var dueUtc = LessonBillingService.ResolvePaymentDueUtc(user, billingYear, billingMonth, utcNow);
         var daysUntilDue = dueUtc is null ? (int?)null : (dueUtc.Value.Date - utcNow.Date).Days;
 
@@ -60,6 +63,10 @@ public static class StudentPaymentSummaryBuilder
             CanSubmitPayment = canSubmitPayment,
             CurrentPeriodPaid = currentPeriodPaid,
             ShowPaymentDetails = showPaymentDetails,
+            AwaitingNextBlockPayment = billing?.IsRolloverBlock == true
+                && !currentPeriodPaid
+                && !pendingVerification
+                && paymentWindowOpen,
         };
     }
 }

@@ -6,7 +6,9 @@ public sealed class PaymentLessonLineItemDto
     public DateTime StartsAtUtc { get; init; }
     public DateTime EndsAtUtc { get; init; }
     public int DurationMinutes { get; init; }
+    public decimal LessonRate { get; init; }
     public decimal HourlyRate { get; init; }
+    public string RateLabel { get; init; } = string.Empty;
     public decimal Amount { get; init; }
 }
 
@@ -20,6 +22,8 @@ public sealed class PaymentStatementDto
     public DateTime? PaymentDueUtc { get; init; }
     public bool ShowPaymentReminder { get; init; }
     public int? DaysUntilDue { get; init; }
+    public decimal Rate45MinUsd { get; init; }
+    public decimal Rate60MinUsd { get; init; }
     public decimal HourlyRate { get; init; }
     public string Currency { get; init; } = "USD";
     public decimal TotalAmount { get; init; }

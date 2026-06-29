@@ -51,10 +51,25 @@ $accent-green: #1e4638;
 }
 
 .pricing-intro {
-    margin: 0 auto;
-    max-width: 34rem;
-    color: $muted;
-    font-size: 1.05rem;
+  margin: 0 auto;
+  max-width: 34rem;
+  color: $muted;
+  font-size: 1.05rem;
+}
+
+.pricing-section {
+  & + & {
+    margin-top: 2.75rem;
+  }
+
+  &__title {
+    margin: 0 0 1.15rem;
+    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    font-size: clamp(1.25rem, 2.5vw, 1.55rem);
+    font-weight: 600;
+    text-align: center;
+    color: $accent-green;
+  }
 }
 
 .pricing-grid {
@@ -92,6 +107,10 @@ $accent-green: #1e4638;
         border-radius: 16px 16px 0 0;
         background: linear-gradient(90deg, $accent-green, #286b54);
         opacity: 0.85;
+    }
+
+    &--hour::before {
+        background: linear-gradient(90deg, $accent-gold, #a8844f);
     }
 
     &:hover {

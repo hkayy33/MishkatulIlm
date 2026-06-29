@@ -191,6 +191,12 @@
             <dt>Lesson frequency</dt>
             <dd>{{ labelFrequencyCode(summary.lessonFrequency) }}</dd>
           </div>
+          @if (summary.preferredLessonDuration) {
+            <div>
+              <dt>Preferred lesson duration</dt>
+              <dd>{{ labelPreferredLessonDurationCode(summary.preferredLessonDuration) }}</dd>
+            </div>
+          }
           <div class="application-summary__span">
             <dt>Subjects</dt>
             <dd>

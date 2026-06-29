@@ -1,7 +1,8 @@
 <div class="admin-page admin-calendar-page">
   <h1 class="admin-title">Lesson calendar</h1>
   <p class="admin-lead">
-    Select a day to see 30-minute slots from 8am–10pm UTC. Grey rows are booked.
+    Select a day and click a time to add an entry. Use Free trial at the bottom for a quick
+    30-minute slot. Student lessons appear in grey.
   </p>
 
   <div class="cal-toolbar-actions">
@@ -18,6 +19,12 @@
   @if (loadError()) {
     <p class="admin-error admin-tight">{{ loadError() }}</p>
   }
+  @if (actionError() && !editSlot()) {
+    <p class="admin-error admin-tight">{{ actionError() }}</p>
+  }
+  @if (slotSelectionError()) {
+    <p class="admin-error admin-tight">{{ slotSelectionError() }}</p>
+  }
   @if (clearMessage()) {
     <p class="admin-success admin-tight">{{ clearMessage() }}</p>
   }
@@ -26,8 +33,88 @@
     [availability]="availability()"
     [loading]="loading()"
     [pickMode]="false"
+    [manageMode]="true"
     [tutorTimeZoneId]="tutorSettings()?.tutorTimeZoneId ?? 'UTC'"
     [tutorDisplayName]="tutorSettings()?.tutorDisplayName ?? 'Tutor'"
     (monthChanged)="onMonthChanged($event)"
+    (createSlotRequested)="onCreateSlotRequested($event)"
+    (adminSlotSelected)="onAdminSlotSelected($event)"
+    (selectionError)="slotSelectionError.set($event)"
   />
 </div>
+
+@if (editSlot(); as slot) {
+  <div class="cal-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="slot-edit-title">
+    <div class="cal-modal">
+      <h2 id="slot-edit-title">Calendar entry</h2>
+      <p class="cal-modal__time">{{ editTimeLabel() }}</p>
+
+      @if (actionError()) {
+        <p class="admin-error">{{ actionError() }}</p>
+      }
+
+      <div class="cal-modal__form">
+        <label class="cal-modal__field">
+          <span>Title</span>
+          <input
+            type="text"
+            maxlength="200"
+            [ngModel]="editTitle()"
+            (ngModelChange)="editTitle.set($event)"
+          />
+        </label>
+
+        <label class="cal-modal__field">
+          <span>Description</span>
+          <textarea
+            rows="4"
+            maxlength="2000"
+            [ngModel]="editDescription()"
+            (ngModelChange)="editDescription.set($event)"
+            placeholder="Optional notes"
+          ></textarea>
+        </label>
+
+        <label class="cal-modal__field">
+          <span>Start time</span>
+          <select [ngModel]="editStartUtc()" (ngModelChange)="onEditStartChange($event)">
+            @for (option of editStartOptions(); track option.value) {
+              <option [value]="option.value">{{ option.label }}</option>
+            }
+          </select>
+        </label>
+
+        <div class="cal-modal__field">
+          <span>Duration</span>
+          <div class="cal-modal__durations" role="group" aria-label="Duration">
+            @for (mins of durationOptions; track mins) {
+              <button
+                type="button"
+                class="slot-duration-btn"
+                [class.slot-duration-btn--active]="editDurationMinutes() === mins"
+                [disabled]="!editDurationChoices().includes(mins)"
+                (click)="onEditDurationPick(mins)"
+              >
+                {{ durationLabel(mins) }}
+              </button>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="cal-modal__actions">
+        <button type="button" class="admin-btn admin-btn--danger admin-btn--ghost" [disabled]="saving()" (click)="deleteEditedSlot()">
+          Remove
+        </button>
+        <div class="cal-modal__actions-right">
+          <button type="button" class="admin-btn admin-btn--ghost" [disabled]="saving()" (click)="closeEditModal()">
+            Cancel
+          </button>
+          <button type="button" class="admin-btn" [disabled]="saving()" (click)="saveEditedSlot()">
+            {{ saving() ? 'Saving…' : 'Save changes' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}

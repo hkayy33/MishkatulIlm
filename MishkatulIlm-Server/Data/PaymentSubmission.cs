@@ -18,4 +18,6 @@ public sealed class PaymentSubmission
     public DateTime? ReviewedAtUtc { get; set; }
     public Guid? ReviewedByAdminUserId { get; set; }
     public string? AdminNote { get; set; }
+    public string? FlutterwaveCheckoutSessionId { get; set; }
+    public string? FlutterwaveTransactionId { get; set; }
 }

@@ -115,11 +115,23 @@ public sealed class AdminPaymentSubmissionService(
         return items;
     }
 
-    public async Task<(bool Success, string? Error, string? Message)> ApproveAsync(
+    public Task<(bool Success, string? Error, string? Message)> ApproveAsync(
         Guid submissionId,
         Guid adminUserId,
         string? adminNote,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        ApproveCoreAsync(submissionId, adminUserId, adminNote, cancellationToken);
+
+    public Task<(bool Success, string? Error, string? Message)> ApproveAutomaticallyAsync(
+        Guid submissionId,
+        CancellationToken cancellationToken = default) =>
+        ApproveCoreAsync(submissionId, reviewedByAdminUserId: null, adminNote: "Confirmed by Flutterwave.", cancellationToken);
+
+    private async Task<(bool Success, string? Error, string? Message)> ApproveCoreAsync(
+        Guid submissionId,
+        Guid? reviewedByAdminUserId,
+        string? adminNote,
+        CancellationToken cancellationToken)
     {
         var submission = await db.PaymentSubmissions
             .Include(s => s.Student)
@@ -135,7 +147,7 @@ public sealed class AdminPaymentSubmissionService(
         var utcNow = DateTime.UtcNow;
         submission.Status = PaymentSubmissionStatusCodes.Paid;
         submission.ReviewedAtUtc = utcNow;
-        submission.ReviewedByAdminUserId = adminUserId;
+        submission.ReviewedByAdminUserId = reviewedByAdminUserId;
         submission.AdminNote = string.IsNullOrWhiteSpace(adminNote) ? null : adminNote.Trim();
 
         user.LastPaymentAmount = submission.Amount;
@@ -146,7 +158,9 @@ public sealed class AdminPaymentSubmissionService(
         await db.SaveChangesAsync(cancellationToken);
         var rollover = await lessonRollover.TryRolloverStudentAsync(user.Id, cancellationToken);
 
-        var message = "Payment marked as paid.";
+        var message = reviewedByAdminUserId is null
+            ? "Payment received. Thank you!"
+            : "Payment marked as paid.";
         if (rollover.AdminFacingMessage is not null)
             message = $"{message} {rollover.AdminFacingMessage}";
 

@@ -66,6 +66,30 @@ export class StudentApiService {
     );
   }
 
+  createFlutterwaveCheckout(): Observable<{
+    checkoutUrl: string;
+    reference: string;
+    submissionId: string;
+    status: string;
+  }> {
+    return this.http.post<{
+      checkoutUrl: string;
+      reference: string;
+      submissionId: string;
+      status: string;
+    }>(`${this.apiBaseUrl}/api/student/flutterwave-checkout`, {});
+  }
+
+  verifyFlutterwavePayment(
+    reference: string,
+    transactionId?: string | null,
+  ): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiBaseUrl}/api/student/flutterwave-verify`, {
+      reference,
+      transactionId: transactionId ?? null,
+    });
+  }
+
   getPaymentHistory(): Observable<StudentPaymentHistoryItem[]> {
     return this.http.get<unknown>(`${this.apiBaseUrl}/api/student/payment-history`).pipe(
       map((rows) => {

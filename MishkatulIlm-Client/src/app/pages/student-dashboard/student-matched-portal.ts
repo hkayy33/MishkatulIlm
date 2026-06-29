@@ -2,7 +2,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
 import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { StudentApiService } from '../../core/services/student-api.service';
@@ -38,6 +38,7 @@ export class StudentMatchedPortal implements OnInit {
   private readonly studentApi = inject(StudentApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly activeTab = signal<MatchedPortalTab>('summary');
@@ -125,6 +126,66 @@ export class StudentMatchedPortal implements OnInit {
           this.loadPaymentStatement();
         }
       });
+    this.handleFlutterwaveReturn();
+  }
+
+  private handleFlutterwaveReturn(): void {
+    const query = this.route.snapshot.queryParamMap;
+    if (query.get('payment') !== 'flutterwave') return;
+
+    const reference = query.get('reference') ?? query.get('tx_ref');
+    if (!reference) return;
+
+    const transactionId =
+      query.get('transaction_id') ??
+      query.get('transactionId') ??
+      query.get('charge_id') ??
+      query.get('id');
+    const status = (query.get('status') ?? '').toLowerCase();
+    if (status === 'cancelled' || status === 'canceled' || status === 'failed') {
+      this.store.actionError.set('Payment was not completed. You can try again when ready.');
+      this.clearFlutterwaveQueryParams();
+      return;
+    }
+
+    this.activeTab.set('payments');
+    this.paymentBusy.set(true);
+    this.studentApi
+      .verifyFlutterwavePayment(reference, transactionId)
+      .pipe(finalize(() => this.paymentBusy.set(false)))
+      .subscribe({
+        next: (res) => {
+          this.store.actionMessage.set(res.message);
+          this.store.reloadPortal(undefined, () => {
+            this.loadPaymentStatement();
+            this.loadPaymentHistory();
+          });
+          this.clearFlutterwaveQueryParams();
+        },
+        error: (err: unknown) => {
+          this.store.actionError.set(formatHttpError(err, 'Could not confirm your payment yet.'));
+          this.setTab('payments');
+          this.clearFlutterwaveQueryParams();
+        },
+      });
+  }
+
+  private clearFlutterwaveQueryParams(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        payment: null,
+        reference: null,
+        tx_ref: null,
+        transaction_id: null,
+        transactionId: null,
+        charge_id: null,
+        id: null,
+        status: null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   protected setTab(tab: MatchedPortalTab): void {
@@ -325,22 +386,24 @@ export class StudentMatchedPortal implements OnInit {
   }
 
   protected submitPayment(): void {
-    if (this.paymentBusy() || !this.canSubmitPayment()) return;
+    if (this.paymentBusy() || (!this.canSubmitPayment() && !this.pendingVerification())) return;
 
     this.paymentBusy.set(true);
     this.store.actionError.set(null);
     this.studentApi
-      .submitPayment()
+      .createFlutterwaveCheckout()
       .pipe(finalize(() => this.paymentBusy.set(false)))
       .subscribe({
         next: (res) => {
-          this.store.actionMessage.set(res.message);
-          this.store.reloadPortal();
-          this.loadPaymentStatement();
-          this.loadPaymentHistory();
+          const checkoutUrl = res.checkoutUrl || (res as { link?: string }).link;
+          if (!checkoutUrl) {
+            this.store.actionError.set('Could not open the payment page. Please try again.');
+            return;
+          }
+          window.location.href = checkoutUrl;
         },
         error: (err: unknown) => {
-          this.store.actionError.set(formatHttpError(err, 'Could not submit payment.'));
+          this.store.actionError.set(formatHttpError(err, 'Could not start payment.'));
         },
       });
   }

@@ -20,7 +20,7 @@ public sealed class StudentPaymentService(
 
         var utcNow = DateTime.UtcNow;
         var billing = await billingContext.ResolveAsync(user, utcNow, cancellationToken);
-        var lessons = await billingContext.LoadBillableLessonsAsync(billing, userId, cancellationToken);
+        var lessons = await billingContext.LoadBillableLessonsAsync(billing, userId, utcNow, cancellationToken);
 
         var currentSubmission = await db.PaymentSubmissions.AsNoTracking()
             .Where(s => s.StudentUserId == userId && s.BillingYear == billing.BillingYear && s.BillingMonth == billing.BillingMonth)
@@ -76,7 +76,7 @@ public sealed class StudentPaymentService(
         if (existing?.Status == PaymentSubmissionStatusCodes.PendingVerification)
             return (false, "Your payment is already pending verification.", null);
 
-        var lessons = await billingContext.LoadBillableLessonsAsync(billing, userId, cancellationToken);
+        var lessons = await billingContext.LoadBillableLessonsAsync(billing, userId, utcNow, cancellationToken);
 
         var settings = await schedulingSettings.GetEntityAsync(cancellationToken);
         var statement = BuildStatement(user, lessons, settings, billing, existing, utcNow);
@@ -142,6 +142,11 @@ public sealed class StudentPaymentService(
         if (billing.IsRolloverBlock && billing.PlannedRollover is { Count: > 0 })
         {
             labelOverride = LessonBillingService.FormatRolloverBillingPeriod(billing.PlannedRollover);
+            billEntireList = true;
+        }
+        else if (user.LastPaymentAtUtc is null && lessons.Count > 0)
+        {
+            labelOverride = LessonBillingService.FormatUpcomingLessonsPeriod(lessons);
             billEntireList = true;
         }
 

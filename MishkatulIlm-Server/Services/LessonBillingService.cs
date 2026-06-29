@@ -56,6 +56,21 @@ public static class LessonBillingService
         return $"Next 4-week block ({first:dd MMM} – {last:dd MMM yyyy})";
     }
 
+    public static string FormatUpcomingLessonsPeriod(IReadOnlyList<LessonSlot> lessons)
+    {
+        if (lessons.Count == 0)
+            return string.Empty;
+
+        var ordered = lessons.OrderBy(l => l.StartsAtUtc).ToList();
+        var first = ordered[0].StartsAtUtc;
+        var last = ordered[^1].StartsAtUtc;
+
+        if (first.Year == last.Year && first.Month == last.Month)
+            return $"Scheduled lessons ({FormatBillingPeriod(first.Year, first.Month)})";
+
+        return $"Scheduled lessons ({first:dd MMM} – {last:dd MMM yyyy})";
+    }
+
     public static (decimal Rate45MinUsd, decimal Rate60MinUsd) ResolveRates(SchedulingSettings settings)
     {
         var rate45 = settings.PaymentRate45MinUsd > 0

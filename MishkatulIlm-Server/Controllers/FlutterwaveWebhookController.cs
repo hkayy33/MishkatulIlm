@@ -63,7 +63,7 @@ public sealed class FlutterwaveWebhookController(
             var reference = data.TryGetProperty("reference", out var refEl)
                 ? refEl.GetString()
                 : data.TryGetProperty("tx_ref", out var txRefEl) ? txRefEl.GetString() : null;
-            var chargeId = data.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
+            var chargeId = TryReadTransactionId(data);
             var amount = data.TryGetProperty("amount", out var amountEl) ? amountEl.GetDecimal() : 0m;
             var currency = data.TryGetProperty("currency", out var currencyEl) ? currencyEl.GetString() ?? "USD" : "USD";
             var status = data.TryGetProperty("status", out var statusEl) ? statusEl.GetString() : null;
@@ -90,5 +90,18 @@ public sealed class FlutterwaveWebhookController(
 
             return Ok(new { message = "Payment recorded." });
         }
+    }
+
+    private static string? TryReadTransactionId(JsonElement data)
+    {
+        if (!data.TryGetProperty("id", out var idEl))
+            return null;
+
+        return idEl.ValueKind switch
+        {
+            JsonValueKind.String => idEl.GetString(),
+            JsonValueKind.Number => idEl.GetInt64().ToString(),
+            _ => null,
+        };
     }
 }

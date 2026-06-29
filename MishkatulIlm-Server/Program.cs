@@ -56,6 +56,11 @@ builder.Services.AddHttpClient(nameof(FlutterwaveApiClient), client =>
     client.Timeout = TimeSpan.FromSeconds(60);
 });
 builder.Services.AddSingleton<FlutterwaveApiClient>();
+builder.Services.AddHttpClient(nameof(FlutterwaveStandardApiClient), client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
+builder.Services.AddSingleton<FlutterwaveStandardApiClient>();
 builder.Services.AddScoped<FlutterwavePaymentService>();
 builder.Services.AddScoped<SchedulingSettingsService>();
 builder.Services.AddScoped<ScheduleProposalService>();

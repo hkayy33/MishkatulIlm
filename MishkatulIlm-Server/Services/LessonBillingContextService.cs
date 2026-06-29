@@ -19,6 +19,21 @@ public sealed class LessonBillingContextService(AppDbContext db)
             return new BillingResolution(year, month, IsRolloverBlock: true, planned);
         }
 
+        if (user.LastPaymentAtUtc is null)
+        {
+            var firstUpcoming = await db.LessonSlots.AsNoTracking()
+                .Where(s => s.StudentUserId == user.Id && s.EndsAtUtc > utcNow)
+                .OrderBy(s => s.StartsAtUtc)
+                .Select(s => s.StartsAtUtc)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (firstUpcoming != default)
+            {
+                var (year, month) = LessonBillingService.BillingMonthForLessonStart(firstUpcoming);
+                return new BillingResolution(year, month, IsRolloverBlock: false, null);
+            }
+        }
+
         var (billingYear, billingMonth) = LessonBillingService.ResolveBillingMonth(user, utcNow);
         return new BillingResolution(billingYear, billingMonth, IsRolloverBlock: false, null);
     }
@@ -26,10 +41,25 @@ public sealed class LessonBillingContextService(AppDbContext db)
     public async Task<List<LessonSlot>> LoadBillableLessonsAsync(
         BillingResolution billing,
         Guid userId,
+        DateTime utcNow,
         CancellationToken cancellationToken = default)
     {
         if (billing.IsRolloverBlock && billing.PlannedRollover is { Count: > 0 })
             return LessonBillingService.SyntheticSlotsFromPlanned(billing.PlannedRollover).ToList();
+
+        var user = await db.Users.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+
+        if (user?.LastPaymentAtUtc is null)
+        {
+            var upcoming = await db.LessonSlots.AsNoTracking()
+                .Where(s => s.StudentUserId == userId && s.EndsAtUtc > utcNow)
+                .OrderBy(s => s.StartsAtUtc)
+                .ToListAsync(cancellationToken);
+
+            if (upcoming.Count > 0)
+                return upcoming;
+        }
 
         var (monthStart, monthEnd) = LessonBillingService.MonthRangeUtc(billing.BillingYear, billing.BillingMonth);
         return await db.LessonSlots.AsNoTracking()

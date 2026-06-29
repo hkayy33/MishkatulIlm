@@ -49,8 +49,21 @@ public sealed class FlutterwavePaymentService(
                 return (true, null, resumeUrl, existing);
         }
 
-        var lessons = await billingContext.LoadBillableLessonsAsync(billing, userId, cancellationToken);
+        var lessons = await billingContext.LoadBillableLessonsAsync(billing, userId, utcNow, cancellationToken);
         var settings = await schedulingSettings.GetEntityAsync(cancellationToken);
+        string? labelOverride = null;
+        var billEntireList = false;
+        if (billing.IsRolloverBlock && billing.PlannedRollover is { Count: > 0 })
+        {
+            labelOverride = LessonBillingService.FormatRolloverBillingPeriod(billing.PlannedRollover);
+            billEntireList = true;
+        }
+        else if (user.LastPaymentAtUtc is null && lessons.Count > 0)
+        {
+            labelOverride = LessonBillingService.FormatUpcomingLessonsPeriod(lessons);
+            billEntireList = true;
+        }
+
         var statement = LessonBillingService.BuildStatement(
             user,
             lessons,
@@ -59,10 +72,8 @@ public sealed class FlutterwavePaymentService(
             billing.BillingMonth,
             existing,
             utcNow,
-            billing.IsRolloverBlock && billing.PlannedRollover is { Count: > 0 }
-                ? LessonBillingService.FormatRolloverBillingPeriod(billing.PlannedRollover)
-                : null,
-            billing.IsRolloverBlock);
+            labelOverride,
+            billEntireList);
 
         if (statement.TotalAmount <= 0)
             return (false, "There are no billable lessons for this billing period.", null, null);

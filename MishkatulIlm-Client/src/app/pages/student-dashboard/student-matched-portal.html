@@ -468,11 +468,9 @@
             <h3>Pay with Flutterwave</h3>
             <p class="matched-muted">
               You will be redirected to Flutterwave to pay by card, bank transfer, or other supported methods.
-              Your payment reference is
-              <mark>{{ statement.paymentReference }}</mark>.
             </p>
 
-            @if ((canSubmitPayment() || pendingVerification()) && statement.totalAmount > 0) {
+            @if (showPaymentDetails() && !currentPeriodPaid() && statement.totalAmount > 0) {
               <button
                 type="button"
                 class="matched-btn"

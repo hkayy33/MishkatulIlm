@@ -46,9 +46,11 @@ public sealed class AdminPaymentSubmissionService(
         foreach (var row in rows)
         {
             var student = row.Student!;
+            var utcNow = DateTime.UtcNow;
             var lessons = await billingContext.LoadBillableLessonsAsync(
-                await billingContext.ResolveAsync(student, DateTime.UtcNow, cancellationToken),
+                await billingContext.ResolveAsync(student, utcNow, cancellationToken),
                 row.StudentUserId,
+                utcNow,
                 cancellationToken);
 
             if (lessons.Count == 0)

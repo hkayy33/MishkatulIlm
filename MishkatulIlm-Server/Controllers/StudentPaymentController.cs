@@ -82,7 +82,10 @@ public sealed class StudentPaymentController(
             return Unauthorized();
 
         var (success, error, checkoutUrl, submission) =
-            await flutterwavePayments.InitiateCheckoutAsync(userId, cancellationToken);
+            await flutterwavePayments.InitiateCheckoutAsync(
+                userId,
+                Request.Headers.Origin.FirstOrDefault(),
+                cancellationToken);
         if (!success)
             return BadRequest(new { message = error });
 

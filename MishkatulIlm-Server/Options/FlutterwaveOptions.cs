@@ -19,9 +19,12 @@ public sealed class FlutterwaveOptions
     public string ClientAppUrl { get; set; } = "http://localhost:4200";
 
     /// <summary>
-    /// Optional HTTPS return URL for hosted Flutterwave redirects (orchestrator fallback).
-    /// Required for local dev when checkout sessions do not return checkout_url.
+    /// LAN-accessible app URL for local dev when the browser uses localhost but Flutterwave
+    /// rejects loopback redirect URLs on orchestrator/direct-charges (e.g. http://192.168.1.40:4200).
     /// </summary>
+    public string LocalNetworkAppUrl { get; set; } = string.Empty;
+
+    /// <summary>Optional HTTPS override when orchestrator fallback is needed and ClientAppUrl is not HTTPS.</summary>
     public string PaymentRedirectUrl { get; set; } = string.Empty;
 
     public bool IsConfigured =>

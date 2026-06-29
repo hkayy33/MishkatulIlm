@@ -13,10 +13,12 @@ public sealed class FlutterwavePaymentService(
     SchedulingSettingsService schedulingSettings,
     AdminPaymentSubmissionService adminPayments,
     IOptions<FlutterwaveOptions> options,
+    IConfiguration configuration,
     ILogger<FlutterwavePaymentService> logger)
 {
     public async Task<(bool Success, string? Error, string? CheckoutUrl, PaymentSubmission? Submission)> InitiateCheckoutAsync(
         Guid userId,
+        string? clientOrigin = null,
         CancellationToken cancellationToken = default)
     {
         if (!options.Value.IsConfigured)
@@ -87,7 +89,8 @@ public sealed class FlutterwavePaymentService(
             return (false, ex.Message, null, null);
         }
 
-        var redirectUrl = ResolvePaymentRedirectUrl(reference);
+        var redirectUrl = ResolvePaymentRedirectUrl(reference, clientOrigin);
+        var orchestratorRedirectUrl = ResolveOrchestratorRedirectUrl(reference, clientOrigin);
         var traceId = $"mi-chk-{Guid.NewGuid():N}";
         var idempotencyKey = $"mi-chk-{reference}";
 
@@ -140,7 +143,7 @@ public sealed class FlutterwavePaymentService(
                 statement.TotalAmount,
                 statement.Currency,
                 reference,
-                redirectUrl,
+                orchestratorRedirectUrl,
                 cancellationToken);
             if (!orchestrated.Success)
             {
@@ -353,10 +356,19 @@ public sealed class FlutterwavePaymentService(
         string redirectUrl,
         CancellationToken cancellationToken)
     {
-        if (!redirectUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        if (!redirectUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+            && !options.Value.ApiBaseUrl.Contains("sandbox", StringComparison.OrdinalIgnoreCase))
         {
             return (false,
-                "Flutterwave requires an HTTPS return URL. Set Flutterwave:PaymentRedirectUrl to your public HTTPS student dashboard URL.",
+                "Flutterwave requires an HTTPS return URL in production. Set Flutterwave:ClientAppUrl to your public HTTPS site URL.",
+                null,
+                null);
+        }
+
+        if (IsLoopbackRedirectUrl(redirectUrl))
+        {
+            return (false,
+                "Flutterwave cannot redirect to localhost. Open the app from your LAN address (e.g. http://192.168.1.40:4200) or set Flutterwave:LocalNetworkAppUrl in development settings.",
                 null,
                 null);
         }
@@ -500,14 +512,108 @@ public sealed class FlutterwavePaymentService(
     private static bool VerifyAmount(decimal expected, decimal actual) =>
         Math.Abs(expected - actual) < 0.01m;
 
-    private string ResolvePaymentRedirectUrl(string reference)
+    private string ResolvePaymentRedirectUrl(string reference, string? clientOrigin = null)
     {
-        var configured = options.Value.PaymentRedirectUrl.Trim();
-        var baseUrl = !string.IsNullOrWhiteSpace(configured)
-            ? configured.TrimEnd('/')
-            : options.Value.ClientAppUrl.TrimEnd('/');
+        var baseUrl = ResolveClientAppBaseUrl(clientOrigin);
+        return $"{baseUrl}/dashboard?payment=flutterwave&reference={Uri.EscapeDataString(reference)}";
+    }
 
-        return $"{baseUrl}/student-dashboard?payment=flutterwave&reference={Uri.EscapeDataString(reference)}";
+    /// <summary>
+    /// Flutterwave orchestrator rejects loopback hosts (localhost / 127.0.0.1) but accepts LAN IPs.
+    /// Checkout sessions may still use the browser origin; orchestrator fallback needs a substitute.
+    /// </summary>
+    private string ResolveOrchestratorRedirectUrl(string reference, string? clientOrigin)
+    {
+        var url = ResolvePaymentRedirectUrl(reference, clientOrigin);
+        if (!IsLoopbackRedirectUrl(url))
+            return url;
+
+        var alternateBase = TryResolveNonLoopbackAppBaseUrl();
+        if (alternateBase is null)
+            return url;
+
+        logger.LogInformation(
+            "Using {AlternateBase} instead of loopback for Flutterwave orchestrator redirect.",
+            alternateBase);
+
+        return $"{alternateBase}/dashboard?payment=flutterwave&reference={Uri.EscapeDataString(reference)}";
+    }
+
+    private string ResolveClientAppBaseUrl(string? clientOrigin)
+    {
+        var fromRequest = TryNormalizeAllowedOrigin(clientOrigin);
+        if (!string.IsNullOrWhiteSpace(fromRequest))
+            return fromRequest;
+
+        return options.Value.ClientAppUrl.TrimEnd('/');
+    }
+
+    private string? TryNormalizeAllowedOrigin(string? origin)
+    {
+        if (string.IsNullOrWhiteSpace(origin))
+            return null;
+
+        if (!Uri.TryCreate(origin.Trim(), UriKind.Absolute, out var uri))
+            return null;
+
+        var normalized = $"{uri.Scheme}://{uri.Authority}";
+        var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var configured in configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])
+        {
+            if (!string.IsNullOrWhiteSpace(configured))
+                allowed.Add(configured.TrimEnd('/'));
+        }
+
+        var clientAppUrl = configuration["Flutterwave:ClientAppUrl"] ?? configuration["Stripe:ClientAppUrl"];
+        if (!string.IsNullOrWhiteSpace(clientAppUrl))
+            allowed.Add(clientAppUrl.TrimEnd('/'));
+
+        return allowed.Contains(normalized) ? normalized : null;
+    }
+
+    private string? TryResolveNonLoopbackAppBaseUrl()
+    {
+        var candidates = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(options.Value.LocalNetworkAppUrl))
+            candidates.Add(options.Value.LocalNetworkAppUrl.TrimEnd('/'));
+
+        var stripeUrl = configuration["Stripe:ClientAppUrl"];
+        if (!string.IsNullOrWhiteSpace(stripeUrl))
+            candidates.Add(stripeUrl.TrimEnd('/'));
+
+        foreach (var configured in configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])
+        {
+            if (!string.IsNullOrWhiteSpace(configured))
+                candidates.Add(configured.TrimEnd('/'));
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.Value.PaymentRedirectUrl))
+            candidates.Add(options.Value.PaymentRedirectUrl.TrimEnd('/'));
+
+        foreach (var candidate in candidates)
+        {
+            if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri))
+                continue;
+
+            if (uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+                || uri.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            return candidate;
+        }
+
+        return null;
+    }
+
+    private static bool IsLoopbackRedirectUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return false;
+
+        return uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+            || uri.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

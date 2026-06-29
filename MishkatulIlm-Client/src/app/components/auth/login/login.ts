@@ -20,6 +20,19 @@ export class Login implements OnInit {
   protected readonly submitInfo = signal<string | null>(null);
   protected readonly submitBusy = signal(false);
 
+  private navigateAfterAuth(): void {
+    const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+    if (returnUrl?.startsWith('/')) {
+      void this.router.navigateByUrl(returnUrl, { replaceUrl: true });
+      return;
+    }
+
+    const u = this.auth.user();
+    if (u?.isAdmin) void this.router.navigate(['/admin'], { replaceUrl: true });
+    else if (u?.onboardingCompleted) void this.router.navigate(['/dashboard'], { replaceUrl: true });
+    else void this.router.navigate(['/onboarding'], { replaceUrl: true });
+  }
+
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
 
@@ -47,9 +60,7 @@ export class Login implements OnInit {
         if (!ready) return;
         const u = this.auth.user();
         if (!u) return;
-        if (u.isAdmin) void this.router.navigate(['/admin'], { replaceUrl: true });
-        else if (u?.onboardingCompleted) void this.router.navigate(['/dashboard'], { replaceUrl: true });
-        else void this.router.navigate(['/onboarding'], { replaceUrl: true });
+        this.navigateAfterAuth();
       });
   }
 
@@ -75,12 +86,7 @@ export class Login implements OnInit {
       .login({ email: email.trim(), password })
       .pipe(finalize(() => this.submitBusy.set(false)))
       .subscribe({
-        next: () => {
-          const u = this.auth.user();
-          if (u?.isAdmin) void this.router.navigate(['/admin']);
-          else if (u?.onboardingCompleted) void this.router.navigate(['/dashboard']);
-          else void this.router.navigate(['/onboarding']);
-        },
+        next: () => this.navigateAfterAuth(),
         error: (err: Error & { message?: string }) => {
           const msg = err?.message || 'Could not sign in. Try again.';
           if (/email not confirmed/i.test(msg)) {

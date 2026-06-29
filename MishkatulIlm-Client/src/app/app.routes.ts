@@ -20,6 +20,7 @@ export const routes: Routes = [
   { path: 'about', component: AboutUs },
   { path: 'pricing', component: PricingPage },
   { path: 'dashboard', component: StudentDashboard, canActivate: [authGuard] },
+  { path: 'student-dashboard', redirectTo: 'dashboard', pathMatch: 'full' },
   { path: 'privacy', component: PrivacyPolicy },
   { path: 'terms', component: TermsOfUse },
   { path: 'onboarding', component: Onboarding, canActivate: [authGuard] },

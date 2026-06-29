@@ -9,6 +9,7 @@ namespace MishkatulIlm_Server.Services.Flutterwave;
 public sealed class FlutterwavePaymentService(
     AppDbContext db,
     FlutterwaveApiClient apiClient,
+    FlutterwaveStandardApiClient standardApiClient,
     LessonBillingContextService billingContext,
     SchedulingSettingsService schedulingSettings,
     AdminPaymentSubmissionService adminPayments,
@@ -21,7 +22,7 @@ public sealed class FlutterwavePaymentService(
         string? clientOrigin = null,
         CancellationToken cancellationToken = default)
     {
-        if (!options.Value.IsConfigured)
+        if (!options.Value.CanAcceptPayments)
             return (false, "Online payments are not configured yet.", null, null);
 
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId && !u.IsAdmin, cancellationToken);
@@ -42,7 +43,8 @@ public sealed class FlutterwavePaymentService(
             return (false, "This billing period is already marked as paid.", null, null);
 
         if (existing?.Status == PaymentSubmissionStatusCodes.PendingVerification
-            && !string.IsNullOrWhiteSpace(existing.FlutterwaveCheckoutSessionId))
+            && !string.IsNullOrWhiteSpace(existing.FlutterwaveCheckoutSessionId)
+            && !ShouldStartFreshCheckout(existing.FlutterwaveCheckoutSessionId))
         {
             var resumeUrl = await TryResolveCheckoutUrlAsync(existing.FlutterwaveCheckoutSessionId, cancellationToken);
             if (!string.IsNullOrWhiteSpace(resumeUrl))
@@ -84,71 +86,48 @@ public sealed class FlutterwavePaymentService(
             return (false, "Payment submission is not available right now.", null, null);
 
         var reference = FlutterwaveReferenceHelper.Create();
-        string customerId;
-        try
-        {
-            customerId = await EnsureCustomerAsync(user, cancellationToken);
-        }
-        catch (FlutterwaveApiException ex)
-        {
-            logger.LogWarning(ex, "Flutterwave customer creation failed for user {UserId}.", userId);
-            return (false, ex.Message, null, null);
-        }
-        catch (InvalidOperationException ex)
-        {
-            logger.LogWarning(ex, "Flutterwave customer creation failed for user {UserId}.", userId);
-            return (false, ex.Message, null, null);
-        }
-
         var redirectUrl = ResolvePaymentRedirectUrl(reference, clientOrigin);
         var orchestratorRedirectUrl = ResolveOrchestratorRedirectUrl(reference, clientOrigin);
-        var traceId = $"mi-chk-{Guid.NewGuid():N}";
-        var idempotencyKey = $"mi-chk-{reference}";
 
-        JsonDocument response;
-        try
+        string? checkoutUrl = null;
+        string externalId = reference;
+        string? lastError = null;
+
+        if (options.Value.HasStandardHostedCheckout)
         {
-            response = await apiClient.PostAsync(
-                "/checkout/sessions",
-                new
-                {
-                    amount = statement.TotalAmount,
-                    currency = statement.Currency,
-                    customer_id = customerId,
-                    redirect_url = redirectUrl,
-                    reference,
-                    session_duration = 60,
-                },
-                traceId,
-                idempotencyKey,
+            var standard = await TryStandardHostedCheckoutAsync(
+                user,
+                statement.TotalAmount,
+                statement.Currency,
+                reference,
+                redirectUrl,
                 cancellationToken);
-        }
-        catch (FlutterwaveApiException ex)
-        {
-            logger.LogWarning(ex, "Flutterwave checkout session failed for user {UserId}.", userId);
-            return (false, ex.Message, null, null);
+            if (standard.Success)
+                checkoutUrl = standard.CheckoutUrl;
+            else
+                lastError = standard.Error;
         }
 
-        string? checkoutUrl;
-        string externalId;
-        using (response)
+        if (string.IsNullOrWhiteSpace(checkoutUrl)
+            && options.Value.IsConfigured
+            && !options.Value.HasStandardHostedCheckout)
         {
-            var root = response.RootElement;
-            if (!string.Equals(root.GetProperty("status").GetString(), "success", StringComparison.OrdinalIgnoreCase))
+            string customerId;
+            try
             {
-                var message = TryReadErrorMessage(root) ?? "Could not start Flutterwave checkout.";
-                return (false, message, null, null);
+                customerId = await EnsureCustomerAsync(user, cancellationToken);
+            }
+            catch (FlutterwaveApiException ex)
+            {
+                logger.LogWarning(ex, "Flutterwave customer creation failed for user {UserId}.", userId);
+                return (false, ex.Message, null, null);
+            }
+            catch (InvalidOperationException ex)
+            {
+                logger.LogWarning(ex, "Flutterwave customer creation failed for user {UserId}.", userId);
+                return (false, ex.Message, null, null);
             }
 
-            var data = root.GetProperty("data");
-            externalId = data.GetProperty("id").GetString() ?? string.Empty;
-            checkoutUrl = TryReadCheckoutUrl(data);
-            if (string.IsNullOrWhiteSpace(checkoutUrl))
-                checkoutUrl = await TryResolveCheckoutUrlAsync(externalId, cancellationToken);
-        }
-
-        if (string.IsNullOrWhiteSpace(checkoutUrl))
-        {
             var orchestrated = await TryOrchestratorHostedCheckoutAsync(
                 user,
                 statement.TotalAmount,
@@ -156,21 +135,35 @@ public sealed class FlutterwavePaymentService(
                 reference,
                 orchestratorRedirectUrl,
                 cancellationToken);
-            if (!orchestrated.Success)
+            if (orchestrated.Success)
             {
-                logger.LogWarning(
-                    "Flutterwave checkout session {SessionId} had no checkout URL and orchestrator fallback failed: {Error}",
-                    externalId,
-                    orchestrated.Error);
-                return (false, orchestrated.Error ?? "Could not open the payment page. Please try again.", null, null);
+                checkoutUrl = orchestrated.CheckoutUrl;
+                externalId = orchestrated.ExternalId ?? reference;
             }
-
-            checkoutUrl = orchestrated.CheckoutUrl;
-            externalId = orchestrated.ExternalId ?? externalId;
+            else
+            {
+                lastError = orchestrated.Error;
+                var session = await TryCreateCheckoutSessionUrlAsync(
+                    customerId,
+                    statement.TotalAmount,
+                    statement.Currency,
+                    redirectUrl,
+                    reference,
+                    cancellationToken);
+                checkoutUrl = session.CheckoutUrl;
+                if (!string.IsNullOrWhiteSpace(session.SessionId))
+                    externalId = session.SessionId;
+            }
         }
 
         if (string.IsNullOrWhiteSpace(checkoutUrl))
-            return (false, "Flutterwave did not return a checkout URL.", null, null);
+        {
+            logger.LogWarning(
+                "Flutterwave hosted checkout failed for reference {Reference}: {Error}",
+                reference,
+                lastError);
+            return (false, lastError ?? "Could not open the payment page. Please try again.", null, null);
+        }
 
         var submission = existing ?? new PaymentSubmission
         {
@@ -291,6 +284,120 @@ public sealed class FlutterwavePaymentService(
         CancellationToken cancellationToken) =>
         adminPayments.ApproveAutomaticallyAsync(submission.Id, cancellationToken);
 
+    private async Task<(bool Success, string? Error, string? CheckoutUrl)> TryStandardHostedCheckoutAsync(
+        AppUser user,
+        decimal amount,
+        string currency,
+        string reference,
+        string redirectUrl,
+        CancellationToken cancellationToken)
+    {
+        if (!redirectUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+            && !options.Value.IsSandbox)
+        {
+            return (false,
+                "Flutterwave requires an HTTPS return URL in production. Set Flutterwave:ClientAppUrl to your public HTTPS site URL.",
+                null);
+        }
+
+        var (first, last) = FlutterwaveCustomerNameHelper.Resolve(user.FirstName, user.LastName);
+        try
+        {
+            using var response = await standardApiClient.PostAsync(
+                "/v3/payments",
+                new
+                {
+                    tx_ref = reference,
+                    amount,
+                    currency,
+                    redirect_url = redirectUrl,
+                    payment_options = "card",
+                    customer = new
+                    {
+                        email = user.Email,
+                        name = $"{first} {last}".Trim(),
+                    },
+                    customizations = new
+                    {
+                        title = "Al Usooliyyah Academy",
+                        description = "Lesson payment",
+                    },
+                    configurations = new
+                    {
+                        session_duration = 60,
+                        max_retry_attempt = 3,
+                    },
+                },
+                cancellationToken);
+
+            var root = response.RootElement;
+            if (!string.Equals(root.GetProperty("status").GetString(), "success", StringComparison.OrdinalIgnoreCase))
+                return (false, TryReadErrorMessage(root) ?? "Could not start Flutterwave checkout.", null);
+
+            var link = TryReadCheckoutUrl(root.GetProperty("data"));
+            if (string.IsNullOrWhiteSpace(link))
+                return (false, "Flutterwave did not return a checkout URL.", null);
+
+            logger.LogInformation(
+                "Flutterwave Standard hosted checkout started for reference {Reference}.",
+                reference);
+
+            return (true, null, link);
+        }
+        catch (FlutterwaveApiException ex)
+        {
+            logger.LogWarning(ex, "Flutterwave Standard checkout failed for reference {Reference}.", reference);
+            return (false, ex.Message, null);
+        }
+    }
+
+    private async Task<(string? CheckoutUrl, string? SessionId)> TryCreateCheckoutSessionUrlAsync(
+        string customerId,
+        decimal amount,
+        string currency,
+        string redirectUrl,
+        string reference,
+        CancellationToken cancellationToken)
+    {
+        var traceId = $"mi-chk-{Guid.NewGuid():N}";
+        var idempotencyKey = $"mi-chk-{reference}";
+
+        try
+        {
+            using var response = await apiClient.PostAsync(
+                "/checkout/sessions",
+                new
+                {
+                    amount,
+                    currency,
+                    customer_id = customerId,
+                    redirect_url = redirectUrl,
+                    reference,
+                    session_duration = 60,
+                },
+                traceId,
+                idempotencyKey,
+                cancellationToken);
+
+            var root = response.RootElement;
+            if (!string.Equals(root.GetProperty("status").GetString(), "success", StringComparison.OrdinalIgnoreCase))
+                return (null, null);
+
+            var data = root.GetProperty("data");
+            var sessionId = data.GetProperty("id").GetString();
+            var checkoutUrl = TryReadCheckoutUrl(data);
+            if (string.IsNullOrWhiteSpace(checkoutUrl) && !string.IsNullOrWhiteSpace(sessionId))
+                checkoutUrl = await TryResolveCheckoutUrlAsync(sessionId, cancellationToken);
+
+            return (checkoutUrl, sessionId);
+        }
+        catch (FlutterwaveApiException ex)
+        {
+            logger.LogWarning(ex, "Flutterwave checkout session failed for reference {Reference}.", reference);
+            return (null, null);
+        }
+    }
+
     private async Task<string> EnsureCustomerAsync(AppUser user, CancellationToken cancellationToken)
     {
         if (!string.IsNullOrWhiteSpace(user.FlutterwaveCustomerId))
@@ -302,11 +409,7 @@ public sealed class FlutterwavePaymentService(
             new
             {
                 email = user.Email,
-                name = new
-                {
-                    first = string.IsNullOrWhiteSpace(user.FirstName) ? "Student" : user.FirstName,
-                    last = string.IsNullOrWhiteSpace(user.LastName) ? "User" : user.LastName,
-                },
+                name = FlutterwaveCustomerNameHelper.Build(user),
             },
             traceId,
             $"mi-cus-{user.Id:N}",
@@ -322,6 +425,22 @@ public sealed class FlutterwavePaymentService(
         user.FlutterwaveCustomerId = customerId;
         await db.SaveChangesAsync(cancellationToken);
         return customerId;
+    }
+
+    private bool ShouldStartFreshCheckout(string externalId)
+    {
+        // v4 orchestrator wallet charges (Apple/Google Pay) must not be resumed — redirect tokens expire
+        // and we prefer v3 Standard hosted card checkout when configured.
+        if (externalId.StartsWith("chg_", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (options.Value.HasStandardHostedCheckout
+            && !externalId.StartsWith("che_", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private async Task<string?> TryResolveCheckoutUrlAsync(string externalId, CancellationToken cancellationToken)
@@ -368,7 +487,7 @@ public sealed class FlutterwavePaymentService(
         CancellationToken cancellationToken)
     {
         if (!redirectUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
-            && !options.Value.ApiBaseUrl.Contains("sandbox", StringComparison.OrdinalIgnoreCase))
+            && !options.Value.IsSandbox)
         {
             return (false,
                 "Flutterwave requires an HTTPS return URL in production. Set Flutterwave:ClientAppUrl to your public HTTPS site URL.",
@@ -384,55 +503,71 @@ public sealed class FlutterwavePaymentService(
                 null);
         }
 
-        var paymentMethodType = string.Equals(currency, "NGN", StringComparison.OrdinalIgnoreCase)
-            ? "opay"
-            : "googlepay";
-
-        var traceId = $"mi-orc-{Guid.NewGuid():N}";
-        try
+        string? lastError = null;
+        foreach (var paymentMethodType in FlutterwaveOrchestratorPaymentMethods.Resolve(options.Value, currency))
         {
-            using var response = await apiClient.PostAsync(
-                "/orchestration/direct-charges",
-                new
-                {
-                    amount,
-                    currency,
-                    reference,
-                    redirect_url = redirectUrl,
-                    customer = new
-                    {
-                        email = user.Email,
-                        name = new
-                        {
-                            first = string.IsNullOrWhiteSpace(user.FirstName) ? "Student" : user.FirstName,
-                            last = string.IsNullOrWhiteSpace(user.LastName) ? "User" : user.LastName,
-                        },
-                    },
-                    payment_method = new { type = paymentMethodType },
-                },
-                traceId,
-                $"mi-orc-{reference}",
-                cancellationToken);
-
-            var root = response.RootElement;
-            if (!string.Equals(root.GetProperty("status").GetString(), "success", StringComparison.OrdinalIgnoreCase))
+            var traceId = $"mi-orc-{Guid.NewGuid():N}";
+            try
             {
-                var message = TryReadErrorMessage(root) ?? "Could not start Flutterwave payment.";
-                return (false, message, null, null);
+                using var response = await apiClient.PostAsync(
+                    "/orchestration/direct-charges",
+                    new
+                    {
+                        amount,
+                        currency,
+                        reference,
+                        redirect_url = redirectUrl,
+                        customer = new
+                        {
+                            email = user.Email,
+                            name = FlutterwaveCustomerNameHelper.Build(user),
+                        },
+                        payment_method = BuildOrchestratorPaymentMethod(paymentMethodType),
+                    },
+                    traceId,
+                    $"mi-orc-{reference}-{paymentMethodType}",
+                    cancellationToken);
+
+                var root = response.RootElement;
+                if (!string.Equals(root.GetProperty("status").GetString(), "success", StringComparison.OrdinalIgnoreCase))
+                {
+                    lastError = TryReadErrorMessage(root) ?? "Could not start Flutterwave payment.";
+                    logger.LogWarning(
+                        "Flutterwave orchestrator {Method} failed for reference {Reference}: {Error}",
+                        paymentMethodType,
+                        reference,
+                        lastError);
+                    continue;
+                }
+
+                var data = root.GetProperty("data");
+                var externalId = data.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
+                var checkoutUrl = TryReadCheckoutUrl(data);
+                if (string.IsNullOrWhiteSpace(checkoutUrl))
+                {
+                    lastError = "Flutterwave did not return a checkout URL.";
+                    continue;
+                }
+
+                logger.LogInformation(
+                    "Flutterwave orchestrator checkout started via {Method} for reference {Reference}.",
+                    paymentMethodType,
+                    reference);
+
+                return (true, null, checkoutUrl, externalId);
             }
-
-            var data = root.GetProperty("data");
-            var externalId = data.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
-            var checkoutUrl = TryReadCheckoutUrl(data);
-            if (string.IsNullOrWhiteSpace(checkoutUrl))
-                return (false, "Flutterwave did not return a checkout URL.", null, externalId);
-
-            return (true, null, checkoutUrl, externalId);
+            catch (FlutterwaveApiException ex)
+            {
+                lastError = ex.Message;
+                logger.LogWarning(
+                    ex,
+                    "Flutterwave orchestrator {Method} failed for reference {Reference}.",
+                    paymentMethodType,
+                    reference);
+            }
         }
-        catch (FlutterwaveApiException ex)
-        {
-            return (false, ex.Message, null, null);
-        }
+
+        return (false, lastError ?? "Could not start Flutterwave payment.", null, null);
     }
 
     private async Task<string?> FindSuccessfulChargeIdAsync(
@@ -441,6 +576,17 @@ public sealed class FlutterwavePaymentService(
         string expectedCurrency,
         CancellationToken cancellationToken)
     {
+        if (options.Value.HasStandardHostedCheckout)
+        {
+            var v3Id = await FindSuccessfulV3TransactionIdAsync(
+                reference,
+                expectedAmount,
+                expectedCurrency,
+                cancellationToken);
+            if (!string.IsNullOrWhiteSpace(v3Id))
+                return v3Id;
+        }
+
         try
         {
             using var response = await apiClient.GetAsync(
@@ -482,7 +628,90 @@ public sealed class FlutterwavePaymentService(
         return null;
     }
 
+    private async Task<string?> FindSuccessfulV3TransactionIdAsync(
+        string reference,
+        decimal expectedAmount,
+        string expectedCurrency,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await standardApiClient.GetAsync(
+                $"/v3/transactions/verify_by_reference?tx_ref={Uri.EscapeDataString(reference)}",
+                cancellationToken);
+
+            var root = response.RootElement;
+            if (!string.Equals(root.GetProperty("status").GetString(), "success", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            var data = root.GetProperty("data");
+            var status = data.TryGetProperty("status", out var statusEl) ? statusEl.GetString() : null;
+            var amount = data.TryGetProperty("amount", out var amountEl) ? amountEl.GetDecimal() : 0m;
+            var currency = data.TryGetProperty("currency", out var currencyEl) ? currencyEl.GetString() : null;
+
+            if (!IsSuccessfulStatus(status))
+                return null;
+
+            if (!VerifyAmount(expectedAmount, amount))
+                return null;
+
+            if (!string.Equals(expectedCurrency, currency, StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            return TryReadJsonId(data, "id");
+        }
+        catch (FlutterwaveApiException ex)
+        {
+            logger.LogWarning(ex, "Flutterwave v3 transaction lookup failed for reference {Reference}.", reference);
+            return null;
+        }
+    }
+
     private async Task<bool> VerifyChargeAsync(
+        string chargeId,
+        decimal expectedAmount,
+        string expectedCurrency,
+        CancellationToken cancellationToken)
+    {
+        if (IsV3TransactionId(chargeId))
+            return await VerifyV3TransactionAsync(chargeId, expectedAmount, expectedCurrency, cancellationToken);
+
+        return await VerifyV4ChargeAsync(chargeId, expectedAmount, expectedCurrency, cancellationToken);
+    }
+
+    private async Task<bool> VerifyV3TransactionAsync(
+        string transactionId,
+        decimal expectedAmount,
+        string expectedCurrency,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await standardApiClient.GetAsync(
+                $"/v3/transactions/{Uri.EscapeDataString(transactionId)}/verify",
+                cancellationToken);
+
+            var root = response.RootElement;
+            if (!string.Equals(root.GetProperty("status").GetString(), "success", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var data = root.GetProperty("data");
+            var status = data.TryGetProperty("status", out var statusEl) ? statusEl.GetString() : null;
+            var amount = data.TryGetProperty("amount", out var amountEl) ? amountEl.GetDecimal() : 0m;
+            var currency = data.TryGetProperty("currency", out var currencyEl) ? currencyEl.GetString() : null;
+
+            return IsSuccessfulStatus(status)
+                && VerifyAmount(expectedAmount, amount)
+                && string.Equals(expectedCurrency, currency, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (FlutterwaveApiException ex)
+        {
+            logger.LogWarning(ex, "Flutterwave v3 transaction verification failed for {TransactionId}.", transactionId);
+            return false;
+        }
+    }
+
+    private async Task<bool> VerifyV4ChargeAsync(
         string chargeId,
         decimal expectedAmount,
         string expectedCurrency,
@@ -513,6 +742,22 @@ public sealed class FlutterwavePaymentService(
             logger.LogWarning(ex, "Flutterwave charge verification failed for {ChargeId}.", chargeId);
             return false;
         }
+    }
+
+    private static bool IsV3TransactionId(string chargeId) =>
+        chargeId.All(char.IsDigit);
+
+    private static string? TryReadJsonId(JsonElement data, string propertyName)
+    {
+        if (!data.TryGetProperty(propertyName, out var idEl))
+            return null;
+
+        return idEl.ValueKind switch
+        {
+            JsonValueKind.String => idEl.GetString(),
+            JsonValueKind.Number => idEl.GetInt64().ToString(),
+            _ => null,
+        };
     }
 
     private static bool IsSuccessfulStatus(string? status) =>
@@ -632,6 +877,9 @@ public sealed class FlutterwavePaymentService(
     /// </summary>
     private static string? TryReadCheckoutUrl(JsonElement data)
     {
+        if (data.TryGetProperty("checkout_session", out var sessionEl))
+            data = sessionEl;
+
         if (data.TryGetProperty("checkout_url", out var checkoutUrlEl))
         {
             var checkoutUrl = checkoutUrlEl.GetString();
@@ -646,29 +894,146 @@ public sealed class FlutterwavePaymentService(
                 return link;
         }
 
-        if (data.TryGetProperty("next_action", out var nextActionEl)
-            && nextActionEl.TryGetProperty("redirect_url", out var redirectUrlEl)
-            && redirectUrlEl.TryGetProperty("url", out var urlEl))
+        if (data.TryGetProperty("next_action", out var nextActionEl))
         {
-            var url = urlEl.GetString();
-            if (!string.IsNullOrWhiteSpace(url))
-                return url;
+            if (nextActionEl.TryGetProperty("redirect_url", out var redirectUrlEl))
+            {
+                if (redirectUrlEl.ValueKind == JsonValueKind.String)
+                {
+                    var direct = redirectUrlEl.GetString();
+                    if (!string.IsNullOrWhiteSpace(direct))
+                        return direct;
+                }
+
+                if (redirectUrlEl.TryGetProperty("url", out var urlEl))
+                {
+                    var url = urlEl.GetString();
+                    if (!string.IsNullOrWhiteSpace(url))
+                        return url;
+                }
+            }
         }
 
         return null;
     }
 
+    private static object BuildOrchestratorPaymentMethod(string paymentMethodType) =>
+        paymentMethodType switch
+        {
+            "applepay" => new { type = paymentMethodType, applepay = new { } },
+            "googlepay" => new { type = paymentMethodType, googlepay = new { } },
+            _ => new { type = paymentMethodType },
+        };
+
     private static string? TryReadErrorMessage(JsonElement root)
     {
-        if (root.TryGetProperty("error", out var error) && error.TryGetProperty("message", out var message))
-            return message.GetString();
+        if (root.TryGetProperty("error", out var error))
+        {
+            if (error.TryGetProperty("message", out var message))
+            {
+                var text = message.GetString();
+                if (error.TryGetProperty("validation_errors", out var validationErrors)
+                    && validationErrors.ValueKind == JsonValueKind.Array)
+                {
+                    var details = validationErrors.EnumerateArray()
+                        .Select(item =>
+                        {
+                            var field = item.TryGetProperty("field_name", out var fieldEl)
+                                ? fieldEl.GetString()
+                                : null;
+                            var detail = item.TryGetProperty("message", out var detailEl)
+                                ? detailEl.GetString()
+                                : null;
+                            return !string.IsNullOrWhiteSpace(field) && !string.IsNullOrWhiteSpace(detail)
+                                ? $"{field}: {detail}"
+                                : detail;
+                        })
+                        .Where(d => !string.IsNullOrWhiteSpace(d))
+                        .ToList();
+
+                    if (details.Count > 0)
+                        return $"{text} ({string.Join("; ", details)})";
+                }
+
+                return text;
+            }
+        }
+
         if (root.TryGetProperty("message", out var topMessage))
             return topMessage.GetString();
         return null;
     }
 }
 
+public static class FlutterwaveOrchestratorPaymentMethods
+{
+    /// <summary>Opens Flutterwave's hosted checkout (card entry page) without encrypted card fields.</summary>
+    public const string DefaultHostedMethod = "applepay";
+
+    private static readonly string[] DefaultHostedMethods = [DefaultHostedMethod, "googlepay"];
+
+    public static IReadOnlyList<string> Resolve(FlutterwaveOptions options, string currency)
+    {
+        var configured = options.OrchestratorPaymentMethod?.Trim();
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return configured
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(m => !string.IsNullOrWhiteSpace(m))
+                .ToArray();
+        }
+
+        _ = currency;
+        return DefaultHostedMethods;
+    }
+}
+
 public static class FlutterwaveReferenceHelper
 {
     public static string Create() => $"MK{Guid.NewGuid():N}";
+}
+
+/// <summary>Flutterwave v4 requires first/last names 2–50 chars; letters and limited punctuation only.</summary>
+public static class FlutterwaveCustomerNameHelper
+{
+    public static object Build(AppUser user)
+    {
+        var (first, last) = Resolve(user.FirstName, user.LastName);
+        return new { first, last };
+    }
+
+    public static (string First, string Last) Resolve(string? firstName, string? lastName)
+    {
+        var first = NormalizePart(firstName, "Student");
+        var last = NormalizePart(lastName, "User");
+        first = EnsureMinLength(first, "Student");
+        last = EnsureMinLength(last, "User");
+        return (first, last);
+    }
+
+    private static string NormalizePart(string? value, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return fallback;
+
+        var cleaned = new string(value.Trim()
+            .Where(c => char.IsLetter(c) || c is ' ' or ',' or '.' or '\'' or '-')
+            .ToArray()).Trim();
+
+        if (string.IsNullOrWhiteSpace(cleaned))
+            return fallback;
+
+        return cleaned.Length > 50 ? cleaned[..50].Trim() : cleaned;
+    }
+
+    private static string EnsureMinLength(string value, string fallback)
+    {
+        if (value.Length >= 2)
+            return value;
+
+        if (value.Length == 1)
+            return $"{value}.";
+
+        return fallback;
+    }
 }

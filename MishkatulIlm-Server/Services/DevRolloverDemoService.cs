@@ -17,11 +17,17 @@ public sealed class DevRolloverDemoService(
     public const string DemoFirstName = "Rollover";
     public const string DemoLastName = "Demo";
 
+    public const string DemoAdminEmail = "admin.rollover.demo@local.test";
+    public const string DemoAdminFirstName = "Demo";
+    public const string DemoAdminLastName = "Admin";
+
     public async Task<(bool Success, string? Error, object? Payload)> SetupAsync(
         CancellationToken cancellationToken = default)
     {
         if (!supabaseAdmin.IsConfigured)
             return (false, "Add Supabase:ServiceRoleKey to user secrets first.", null);
+
+        await EnsureDemoAdminAsync(cancellationToken);
 
         var userId = await EnsureDemoStudentAsync(cancellationToken);
         if (userId is null)
@@ -129,6 +135,7 @@ public sealed class DevRolloverDemoService(
                 message =
                     "Demo reset. Sign in as the demo student, open Payments, submit payment, then approve as admin to trigger rollover.",
                 student = new { email = DemoEmail, password = DemoPassword },
+                admin = new { email = DemoAdminEmail, password = DemoPassword },
                 billingPeriod = billing.IsRolloverBlock && billing.PlannedRollover is { Count: > 0 }
                     ? LessonBillingService.FormatRolloverBillingPeriod(billing.PlannedRollover)
                     : LessonBillingService.FormatBillingPeriod(billingYear, billingMonth),
@@ -176,6 +183,67 @@ public sealed class DevRolloverDemoService(
             cancellationToken);
 
         return newId;
+    }
+
+    private async Task EnsureDemoAdminAsync(CancellationToken cancellationToken)
+    {
+        var existing = await db.Users.FirstOrDefaultAsync(u => u.Email == DemoAdminEmail, cancellationToken);
+        if (existing is not null)
+        {
+            var changed = false;
+            if (!existing.IsAdmin)
+            {
+                existing.IsAdmin = true;
+                changed = true;
+            }
+
+            if (!existing.OnboardingCompleted)
+            {
+                existing.OnboardingCompleted = true;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                logger.LogInformation("Dev rollover demo: updated {Email} to admin.", DemoAdminEmail);
+            }
+
+            return;
+        }
+
+        var newId = await supabaseAdmin.CreateUserAsync(
+            DemoAdminEmail,
+            DemoPassword,
+            DemoAdminFirstName,
+            DemoAdminLastName,
+            cancellationToken,
+            onboardingCompletedInMetadata: true);
+
+        if (newId is null)
+        {
+            existing = await db.Users.FirstOrDefaultAsync(u => u.Email == DemoAdminEmail, cancellationToken);
+            if (existing is not null)
+            {
+                existing.IsAdmin = true;
+                existing.OnboardingCompleted = true;
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
+            return;
+        }
+
+        await UserProfileProvisioner.EnsureAsync(
+            db,
+            newId.Value,
+            DemoAdminEmail,
+            DemoAdminFirstName,
+            DemoAdminLastName,
+            isAdmin: true,
+            onboardingCompleted: true,
+            cancellationToken);
+
+        logger.LogInformation("Dev rollover demo: created admin {Email} ({UserId}).", DemoAdminEmail, newId);
     }
 
     private async Task<DateTime?> FindConflictFreeWeekOneStartAsync(

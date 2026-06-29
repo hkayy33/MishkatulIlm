@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MishkatulIlm_Server.Authentication;
 using MishkatulIlm_Server.Data;
+using MishkatulIlm_Server.Dtos;
 using MishkatulIlm_Server.Services;
+using MishkatulIlm_Server.Services.Flutterwave;
 
 namespace MishkatulIlm_Server.Controllers;
 
@@ -69,6 +71,52 @@ public sealed class StudentPaymentController(
             submissionId = submission!.Id,
             status = submission.Status,
         });
+    }
+
+    [HttpPost("flutterwave-checkout")]
+    public async Task<IActionResult> CreateFlutterwaveCheckout(
+        FlutterwavePaymentService flutterwavePayments,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetSupabaseUserId(out var userId))
+            return Unauthorized();
+
+        var (success, error, checkoutUrl, submission) =
+            await flutterwavePayments.InitiateCheckoutAsync(
+                userId,
+                Request.Headers.Origin.FirstOrDefault(),
+                cancellationToken);
+        if (!success)
+            return BadRequest(new { message = error });
+
+        return Ok(new
+        {
+            checkoutUrl,
+            link = checkoutUrl,
+            reference = submission!.PaymentReference,
+            submissionId = submission.Id,
+            status = submission.Status,
+        });
+    }
+
+    [HttpPost("flutterwave-verify")]
+    public async Task<IActionResult> VerifyFlutterwavePayment(
+        [FromBody] VerifyFlutterwavePaymentRequest request,
+        FlutterwavePaymentService flutterwavePayments,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetSupabaseUserId(out var userId))
+            return Unauthorized();
+
+        var (success, error, message) = await flutterwavePayments.TryCompleteByReferenceAsync(
+            userId,
+            request.Reference,
+            request.TransactionId,
+            cancellationToken);
+        if (!success)
+            return BadRequest(new { message = error });
+
+        return Ok(new { message });
     }
 
     [HttpGet("payment-history")]

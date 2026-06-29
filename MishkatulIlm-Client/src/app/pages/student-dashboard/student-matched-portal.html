@@ -354,14 +354,14 @@
           <div class="matched-payment-cta matched-payment-cta--page" role="region">
             <div>
               <h2>First payment</h2>
-              <p>Pay for your scheduled lessons before your first lesson begins.</p>
+              <p>Pay for your scheduled lessons securely with Flutterwave before your first lesson begins.</p>
             </div>
           </div>
         } @else if (paymentOverdue()) {
           <div class="matched-payment-cta matched-payment-cta--page" role="region">
             <div>
               <h2>Payment overdue</h2>
-              <p>Your monthly payment is due. Transfer the amount below and submit once paid.</p>
+              <p>Your monthly payment is due. Pay securely with Flutterwave below.</p>
             </div>
           </div>
         } @else if (showPaymentReminder()) {
@@ -390,8 +390,8 @@
           </div>
         } @else if (pendingVerification()) {
           <div class="matched-payment-status matched-payment-status--pending" role="status">
-            <strong>Pending verification</strong>
-            <span>We are checking that we have received your payment.</span>
+            <strong>Payment in progress</strong>
+            <span>Complete your Flutterwave payment or wait while we confirm it.</span>
           </div>
         }
 
@@ -465,53 +465,27 @@
               </div>
             }
 
-            <h3>Pay to</h3>
-            <dl class="matched-payment-meta matched-payment-meta--bank">
-              @if (statement.bankName) {
-                <div>
-                  <dt>Bank</dt>
-                  <dd>{{ statement.bankName }}</dd>
-                </div>
-              }
-              @if (statement.accountName) {
-                <div>
-                  <dt>Account name</dt>
-                  <dd>{{ statement.accountName }}</dd>
-                </div>
-              }
-              @if (statement.sortCode) {
-                <div>
-                  <dt>Sort code</dt>
-                  <dd>{{ statement.sortCode }}</dd>
-                </div>
-              }
-              @if (statement.accountNumber) {
-                <div>
-                  <dt>Account number</dt>
-                  <dd>{{ statement.accountNumber }}</dd>
-                </div>
-              }
-            </dl>
-            @if (statement.paymentInstructions) {
-              <p class="matched-muted">{{ statement.paymentInstructions }}</p>
-            }
-
-            <p class="matched-payment-reference" role="note">
-              Please use this exact payment reference:
-              <mark>{{ statement.paymentReference }}</mark>
+            <h3>Pay with Flutterwave</h3>
+            <p class="matched-muted">
+              You will be redirected to Flutterwave to pay by card, bank transfer, or other supported methods.
+              Your payment reference is
+              <mark>{{ statement.paymentReference }}</mark>.
             </p>
 
-            @if (canSubmitPayment() && statement.totalAmount > 0) {
-              <p class="matched-muted">
-                After you have made the bank transfer, confirm below so we can verify your payment.
-              </p>
+            @if ((canSubmitPayment() || pendingVerification()) && statement.totalAmount > 0) {
               <button
                 type="button"
                 class="matched-btn"
                 [disabled]="paymentBusy()"
                 (click)="submitPayment()"
               >
-                {{ paymentBusy() ? 'Submitting…' : 'I have made this payment' }}
+                @if (paymentBusy()) {
+                  Opening payment…
+                } @else if (pendingVerification()) {
+                  Continue Flutterwave payment
+                } @else {
+                  Pay now with Flutterwave
+                }
               </button>
             }
           </section>

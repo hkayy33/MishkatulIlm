@@ -32,6 +32,7 @@ public sealed class AppUser
     public bool StripeSubscriptionCancelAtPeriodEnd { get; set; }
     public DateTime? StripeSubscriptionPeriodEndUtc { get; set; }
     public string? LastStripeInvoiceId { get; set; }
+    public string? FlutterwaveCustomerId { get; set; }
     public DateTime? DeletionRequestedAtUtc { get; set; }
 
     /// <summary>Optional note from the student for their tutor (admin dashboard).</summary>

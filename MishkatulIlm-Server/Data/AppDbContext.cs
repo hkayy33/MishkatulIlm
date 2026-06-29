@@ -30,6 +30,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.StripeSubscriptionId).HasMaxLength(255);
             entity.Property(e => e.StripeSubscriptionStatus).HasMaxLength(32);
             entity.Property(e => e.LastStripeInvoiceId).HasMaxLength(255);
+            entity.Property(e => e.FlutterwaveCustomerId).HasMaxLength(64);
             entity.Property(e => e.MessageToTutor).HasMaxLength(2000);
             entity.Property(e => e.ApplicationDeclineMessage).HasMaxLength(2000);
             entity.HasOne(e => e.Onboarding)
@@ -112,6 +113,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.Currency).HasMaxLength(8).IsRequired();
             entity.Property(e => e.PaymentReference).HasMaxLength(120).IsRequired();
             entity.Property(e => e.AdminNote).HasMaxLength(2000);
+            entity.Property(e => e.FlutterwaveCheckoutSessionId).HasMaxLength(64);
+            entity.Property(e => e.FlutterwaveTransactionId).HasMaxLength(64);
             entity.HasOne(e => e.Student)
                 .WithMany()
                 .HasForeignKey(e => e.StudentUserId)

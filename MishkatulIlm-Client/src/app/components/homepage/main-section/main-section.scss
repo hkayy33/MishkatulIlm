@@ -104,27 +104,46 @@ $accent-gold: #c59d5f;
 
 @media (max-width: 767px) {
     .hero {
-        min-height: auto;
+        min-height: 100vh;
+        min-height: 100dvh;
     }
 
     .hero-layout {
         flex-direction: column;
-        min-height: auto;
+        min-height: calc(100dvh - #{$nav-height});
     }
 
     .info-section {
         max-width: none;
-        padding: clamp(1.25rem, 4vw, 1.75rem) clamp(1.25rem, 5vw, 1.5rem) 1.25rem;
+        flex: 1;
+        justify-content: center;
+        gap: 0;
+        padding: clamp(2rem, 6vw, 2.75rem) clamp(1.5rem, 6vw, 2rem) clamp(2.5rem, 8vw, 3.5rem);
         order: 0;
     }
 
     .hero-title {
-        font-size: clamp(2rem, 9vw, 2.75rem);
+        margin: 0 0 clamp(1.5rem, 5vw, 2rem);
+        font-size: clamp(2.65rem, 11vw, 3.5rem);
+        line-height: 1.12;
+        letter-spacing: -0.015em;
+    }
+
+    .hero-title-line + .hero-title-line {
+        margin-top: 0.2em;
+    }
+
+    .hero-subtitle {
+        max-width: none;
+        font-size: clamp(1.125rem, 4.2vw, 1.4rem);
+        line-height: 1.7;
     }
 
     .action-buttons {
         flex-direction: column;
         align-items: stretch;
+        gap: 1rem;
+        margin-top: clamp(2rem, 6vw, 2.75rem);
 
         app-get-started-btn {
             display: block;

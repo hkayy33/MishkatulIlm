@@ -54,7 +54,12 @@ export class StudentDashboard {
   protected readonly formatAvailabilityCodes = formatAvailabilityCodes;
   protected readonly isMatched = computed(() => {
     const status = this.application()?.status;
-    return status === 'matched' || status === 'active';
+    return (
+      status === 'matched' ||
+      status === 'active' ||
+      status === 'approved' ||
+      status === 'enrolled'
+    );
   });
 
   protected readonly statusPresentation = computed((): StatusPresentation => {
@@ -134,7 +139,7 @@ export class StudentDashboard {
                 void this.router.navigate(['/login']);
               } else if (err instanceof HttpErrorResponse && err.status === 404) {
                 this.loadError.set(
-                  'Application status is not available yet. Restart the API server and try again.',
+                  'We could not find your application yet. If you just signed up, complete the application form first.',
                 );
               } else {
                 this.loadError.set('Could not load your application status. Please try again.');

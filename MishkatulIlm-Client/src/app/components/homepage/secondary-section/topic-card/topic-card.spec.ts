@@ -14,12 +14,11 @@ describe('TopicCard', () => {
 
     fixture = TestBed.createComponent(TopicCard);
     fixture.componentRef.setInput('card', {
-      id: 'test',
+      slug: 'quran-tajweed',
       title: 'Test',
+      titleArabic: 'اختبار',
       summary: 'Summary',
-      details: 'Details',
-      accent: 'green',
-      icon: 'book',
+      image: '/offers/quran-tajweed.png',
     });
     component = fixture.componentInstance;
     await fixture.whenStable();

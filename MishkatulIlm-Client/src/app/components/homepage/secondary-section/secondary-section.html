@@ -2,11 +2,7 @@
     <div class="top-section">
         <h2>What We Offer</h2>
         <div class="topic-cards">
-            <app-topic-card
-                *ngFor="let card of topicsPrimary"
-                [card]="card"
-                (cardSelect)="openTopic($event)"
-            ></app-topic-card>
+            <app-topic-card *ngFor="let card of topicsPrimary" [card]="card"></app-topic-card>
             <div
                 class="topic-cards-extra"
                 [class.topic-cards-extra--open]="showAllTopics()"
@@ -14,11 +10,7 @@
                 [attr.aria-hidden]="showAllTopics() ? null : 'true'"
             >
                 <div class="topic-cards-extra-inner">
-                    <app-topic-card
-                        *ngFor="let card of topicsExtra"
-                        [card]="card"
-                        (cardSelect)="openTopic($event)"
-                    ></app-topic-card>
+                    <app-topic-card *ngFor="let card of topicsExtra" [card]="card"></app-topic-card>
                 </div>
             </div>
         </div>
@@ -52,71 +44,3 @@
         </div>
     </div>
 </div>
-
-@if (selectedTopic(); as topic) {
-    <div
-        class="topic-modal-overlay"
-        role="presentation"
-        (click)="closeTopic()"
-    >
-        <div
-            class="topic-modal"
-            role="dialog"
-            aria-modal="true"
-            [attr.aria-labelledby]="'topic-modal-title-' + topic.id"
-            (click)="$event.stopPropagation()"
-        >
-            <button type="button" class="topic-modal__close" (click)="closeTopic()" aria-label="Close">
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path
-                        d="M7 7l10 10M17 7 7 17"
-                        stroke="currentColor"
-                        stroke-width="1.75"
-                        stroke-linecap="round"
-                    />
-                </svg>
-            </button>
-
-            <div
-                class="topic-modal__icon"
-                [class.topic-modal__icon--green]="topic.accent === 'green'"
-                [class.topic-modal__icon--gold]="topic.accent === 'gold'"
-                aria-hidden="true"
-            >
-                @switch (topic.icon) {
-                    @case ('book') {
-                        <svg viewBox="0 0 24 24" fill="none">
-                            <path
-                                d="M4 5a2 2 0 012-2h5v16H6a2 2 0 01-2-2V5zm10-2h5a2 2 0 012 2v12a2 2 0 01-2 2h-5V3z"
-                                fill="currentColor"
-                            />
-                        </svg>
-                    }
-                    @case ('arabic') {
-                        <span dir="rtl">ع</span>
-                    }
-                    @case ('chat') {
-                        <svg viewBox="0 0 24 24" fill="none">
-                            <path
-                                d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.5 8.5 0 01-5.7-2.1L3 21l2.3-4.1A8.5 8.5 0 013.5 11.5 8.5 8.5 0 0112 3a8.5 8.5 0 019 8.5z"
-                                stroke="currentColor"
-                                stroke-width="1.65"
-                            />
-                        </svg>
-                    }
-                }
-            </div>
-
-            <h3 class="topic-modal__title" [id]="'topic-modal-title-' + topic.id">
-                {{ topic.title }}
-                @if (topic.titleArabic) {
-                    <span class="topic-modal__title-arabic" dir="rtl" lang="ar">{{
-                        topic.titleArabic
-                    }}</span>
-                }
-            </h3>
-            <p class="topic-modal__summary">{{ topic.summary }}</p>
-            <p class="topic-modal__details">{{ topic.details }}</p>
-        </div>
-    </div>
-}

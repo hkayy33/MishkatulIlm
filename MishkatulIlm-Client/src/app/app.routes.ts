@@ -14,9 +14,11 @@ import { ResetPassword } from './components/auth/reset-password/reset-password';
 import { adminGuard } from './core/guards/admin.guard';
 import { authGuard } from './core/guards/auth.guard';
 import { StudentDashboard } from './pages/student-dashboard/student-dashboard';
+import { CourseDetail } from './pages/course-detail/course-detail';
 
 export const routes: Routes = [
   { path: '', component: Homepage },
+  { path: 'courses/:slug', component: CourseDetail },
   { path: 'about', component: AboutUs },
   { path: 'pricing', component: PricingPage },
   { path: 'dashboard', component: StudentDashboard, canActivate: [authGuard] },

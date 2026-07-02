@@ -1,26 +1,18 @@
-import { Component, Input, output } from '@angular/core';
+import { Component, Input } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import type { CourseCatalogEntry } from '../../../../core/data/course-catalog.data';
 
-export type TopicCardAccent = 'green' | 'gold';
-export type TopicCardIcon = 'book' | 'arabic' | 'chat';
-
-export interface TopicCardData {
-  id: string;
-  title: string;
-  titleArabic?: string;
-  summary: string;
-  details: string;
-  accent: TopicCardAccent;
-  icon: TopicCardIcon;
-}
+export type TopicCardData = Pick<
+  CourseCatalogEntry,
+  'slug' | 'title' | 'titleArabic' | 'overlayTitle' | 'summary' | 'image'
+>;
 
 @Component({
   selector: 'app-topic-card',
-  imports: [],
+  imports: [RouterLink],
   templateUrl: './topic-card.html',
   styleUrl: './topic-card.scss',
 })
 export class TopicCard {
   @Input({ required: true }) card!: TopicCardData;
-
-  readonly cardSelect = output<TopicCardData>();
 }

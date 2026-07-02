@@ -117,8 +117,19 @@ export class StudentMatchedPortal implements OnInit {
     () => this.store.portalData()?.portal?.hasPendingScheduleChangeRequest ?? false,
   );
 
+  protected readonly paymentAttention = computed(
+    () =>
+      this.requiresInitialPayment() ||
+      this.paymentOverdue() ||
+      this.showPaymentReminder() ||
+      this.pendingVerification(),
+  );
+
   ngOnInit(): void {
-    this.store.reloadPortalForWeek(this.summaryWeekStart());
+    const tabParam = this.route.snapshot.queryParamMap.get('tab');
+    const initialTab = isMatchedPortalTab(tabParam) ? tabParam : 'summary';
+    this.activateTab(initialTab, false);
+
     this.store.attendanceChanged
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
@@ -148,7 +159,7 @@ export class StudentMatchedPortal implements OnInit {
       return;
     }
 
-    this.activeTab.set('payments');
+    this.setTab('payments');
     this.paymentBusy.set(true);
     this.studentApi
       .verifyFlutterwavePayment(reference, transactionId)
@@ -189,7 +200,20 @@ export class StudentMatchedPortal implements OnInit {
   }
 
   protected setTab(tab: MatchedPortalTab): void {
+    this.activateTab(tab, true);
+  }
+
+  private activateTab(tab: MatchedPortalTab, syncUrl: boolean): void {
     this.activeTab.set(tab);
+    if (syncUrl) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { tab },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    }
+
     if (tab === 'summary') {
       this.store.reloadPortalForWeek(this.summaryWeekStart());
     } else if (tab === 'lessons' || tab === 'account') {
@@ -536,4 +560,8 @@ function persistDismissedUpdateKeys(keys: ReadonlySet<string>): void {
   } catch {
     // ignore quota / private mode
   }
+}
+
+function isMatchedPortalTab(value: string | null): value is MatchedPortalTab {
+  return value === 'summary' || value === 'lessons' || value === 'payments' || value === 'account';
 }

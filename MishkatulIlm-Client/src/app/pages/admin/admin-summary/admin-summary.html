@@ -1,21 +1,61 @@
 <div class="admin-page">
   <h1 class="admin-title">Summary</h1>
-  <p class="admin-lead">Booked lessons for the week. Select a day to see who is scheduled.</p>
+  @if (auth.user(); as u) {
+    <p class="admin-lead">Welcome back, {{ u.firstName || 'admin' }}. Here is your week and what needs attention.</p>
+  } @else {
+    <p class="admin-lead">Your week at a glance, plus items that need your attention.</p>
+  }
+
+  @if (totalPending() > 0) {
+    <section class="admin-quick-actions" aria-labelledby="quick-actions-heading">
+      <h2 id="quick-actions-heading" class="admin-section-title">Needs your attention</h2>
+      <div class="admin-quick-actions__grid">
+        @if (navBadges.counts().pendingApplications > 0) {
+          <a routerLink="/admin/pending" class="admin-quick-card admin-quick-card--action">
+            <span class="admin-quick-card__count">{{ navBadges.counts().pendingApplications }}</span>
+            <span class="admin-quick-card__label">Pending applications</span>
+            <span class="admin-quick-card__hint">Review and schedule lessons</span>
+          </a>
+        }
+        @if (navBadges.counts().pendingScheduleChanges > 0) {
+          <a routerLink="/admin/schedule-changes" class="admin-quick-card admin-quick-card--action">
+            <span class="admin-quick-card__count">{{ navBadges.counts().pendingScheduleChanges }}</span>
+            <span class="admin-quick-card__label">Schedule changes</span>
+            <span class="admin-quick-card__hint">Respond to student requests</span>
+          </a>
+        }
+        @if (navBadges.counts().pendingPaymentSubmissions > 0) {
+          <a routerLink="/admin/payments" class="admin-quick-card admin-quick-card--action">
+            <span class="admin-quick-card__count">{{ navBadges.counts().pendingPaymentSubmissions }}</span>
+            <span class="admin-quick-card__label">Payment submissions</span>
+            <span class="admin-quick-card__hint">Verify and approve payments</span>
+          </a>
+        }
+      </div>
+    </section>
+  } @else if (!loading()) {
+    <p class="admin-all-clear" role="status">All caught up — no pending applications, schedule changes, or payments.</p>
+  }
 
   @if (loadError()) {
     <p class="admin-error">{{ loadError() }}</p>
   }
 
-  <p class="admin-summary-stat">
-    <span class="admin-summary-stat__value">{{ weekLessonTotal() }}</span>
-  lesson{{ weekLessonTotal() === 1 ? '' : 's' }} this week
-  </p>
+  <section class="admin-week-section" aria-labelledby="week-heading">
+    <div class="admin-week-section__header">
+      <h2 id="week-heading" class="admin-section-title">This week</h2>
+      <p class="admin-summary-stat">
+        <span class="admin-summary-stat__value">{{ weekLessonTotal() }}</span>
+        lesson{{ weekLessonTotal() === 1 ? '' : 's' }} scheduled
+      </p>
+    </div>
 
-  <app-admin-week-schedule
-    [lessons]="weekLessons()"
-    [loading]="loading()"
-    [timeZoneId]="timeZoneId()"
-    [weekStart]="weekStart()"
-    (weekChanged)="onWeekChanged($event)"
-  />
+    <app-admin-week-schedule
+      [lessons]="weekLessons()"
+      [loading]="loading()"
+      [timeZoneId]="timeZoneId()"
+      [weekStart]="weekStart()"
+      (weekChanged)="onWeekChanged($event)"
+    />
+  </section>
 </div>

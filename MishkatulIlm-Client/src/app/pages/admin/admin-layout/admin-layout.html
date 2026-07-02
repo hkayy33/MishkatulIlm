@@ -1,9 +1,44 @@
 <div class="admin-shell">
-  <aside class="admin-side" aria-label="Admin navigation">
+  <header class="admin-topbar" aria-label="Admin toolbar">
+    <button
+      type="button"
+      class="admin-menu-btn"
+      [attr.aria-expanded]="sidebarOpen()"
+      aria-controls="admin-sidebar"
+      (click)="toggleSidebar()"
+    >
+      <span class="admin-menu-btn__bar" aria-hidden="true"></span>
+      <span class="admin-menu-btn__bar" aria-hidden="true"></span>
+      <span class="admin-menu-btn__bar" aria-hidden="true"></span>
+      <span class="admin-menu-btn__label">Menu</span>
+    </button>
+    <span class="admin-topbar__title">Admin</span>
+    @if (totalPending() > 0) {
+      <span class="admin-topbar__badge" [attr.aria-label]="totalPending() + ' items need attention'">
+        {{ totalPending() > 99 ? '99+' : totalPending() }}
+      </span>
+    }
+  </header>
+
+  @if (sidebarOpen()) {
+    <button
+      type="button"
+      class="admin-overlay"
+      aria-label="Close menu"
+      (click)="closeSidebar()"
+    ></button>
+  }
+
+  <aside
+    id="admin-sidebar"
+    class="admin-side"
+    [class.admin-side--open]="sidebarOpen()"
+    aria-label="Admin navigation"
+  >
     <div class="admin-brand">Admin</div>
     <nav class="admin-nav">
-      <a routerLink="summary" routerLinkActive="is-active">Summary</a>
-      <a routerLink="pending" routerLinkActive="is-active" class="admin-nav__link">
+      <a routerLink="summary" routerLinkActive="is-active" (click)="closeSidebar()">Summary</a>
+      <a routerLink="pending" routerLinkActive="is-active" class="admin-nav__link" (click)="closeSidebar()">
         <span>Pending applications</span>
         @if (navBadges.counts().pendingApplications > 0) {
           <span class="admin-nav__badge" [attr.aria-label]="navBadges.counts().pendingApplications + ' pending'">
@@ -11,7 +46,12 @@
           </span>
         }
       </a>
-      <a routerLink="schedule-changes" routerLinkActive="is-active" class="admin-nav__link">
+      <a
+        routerLink="schedule-changes"
+        routerLinkActive="is-active"
+        class="admin-nav__link"
+        (click)="closeSidebar()"
+      >
         <span>Schedule changes</span>
         @if (navBadges.counts().pendingScheduleChanges > 0) {
           <span
@@ -22,8 +62,8 @@
           </span>
         }
       </a>
-      <a routerLink="students" routerLinkActive="is-active">Active students</a>
-      <a routerLink="payments" routerLinkActive="is-active" class="admin-nav__link">
+      <a routerLink="students" routerLinkActive="is-active" (click)="closeSidebar()">Active students</a>
+      <a routerLink="payments" routerLinkActive="is-active" class="admin-nav__link" (click)="closeSidebar()">
         <span>Manage payments</span>
         @if (navBadges.counts().pendingPaymentSubmissions > 0) {
           <span
@@ -34,11 +74,11 @@
           </span>
         }
       </a>
-      <a routerLink="calendar" routerLinkActive="is-active">Calendar</a>
-      <a routerLink="details" routerLinkActive="is-active">Admin details</a>
+      <a routerLink="calendar" routerLinkActive="is-active" (click)="closeSidebar()">Calendar</a>
+      <a routerLink="details" routerLinkActive="is-active" (click)="closeSidebar()">Admin details</a>
     </nav>
     <div class="admin-side-footer">
-      <a class="admin-link-quiet" routerLink="/">Back to site</a>
+      <a class="admin-link-quiet" routerLink="/" (click)="closeSidebar()">Back to site</a>
       <button type="button" class="admin-signout" (click)="signOut()">Sign out</button>
     </div>
   </aside>

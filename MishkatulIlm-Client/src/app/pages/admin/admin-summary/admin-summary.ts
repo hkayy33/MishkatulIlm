@@ -1,8 +1,11 @@
 import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { AdminApiService } from '../../../core/services/admin-api.service';
+import { AdminNavBadgeService } from '../../../core/services/admin-nav-badge.service';
 import { AdminScheduleRefreshService } from '../../../core/services/admin-schedule-refresh.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { SchedulingSettingsService } from '../../../core/services/scheduling-settings.service';
 import type { AvailabilitySlotRow } from '../../../core/models/calendar.models';
 import { parseLessonAttendanceStatus } from '../../../core/utils/attendance.util';
@@ -17,11 +20,13 @@ import {
 @Component({
   selector: 'app-admin-summary',
   standalone: true,
-  imports: [AdminWeekSchedule],
+  imports: [AdminWeekSchedule, RouterLink],
   templateUrl: './admin-summary.html',
   styleUrl: './admin-summary.scss',
 })
 export class AdminSummary {
+  protected readonly auth = inject(AuthService);
+  protected readonly navBadges = inject(AdminNavBadgeService);
   private readonly adminApi = inject(AdminApiService);
   private readonly schedulingSettings = inject(SchedulingSettingsService);
   private readonly scheduleRefresh = inject(AdminScheduleRefreshService);
@@ -38,7 +43,17 @@ export class AdminSummary {
 
   protected readonly weekLessonTotal = computed(() => this.weekLessons().length);
 
+  protected readonly totalPending = computed(() => {
+    const counts = this.navBadges.counts();
+    return (
+      counts.pendingApplications +
+      counts.pendingScheduleChanges +
+      counts.pendingPaymentSubmissions
+    );
+  });
+
   constructor() {
+    this.navBadges.refresh();
     this.scheduleRefresh.scheduleChanged$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.reloadWeek());

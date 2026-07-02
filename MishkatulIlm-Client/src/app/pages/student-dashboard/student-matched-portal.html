@@ -1,39 +1,72 @@
 <div class="matched-shell">
   <aside class="matched-side" aria-label="Student portal navigation">
-    <div class="matched-brand">Student portal</div>
-    <p class="matched-side__status">Matched with a teacher</p>
     <nav class="matched-nav">
       <button
         type="button"
         class="matched-nav__btn"
         [class.is-active]="activeTab() === 'summary'"
+        [attr.aria-current]="activeTab() === 'summary' ? 'page' : null"
         (click)="setTab('summary')"
       >
-        Summary
+        <span class="matched-nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" />
+          </svg>
+        </span>
+        <span class="matched-nav__label">Summary</span>
       </button>
       <button
         type="button"
         class="matched-nav__btn"
         [class.is-active]="activeTab() === 'lessons'"
+        [attr.aria-current]="activeTab() === 'lessons' ? 'page' : null"
         (click)="setTab('lessons')"
       >
-        Lessons
+        <span class="matched-nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+        </span>
+        <span class="matched-nav__label">Lessons</span>
       </button>
       <button
         type="button"
         class="matched-nav__btn"
         [class.is-active]="activeTab() === 'payments'"
+        [attr.aria-current]="activeTab() === 'payments' ? 'page' : null"
         (click)="setTab('payments')"
       >
-        Payments
+        <span class="matched-nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="5" width="20" height="14" rx="2" />
+            <line x1="2" y1="10" x2="22" y2="10" />
+          </svg>
+        </span>
+        <span class="matched-nav__label">Payments</span>
+        @if (paymentAttention()) {
+          <span class="matched-nav__alert" aria-label="Payment needs attention">!</span>
+        }
       </button>
       <button
         type="button"
         class="matched-nav__btn"
         [class.is-active]="activeTab() === 'account'"
+        [attr.aria-current]="activeTab() === 'account' ? 'page' : null"
         (click)="setTab('account')"
       >
-        Account
+        <span class="matched-nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+          </svg>
+        </span>
+        <span class="matched-nav__label">Account</span>
       </button>
     </nav>
   </aside>

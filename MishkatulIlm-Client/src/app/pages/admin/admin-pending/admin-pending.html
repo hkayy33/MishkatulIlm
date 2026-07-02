@@ -10,8 +10,12 @@
   } @else if (loadError() && !approveTarget()) {
     <p class="admin-error">{{ loadError() }}</p>
   } @else if (rows().length === 0) {
-    <p class="admin-muted">No pending applications right now.</p>
+    <div class="admin-empty-state">
+      <p class="admin-empty-state__title">No pending applications</p>
+      <p class="admin-empty-state__detail">New student applications will appear here for you to review and schedule.</p>
+    </div>
   } @else {
+    <p class="admin-table-hint">Swipe horizontally to see all columns on smaller screens.</p>
     <div class="admin-table-wrap">
       <table class="admin-table admin-table--pending">
         <thead>

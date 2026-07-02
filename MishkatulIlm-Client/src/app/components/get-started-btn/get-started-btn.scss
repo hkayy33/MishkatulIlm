@@ -20,6 +20,15 @@ $accent-gold-hover: #b08a4f;
     width: 100%;
 }
 
+@media (max-width: 767px) {
+    :host-context(.action-buttons) button,
+    :host-context(.action-buttons) a {
+        padding: 0.9rem 1.75rem;
+        font-size: 1.0625rem;
+        border-radius: 12px;
+    }
+}
+
 button,
 a {
     display: inline-flex;

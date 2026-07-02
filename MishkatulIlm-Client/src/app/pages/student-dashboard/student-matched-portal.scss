@@ -1,7 +1,7 @@
 .matched-shell {
   display: flex;
   min-height: 28rem;
-  margin-top: 1.25rem;
+  margin-top: 0.5rem;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid rgba(28, 27, 24, 0.12);
@@ -10,28 +10,13 @@
 }
 
 .matched-side {
-  width: 220px;
+  width: 200px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 1.35rem 1rem;
+  padding: 1rem 0.75rem;
   border-right: 1px solid rgba(28, 27, 24, 0.12);
   background: #f4f1ea;
-}
-
-.matched-brand {
-  font-family: 'Playfair Display', Georgia, serif;
-  font-size: 1.15rem;
-  font-weight: 600;
-  margin-bottom: 0.35rem;
-}
-
-.matched-side__status {
-  margin: 0 0 1.1rem;
-  font-family: 'Source Sans 3', system-ui, sans-serif;
-  font-size: 0.8rem;
-  color: #2f5a3f;
-  font-weight: 600;
 }
 
 .matched-nav {
@@ -42,15 +27,19 @@
 }
 
 .matched-nav__btn {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   font-family: 'Source Sans 3', system-ui, sans-serif;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   text-align: left;
   cursor: pointer;
   color: #3a3834;
   padding: 0.55rem 0.65rem;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid transparent;
   background: transparent;
+  position: relative;
 
   &:hover {
     background: rgba(28, 27, 24, 0.06);
@@ -60,7 +49,44 @@
     background: #fff;
     border-color: rgba(28, 27, 24, 0.12);
     font-weight: 600;
+    box-shadow: 0 1px 4px rgba(28, 27, 24, 0.06);
   }
+}
+
+.matched-nav__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 1.15rem;
+  height: 1.15rem;
+  color: #6f6a62;
+
+  svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .is-active & {
+    color: #6b5420;
+  }
+}
+
+.matched-nav__label {
+  flex: 1;
+  min-width: 0;
+}
+
+.matched-nav__alert {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 999px;
+  background: #8b2c2c;
+  color: #fff;
 }
 
 .matched-content {
@@ -823,12 +849,41 @@
     width: 100%;
     border-right: none;
     border-bottom: 1px solid rgba(28, 27, 24, 0.12);
+    padding: 0.65rem 0.5rem;
   }
 
   .matched-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.35rem;
   }
 
+  .matched-nav__btn {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.55rem 0.35rem;
+    font-size: 0.72rem;
+    text-align: center;
+    min-height: 3.5rem;
+  }
 
+  .matched-nav__icon {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .matched-nav__alert {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    width: 0.95rem;
+    height: 0.95rem;
+    font-size: 0.62rem;
+  }
+
+  .matched-content {
+    padding: 1.15rem 1rem 1.75rem;
+  }
 }

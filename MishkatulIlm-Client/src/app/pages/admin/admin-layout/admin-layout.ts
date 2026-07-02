@@ -1,4 +1,4 @@
-import { Component, inject, OnDestroy, OnInit } from '@angular/core';
+import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, Subscription, interval } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
@@ -16,6 +16,17 @@ export class AdminLayout implements OnInit, OnDestroy {
   protected readonly navBadges = inject(AdminNavBadgeService);
   private readonly router = inject(Router);
 
+  protected readonly sidebarOpen = signal(false);
+
+  protected readonly totalPending = computed(() => {
+    const counts = this.navBadges.counts();
+    return (
+      counts.pendingApplications +
+      counts.pendingScheduleChanges +
+      counts.pendingPaymentSubmissions
+    );
+  });
+
   private sub = new Subscription();
 
   ngOnInit(): void {
@@ -23,6 +34,7 @@ export class AdminLayout implements OnInit, OnDestroy {
     this.sub.add(
       this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => {
         this.navBadges.refresh();
+        this.sidebarOpen.set(false);
       }),
     );
     this.sub.add(interval(60_000).subscribe(() => this.navBadges.refresh()));
@@ -32,11 +44,20 @@ export class AdminLayout implements OnInit, OnDestroy {
     this.sub.unsubscribe();
   }
 
+  protected toggleSidebar(): void {
+    this.sidebarOpen.update((open) => !open);
+  }
+
+  protected closeSidebar(): void {
+    this.sidebarOpen.set(false);
+  }
+
   signOut(): void {
     this.auth.logout();
   }
 
   protected badgeLabel(count: number): string {
-    return count > 9 ? '+9+' : `+${count}`;
+    if (count > 99) return '99+';
+    return String(count);
   }
 }

@@ -1,9 +1,12 @@
 <section class="dashboard" [class.dashboard--matched]="isMatched()">
-  <header class="dashboard__header">
+  <header class="dashboard__header" [class.dashboard__header--matched]="isMatched()">
     <p class="dashboard__eyebrow">Student portal</p>
     <h1>My dashboard</h1>
     @if (auth.user(); as u) {
       <p class="dashboard__welcome">Welcome back, {{ u.firstName || 'student' }}.</p>
+    }
+    @if (!loading() && !loadError() && !isMatched()) {
+      <p class="dashboard__subtitle">Track your application and next steps below.</p>
     }
   </header>
 
@@ -23,15 +26,6 @@
     @let presentation = statusPresentation();
 
     @if (isMatched()) {
-      <article class="status-card status-card--success status-card--compact">
-        <div class="status-card__top">
-          <div class="status-badge">
-            <span class="status-badge__dot" aria-hidden="true"></span>
-            <span class="status-badge__label">{{ presentation.label }}</span>
-          </div>
-          <p class="status-card__detail">{{ presentation.detail }}</p>
-        </div>
-      </article>
       <app-student-matched-portal />
     } @else {
     <article

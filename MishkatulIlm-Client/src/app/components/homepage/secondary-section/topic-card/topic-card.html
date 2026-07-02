@@ -1,53 +1,29 @@
-<button
-  type="button"
+<a
   class="card"
-  (click)="cardSelect.emit(card)"
-  [attr.aria-label]="'Learn more about ' + card.title"
+  [routerLink]="['/courses', card.slug]"
+  [attr.aria-label]="'Read more about ' + card.title"
 >
-  <div
-    class="icon-ring"
-    [class.icon-ring--green]="card.accent === 'green'"
-    [class.icon-ring--gold]="card.accent === 'gold'"
-    aria-hidden="true"
-  >
-    @switch (card.icon) {
-      @case ('book') {
-        <svg class="card-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M4 5a2 2 0 012-2h5v16H6a2 2 0 01-2-2V5zm10-2h5a2 2 0 012 2v12a2 2 0 01-2 2h-5V3z"
-            fill="currentColor"
-          />
-          <path d="M11 3v16" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.25" />
-        </svg>
-      }
-      @case ('arabic') {
-        <span class="arabic-glyph" dir="rtl">ع</span>
-      }
-      @case ('chat') {
-        <svg class="card-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.5 8.5 0 01-5.7-2.1L3 21l2.3-4.1A8.5 8.5 0 013.5 11.5 8.5 8.5 0 0112 3a8.5 8.5 0 019 8.5z"
-            stroke="currentColor"
-            stroke-width="1.65"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-          <path
-            d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-          />
-        </svg>
-      }
-    }
+  <div class="card-hero">
+    <img
+      class="card-hero__image"
+      [src]="card.image"
+      [alt]="card.title"
+      loading="lazy"
+      decoding="async"
+    />
+    <div class="card-hero__overlay" aria-hidden="true">
+      <p class="card-hero__arabic" dir="rtl" lang="ar">{{ card.titleArabic }}</p>
+      <span class="card-hero__divider"></span>
+      <p class="card-hero__english">{{ card.overlayTitle ?? card.title }}</p>
+    </div>
   </div>
-  <h3 class="card-title">
-    {{ card.title }}
-    @if (card.titleArabic) {
-      <span class="card-title__arabic" dir="rtl" lang="ar">{{ card.titleArabic }}</span>
-    }
-  </h3>
-  <p class="card-summary">{{ card.summary }}</p>
-  <span class="card-cta">Learn more</span>
-</button>
+
+  <div class="card-body">
+    <h3 class="card-title">
+      {{ card.title }}
+      <span class="card-title__arabic" dir="rtl" lang="ar">({{ card.titleArabic }})</span>
+    </h3>
+    <p class="card-summary">{{ card.summary }}</p>
+    <span class="card-cta">Read More</span>
+  </div>
+</a>

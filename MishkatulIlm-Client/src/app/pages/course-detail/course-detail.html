@@ -1,0 +1,71 @@
+@if (course(); as course) {
+  <article class="course-page" [attr.aria-labelledby]="'course-title-' + course.slug">
+    <header class="course-hero">
+      <img
+        class="course-hero__image"
+        [src]="course.image"
+        [alt]="course.title"
+        decoding="async"
+      />
+      <div class="course-hero__overlay">
+        <p class="course-hero__arabic" dir="rtl" lang="ar">{{ course.titleArabic }}</p>
+        <span class="course-hero__divider" aria-hidden="true"></span>
+        <h1 class="course-hero__title" [id]="'course-title-' + course.slug">
+          {{ course.title }}
+        </h1>
+        @if (course.tagline) {
+          <p class="course-hero__tagline">{{ course.tagline }}</p>
+        }
+      </div>
+    </header>
+
+    <div class="course-inner">
+      @for (section of course.sections; track $index) {
+        <section class="course-section">
+          @if (section.title) {
+            <h2>{{ section.title }}</h2>
+          }
+          @if (section.intro) {
+            <p class="course-section__intro">{{ section.intro }}</p>
+          }
+          @if (section.items?.length) {
+            @if (section.ordered) {
+              <ol class="course-list course-list--ordered">
+                @for (item of section.items; track item.text) {
+                  <li>
+                    @if (item.label) {
+                      <strong>{{ item.label }}:</strong>
+                    }
+                    {{ item.text }}
+                  </li>
+                }
+              </ol>
+            } @else {
+              <ul class="course-list">
+                @for (item of section.items; track item.text) {
+                  <li>
+                    @if (item.label) {
+                      <strong>{{ item.label }}:</strong>
+                    }
+                    {{ item.text }}
+                  </li>
+                }
+              </ul>
+            }
+          }
+        </section>
+      }
+
+      <div class="course-cta">
+        <a routerLink="/register" class="course-cta__btn">Get Started</a>
+        <a routerLink="/" class="course-cta__link">Back to home</a>
+      </div>
+    </div>
+  </article>
+} @else {
+  <div class="course-missing">
+    <h1>Course not found</h1>
+    <p>The course you are looking for is not available.</p>
+    <a routerLink="/">Return home</a>
+  </div>
+}

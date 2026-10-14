@@ -19,7 +19,8 @@ public sealed class StripeOptions
     /// <summary>Angular app origin used for Checkout success and cancel URLs.</summary>
     public string ClientAppUrl { get; set; } = "http://localhost:4200";
 
-    public bool IsConfigured =>
-        !string.IsNullOrWhiteSpace(SecretKey)
+    public bool CanCreateStatementCheckout => !string.IsNullOrWhiteSpace(SecretKey);
+
+    public bool IsConfigured => CanCreateStatementCheckout
         && (!string.IsNullOrWhiteSpace(ProductId) || !string.IsNullOrWhiteSpace(PriceLookupKey));
 }

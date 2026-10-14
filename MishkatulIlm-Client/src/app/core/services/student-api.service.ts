@@ -66,7 +66,7 @@ export class StudentApiService {
     );
   }
 
-  createFlutterwaveCheckout(): Observable<{
+  createStripeCheckout(): Observable<{
     checkoutUrl: string;
     reference: string;
     submissionId: string;
@@ -77,7 +77,13 @@ export class StudentApiService {
       reference: string;
       submissionId: string;
       status: string;
-    }>(`${this.apiBaseUrl}/api/student/flutterwave-checkout`, {});
+    }>(`${this.apiBaseUrl}/api/student/stripe-checkout`, {});
+  }
+
+  confirmStripeCheckoutReturn(sessionId: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiBaseUrl}/api/student/stripe-checkout-return`, {
+      sessionId,
+    });
   }
 
   verifyFlutterwavePayment(

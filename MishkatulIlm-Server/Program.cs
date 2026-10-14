@@ -70,6 +70,7 @@ builder.Services.AddScoped<DevRolloverDemoService>();
 builder.Services.AddScoped<DevStudentHistoryDemoService>();
 builder.Services.AddScoped<StudentPaymentService>();
 builder.Services.AddScoped<AdminPaymentSubmissionService>();
+builder.Services.AddScoped<StripeStatementPaymentService>();
 builder.Services.AddScoped<StudentAccountDeletionService>();
 builder.Services.AddSingleton<LocationCatalogService>();
 

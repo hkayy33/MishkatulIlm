@@ -137,12 +137,44 @@ export class StudentMatchedPortal implements OnInit {
           this.loadPaymentStatement();
         }
       });
-    this.handleFlutterwaveReturn();
+    this.handlePaymentReturn();
   }
 
-  private handleFlutterwaveReturn(): void {
+  private handlePaymentReturn(): void {
     const query = this.route.snapshot.queryParamMap;
-    if (query.get('payment') !== 'flutterwave') return;
+    const paymentType = query.get('payment');
+    if (paymentType === 'stripe-success') {
+      const sessionId = query.get('session_id');
+      if (!sessionId) return;
+      this.setTab('payments');
+      this.paymentBusy.set(true);
+      this.studentApi
+        .confirmStripeCheckoutReturn(sessionId)
+        .pipe(finalize(() => this.paymentBusy.set(false)))
+        .subscribe({
+          next: (res) => {
+            this.store.actionMessage.set(res.message);
+            this.store.reloadPortal(undefined, () => {
+              this.loadPaymentStatement();
+              this.loadPaymentHistory();
+            });
+            this.clearPaymentReturnQueryParams();
+          },
+          error: (err: unknown) => {
+            this.store.actionError.set(formatHttpError(err, 'Could not confirm your payment yet.'));
+            this.setTab('payments');
+            this.clearPaymentReturnQueryParams();
+          },
+        });
+      return;
+    }
+    if (paymentType === 'stripe-cancelled') {
+      this.store.actionError.set('Payment was not completed. You can try again when ready.');
+      this.setTab('payments');
+      this.clearPaymentReturnQueryParams();
+      return;
+    }
+    if (paymentType !== 'flutterwave') return;
 
     const reference = query.get('reference') ?? query.get('tx_ref');
     if (!reference) return;
@@ -155,7 +187,7 @@ export class StudentMatchedPortal implements OnInit {
     const status = (query.get('status') ?? '').toLowerCase();
     if (status === 'cancelled' || status === 'canceled' || status === 'failed') {
       this.store.actionError.set('Payment was not completed. You can try again when ready.');
-      this.clearFlutterwaveQueryParams();
+      this.clearPaymentReturnQueryParams();
       return;
     }
 
@@ -171,21 +203,22 @@ export class StudentMatchedPortal implements OnInit {
             this.loadPaymentStatement();
             this.loadPaymentHistory();
           });
-          this.clearFlutterwaveQueryParams();
+          this.clearPaymentReturnQueryParams();
         },
         error: (err: unknown) => {
           this.store.actionError.set(formatHttpError(err, 'Could not confirm your payment yet.'));
           this.setTab('payments');
-          this.clearFlutterwaveQueryParams();
+          this.clearPaymentReturnQueryParams();
         },
       });
   }
 
-  private clearFlutterwaveQueryParams(): void {
+  private clearPaymentReturnQueryParams(): void {
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {
         payment: null,
+        session_id: null,
         reference: null,
         tx_ref: null,
         transaction_id: null,
@@ -415,7 +448,7 @@ export class StudentMatchedPortal implements OnInit {
     this.paymentBusy.set(true);
     this.store.actionError.set(null);
     this.studentApi
-      .createFlutterwaveCheckout()
+      .createStripeCheckout()
       .pipe(finalize(() => this.paymentBusy.set(false)))
       .subscribe({
         next: (res) => {

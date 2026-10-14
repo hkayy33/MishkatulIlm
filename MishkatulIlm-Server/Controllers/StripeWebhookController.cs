@@ -14,6 +14,7 @@ namespace MishkatulIlm_Server.Controllers;
 public sealed class StripeWebhookController(
     IOptions<StripeOptions> stripeOptions,
     StripePaymentRecorder paymentRecorder,
+    StripeStatementPaymentService statementPayments,
     ILogger<StripeWebhookController> logger) : ControllerBase
 {
     [HttpPost]
@@ -31,7 +32,7 @@ public sealed class StripeWebhookController(
         try
         {
             var signature = Request.Headers["Stripe-Signature"].ToString();
-            stripeEvent = EventUtility.ConstructEvent(json, signature, options.WebhookSecret);
+            stripeEvent = StripeWebhookSignatureVerifier.ConstructEvent(json, signature, options.WebhookSecret);
         }
         catch (StripeException ex)
         {
@@ -44,8 +45,18 @@ public sealed class StripeWebhookController(
         switch (stripeEvent.Type)
         {
             case EventTypes.CheckoutSessionCompleted:
+            case "checkout.session.async_payment_succeeded":
                 if (stripeEvent.Data.Object is Session checkoutSession)
-                    await paymentRecorder.TryRecordCheckoutSessionAsync(checkoutSession, cancellationToken);
+                {
+                    if (checkoutSession.Mode == "payment")
+                    {
+                        var recorded = await statementPayments.TryRecordPaidSessionAsync(checkoutSession, cancellationToken);
+                        if (!recorded && string.Equals(checkoutSession.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase))
+                            return StatusCode(StatusCodes.Status500InternalServerError);
+                    }
+                    else
+                        await paymentRecorder.TryRecordCheckoutSessionAsync(checkoutSession, cancellationToken);
+                }
                 break;
 
             case EventTypes.InvoicePaid:

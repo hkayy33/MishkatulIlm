@@ -73,34 +73,46 @@ public sealed class StudentPaymentController(
         });
     }
 
-    [HttpPost("flutterwave-checkout")]
-    public async Task<IActionResult> CreateFlutterwaveCheckout(
-        FlutterwavePaymentService flutterwavePayments,
+    [HttpPost("stripe-checkout")]
+    public async Task<IActionResult> CreateStripeCheckout(
+        StripeStatementPaymentService stripePayments,
         CancellationToken cancellationToken)
     {
         if (!User.TryGetSupabaseUserId(out var userId))
             return Unauthorized();
 
         var (success, error, checkoutUrl, submission) =
-            await flutterwavePayments.InitiateCheckoutAsync(
-                userId,
-                Request.Headers.Origin.FirstOrDefault(),
-                cancellationToken);
+            await stripePayments.CreateCheckoutAsync(userId, cancellationToken);
         if (!success)
             return BadRequest(new { message = error });
 
         return Ok(new
         {
             checkoutUrl,
-            link = checkoutUrl,
             reference = submission!.PaymentReference,
             submissionId = submission.Id,
             status = submission.Status,
         });
     }
 
+    [HttpPost("stripe-checkout-return")]
+    public async Task<IActionResult> ConfirmStripeCheckoutReturn(
+        [FromBody] StripeCheckoutReturnRequest request,
+        StripeStatementPaymentService stripePayments,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetSupabaseUserId(out var userId))
+            return Unauthorized();
+
+        var (success, message) = await stripePayments.ConfirmReturnAsync(userId, request.SessionId, cancellationToken);
+        if (!success)
+            return BadRequest(new { message });
+        return Ok(new { message });
+    }
+
+    // Complete a Flutterwave checkout that was already open during the provider transition.
     [HttpPost("flutterwave-verify")]
-    public async Task<IActionResult> VerifyFlutterwavePayment(
+    public async Task<IActionResult> VerifyExistingFlutterwavePayment(
         [FromBody] VerifyFlutterwavePaymentRequest request,
         FlutterwavePaymentService flutterwavePayments,
         CancellationToken cancellationToken)
@@ -115,7 +127,6 @@ public sealed class StudentPaymentController(
             cancellationToken);
         if (!success)
             return BadRequest(new { message = error });
-
         return Ok(new { message });
     }
 
@@ -133,4 +144,9 @@ public sealed class StudentPaymentController(
         var history = await paymentService.GetPaymentHistoryAsync(userId, cancellationToken);
         return Ok(history);
     }
+}
+
+public sealed class StripeCheckoutReturnRequest
+{
+    public string SessionId { get; set; } = string.Empty;
 }

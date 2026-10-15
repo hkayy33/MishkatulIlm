@@ -20,4 +20,6 @@ public sealed class PaymentSubmission
     public string? AdminNote { get; set; }
     public string? FlutterwaveCheckoutSessionId { get; set; }
     public string? FlutterwaveTransactionId { get; set; }
+    public string? StripeCheckoutSessionId { get; set; }
+    public string? StripePaymentIntentId { get; set; }
 }

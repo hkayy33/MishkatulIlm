@@ -115,6 +115,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.AdminNote).HasMaxLength(2000);
             entity.Property(e => e.FlutterwaveCheckoutSessionId).HasMaxLength(64);
             entity.Property(e => e.FlutterwaveTransactionId).HasMaxLength(64);
+            entity.Property(e => e.StripeCheckoutSessionId).HasMaxLength(255);
+            entity.Property(e => e.StripePaymentIntentId).HasMaxLength(255);
             entity.HasOne(e => e.Student)
                 .WithMany()
                 .HasForeignKey(e => e.StudentUserId)

@@ -186,6 +186,20 @@ public sealed class DevBootstrapAdminRequest
     public string LastName { get; set; } = "User";
 }
 
+/// <summary>Body for <c>POST /api/dev/student-account</c> (Development only).</summary>
+public sealed class DevBootstrapStudentRequest
+{
+    public string Email { get; set; } = "student.ready@local.test";
+    public string Password { get; set; } = "DemoPass123!";
+    public string FirstName { get; set; } = "Ready";
+    public string LastName { get; set; } = "Student";
+    /// <summary>e.g. PENDING, ACTIVE — when null, ACTIVE if <see cref="PrepareForStripePayment"/> is true, else PENDING.</summary>
+    public string? ApplicationStatus { get; set; }
+
+    /// <summary>Book upcoming lessons and reset payment state so Payments → Pay now with Stripe works locally.</summary>
+    public bool PrepareForStripePayment { get; set; } = true;
+}
+
 /// <summary>Body for <c>POST /api/dev/signup-confirmation-link</c> (Development only).</summary>
 public sealed class DevConfirmationLinkRequest
 {

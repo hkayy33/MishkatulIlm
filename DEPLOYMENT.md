@@ -81,7 +81,6 @@ fly secrets set \
   Admin__PromotedAdminEmails="admin@example.com" \
   Stripe__SecretKey="sk_live_..." \
   Stripe__WebhookSecret="whsec_..." \
-  Stripe__ProductId="prod_..." \
   Stripe__ClientAppUrl="https://www.alusooliyyah.com" \
   Cors__AllowedOrigins__0="https://www.alusooliyyah.com" \
   Cors__AllowedOrigins__1="https://alusooliyyah.com"
@@ -107,6 +106,18 @@ In Stripe Dashboard → Webhooks, endpoint:
 `https://YOUR_APP.fly.dev/api/webhooks/stripe`
 
 Use the signing secret as `Stripe__WebhookSecret`.
+Subscribe it to `checkout.session.completed` and `checkout.session.async_payment_succeeded`.
+The existing recurring subscription handler also uses `invoice.paid`,
+`customer.subscription.updated`, and `customer.subscription.deleted`. Set the webhook
+endpoint API version to `2026-04-22.dahlia`, which matches the pinned Stripe.net 51.1.0
+SDK used for signature-verified event deserialization.
+
+The lesson statement checkout is a one-time USD Checkout Session. It requires
+`Stripe__SecretKey`, `Stripe__WebhookSecret`, and `Stripe__ClientAppUrl`; configure
+the client URL as a trusted absolute `http://` or `https://` origin. The session
+amount and lesson line items are generated from the server-side payment statement.
+`Stripe__ProductId` and `Stripe__PriceLookupKey` belong to the separate recurring
+subscription integration and are not used for lesson statement payments.
 
 ---
 

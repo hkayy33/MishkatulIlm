@@ -387,14 +387,14 @@
           <div class="matched-payment-cta matched-payment-cta--page" role="region">
             <div>
               <h2>First payment</h2>
-              <p>Pay for your scheduled lessons securely with Flutterwave before your first lesson begins.</p>
+              <p>Pay for your scheduled lessons securely with Stripe before your first lesson begins.</p>
             </div>
           </div>
         } @else if (paymentOverdue()) {
           <div class="matched-payment-cta matched-payment-cta--page" role="region">
             <div>
               <h2>Payment overdue</h2>
-              <p>Your monthly payment is due. Pay securely with Flutterwave below.</p>
+              <p>Your monthly payment is due. Pay securely with Stripe below.</p>
             </div>
           </div>
         } @else if (showPaymentReminder()) {
@@ -424,7 +424,7 @@
         } @else if (pendingVerification()) {
           <div class="matched-payment-status matched-payment-status--pending" role="status">
             <strong>Payment in progress</strong>
-            <span>Complete your Flutterwave payment or wait while we confirm it.</span>
+            <span>Complete your Stripe payment or wait while we confirm it.</span>
           </div>
         }
 
@@ -498,26 +498,30 @@
               </div>
             }
 
-            <h3>Pay with Flutterwave</h3>
+            <h3>Pay with Stripe</h3>
             <p class="matched-muted">
-              You will be redirected to Flutterwave to pay by card, bank transfer, or other supported methods.
+              You will be redirected to Stripe Checkout to pay securely by card and other supported methods.
             </p>
 
             @if (showPaymentDetails() && !currentPeriodPaid() && statement.totalAmount > 0) {
               <button
                 type="button"
                 class="matched-btn"
-                [disabled]="paymentBusy()"
+                [disabled]="paymentBusy() || (!canSubmitPayment() && !pendingVerification())"
                 (click)="submitPayment()"
               >
                 @if (paymentBusy()) {
                   Opening payment…
                 } @else if (pendingVerification()) {
-                  Continue Flutterwave payment
+                  Continue Stripe payment
                 } @else {
-                  Pay now with Flutterwave
+                  Pay now with Stripe
                 }
               </button>
+            } @else if (showPaymentDetails() && !currentPeriodPaid() && statement.totalAmount <= 0) {
+              <p class="matched-muted">
+                There is nothing to pay for this period yet. After lessons are scheduled, your total will appear here.
+              </p>
             }
           </section>
           }

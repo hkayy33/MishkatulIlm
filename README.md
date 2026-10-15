@@ -51,6 +51,16 @@ curl -X POST http://localhost:5198/api/dev/rollover-demo/setup
 
 Requires `DevBootstrap:Enabled` (default in Development) and `Supabase:ServiceRoleKey` in user secrets.
 
+Create a student with onboarding already complete (no `/onboarding` wizard):
+
+```bash
+curl -X POST http://localhost:5198/api/dev/student-account \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+Defaults: `student.ready@local.test` / `DemoPass123!` (application status **PENDING** — admin can match). Pass `"applicationStatus": "ACTIVE"` for an active student without demo lessons.
+
 ## Tests
 
 ```bash

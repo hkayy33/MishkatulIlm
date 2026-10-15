@@ -507,7 +507,7 @@
               <button
                 type="button"
                 class="matched-btn"
-                [disabled]="paymentBusy()"
+                [disabled]="paymentBusy() || (!canSubmitPayment() && !pendingVerification())"
                 (click)="submitPayment()"
               >
                 @if (paymentBusy()) {
@@ -518,6 +518,10 @@
                   Pay now with Stripe
                 }
               </button>
+            } @else if (showPaymentDetails() && !currentPeriodPaid() && statement.totalAmount <= 0) {
+              <p class="matched-muted">
+                There is nothing to pay for this period yet. After lessons are scheduled, your total will appear here.
+              </p>
             }
           </section>
           }

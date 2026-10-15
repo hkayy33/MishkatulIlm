@@ -21,6 +21,7 @@ public sealed class DevBootstrapController(
     IConfiguration configuration,
     AppDbContext db,
     SupabaseAdminAuthClient supabaseAdmin,
+    DevBootstrapStudentService bootstrapStudent,
     DevRolloverDemoService rolloverDemo,
     DevStudentHistoryDemoService studentHistoryDemo,
     ILogger<DevBootstrapController> logger) : ControllerBase
@@ -203,6 +204,39 @@ public sealed class DevBootstrapController(
                 email,
                 userId = newId.Value,
             });
+    }
+
+    /// <summary>Creates a student with Supabase auth + full onboarding profile (dev only).</summary>
+    [HttpPost("student-account")]
+    public async Task<IActionResult> CreateDevStudent(
+        [FromBody] DevBootstrapStudentRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsBootstrapAllowed())
+            return NotFound();
+
+        request ??= new DevBootstrapStudentRequest();
+        var applicationStatus = request.ApplicationStatus;
+        if (string.IsNullOrWhiteSpace(applicationStatus))
+        {
+            applicationStatus = request.PrepareForStripePayment
+                ? ApplicationStatusCodes.Active
+                : ApplicationStatusCodes.Pending;
+        }
+
+        var (success, error, payload) = await bootstrapStudent.CreateFullyOnboardedStudentAsync(
+            request.Email,
+            request.Password,
+            request.FirstName.Trim(),
+            request.LastName.Trim(),
+            applicationStatus,
+            request.PrepareForStripePayment,
+            cancellationToken);
+
+        if (!success)
+            return BadRequest(new { message = error });
+
+        return Ok(payload);
     }
 
     /// <summary>Resets a demo student with a completed lesson block and an open payment window (dev only).</summary>

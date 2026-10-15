@@ -9,23 +9,16 @@ public sealed class AddStripeStatementPaymentFields : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
-        migrationBuilder.AddColumn<string>(
-            name: "StripeCheckoutSessionId",
-            table: "payment_submissions",
-            type: "character varying(255)",
-            maxLength: 255,
-            nullable: true);
-        migrationBuilder.AddColumn<string>(
-            name: "StripePaymentIntentId",
-            table: "payment_submissions",
-            type: "character varying(255)",
-            maxLength: 255,
-            nullable: true);
+        // StripeCheckoutSessionId is added in 20261007174549_AddStripeCheckoutSessionId.
+        migrationBuilder.Sql(
+            """
+            ALTER TABLE payment_submissions
+            ADD COLUMN IF NOT EXISTS "StripePaymentIntentId" character varying(255);
+            """);
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
     {
-        migrationBuilder.DropColumn(name: "StripeCheckoutSessionId", table: "payment_submissions");
         migrationBuilder.DropColumn(name: "StripePaymentIntentId", table: "payment_submissions");
     }
 }
